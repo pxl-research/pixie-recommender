@@ -1,0 +1,17 @@
+# Build stage
+FROM ghcr.io/astral-sh/uv:python3.12-bookworm-slim AS build
+ENV PYTHONDONTWRITEBYTECODE=1 PYTHONUNBUFFERED=1 PYTHONPATH=/app
+WORKDIR /app
+COPY pyproject.toml ./
+COPY uv.lock ./
+RUN uv sync --no-dev --frozen
+COPY . .
+
+# Runtime stage (distroless)
+FROM gcr.io/distroless/python3-debian12
+ENV PYTHONPATH=/app
+WORKDIR /app
+COPY --from=build /app /app
+EXPOSE 8000
+USER 65532:65532  # non-root
+CMD ["/usr/local/bin/python", "-m", "uvicorn", "apps.api.main:app", "--host", "0.0.0.0", "--port", "8000"]
