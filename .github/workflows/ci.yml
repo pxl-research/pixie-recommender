@@ -29,13 +29,8 @@ jobs:
 
       - name: Run linter (ruff)
         run: |
-          # use uvx if available, fallback to ruff
-          if command -v uvx >/dev/null 2>&1; then
-            uvx ruff check .
-          else
-            python -m ruff check .
-          fi
+          uv run python -m ruff check .
 
       - name: Run tests
         run: |
-          python -m pytest -q
+          uv run python -m pytest -q
