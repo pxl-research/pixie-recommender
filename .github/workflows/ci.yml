@@ -1,0 +1,41 @@
+name: CI
+
+on:
+  push:
+    branches: ["main"]
+  pull_request:
+    branches: ["main"]
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python 3.12
+        uses: actions/setup-python@v4
+        with:
+          python-version: '3.12'
+
+      - name: Install uv (astral uv) CLI
+        run: |
+          python -m pip install --upgrade pip
+          pip install astral-uv
+
+      - name: Sync dependencies from uv.lock
+        run: |
+          # install pinned deps into the runner environment
+          uv sync --frozen --extra dev
+
+      - name: Run linter (ruff)
+        run: |
+          # use uvx if available, fallback to ruff
+          if command -v uvx >/dev/null 2>&1; then
+            uvx ruff check .
+          else
+            python -m ruff check .
+          fi
+
+      - name: Run tests
+        run: |
+          python -m pytest -q

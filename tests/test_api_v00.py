@@ -1,4 +1,5 @@
 from fastapi.testclient import TestClient
+
 from apps.api.main import app
 
 client = TestClient(app)
@@ -14,3 +15,5 @@ def test_ask_mock():
     data = r.json()
     assert data["type"] == "answer"
     assert "mock" in data["text"]
+    # trace id header should be present for tracing
+    assert "X-Trace-Id" in r.headers

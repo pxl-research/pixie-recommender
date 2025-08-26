@@ -12,6 +12,9 @@ COPY pyproject.toml ./
 COPY uv.lock ./
 RUN uv sync --frozen --extra dev
 
+# Make uv venv the default python (optional - but uv run is preferred)
+ENV PATH="/app/.venv/bin:$PATH"
+
 # App code
 COPY . .
 
