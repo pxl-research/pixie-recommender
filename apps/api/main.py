@@ -71,23 +71,27 @@ def health():
 def ask(req: AskRequest):
     logger = logging.getLogger(__name__)
 
+    # Generate a single timestamp for this request and reuse it for both
+    # request and response logs so they remain consistent.
+    ts = datetime.now(timezone.utc).isoformat()
+
     # Log the incoming /ask request with timestamp
     logger.info(
         "api.ask.request",
-        extra={"question": req.question, "ts": datetime.now(timezone.utc).isoformat()},
+        extra={"question": req.question, "ts": ts},
     )
 
     # v0.0: deterministic mock-antwoord via Pixie core service
     pixie = Pixie()
     resp = pixie.answer(req)
 
-    # Log the AskResponse being returned
+    # Log the AskResponse being returned (reuse the same timestamp)
     logger.info(
         "api.ask.response",
         extra={
             "response_type": resp.type,
             "response_text": resp.text,
-            "ts": datetime.now(timezone.utc).isoformat(),
+            "ts": ts,
         },
     )
 

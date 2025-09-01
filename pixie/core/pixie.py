@@ -32,26 +32,30 @@ class Pixie:
         """Return a deterministic AskResponse for the provided AskRequest."""
         logger = logging.getLogger(__name__)
 
-        # Log the incoming question with an explicit timestamp to make it
+        # Generate a single timestamp for this logical operation so both
+        # request and response logs share the exact same timestamp.
+        ts = datetime.now(timezone.utc).isoformat()
+
+        # Log the incoming question with the shared timestamp to make it
         # easy to correlate in plain-text or JSON logs.
         logger.info(
             "pixie.answer.request",
             extra={
                 "question": request.question,
-                "ts": datetime.now(timezone.utc).isoformat(),
+                "ts": ts,
             },
         )
 
         text = self._rag.answer(request.question)
         resp = AskResponse(type="answer", text=text)
 
-        # Log the response that will be returned
+        # Log the response that will be returned (reuse the same timestamp)
         logger.info(
             "pixie.answer.response",
             extra={
                 "response_type": resp.type,
                 "response_text": resp.text,
-                "ts": datetime.now(timezone.utc).isoformat(),
+                "ts": ts,
             },
         )
 
