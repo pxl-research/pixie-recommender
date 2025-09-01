@@ -39,27 +39,30 @@ def test_ask_endpoint():
 
 
 def test_reply_flow():
-    # Test invalid pending_id gives error (new behavior with proper validation)
-    r = client.post("/ask", json={"pending_id": "invalid-123", "message": "extra context"})
-    assert r.status_code == 200
-    data = r.json()
-    assert data["type"] == "error"
-    assert "ongeldig" in data["reason"].lower()
-    
-    # Test valid flow: ask_user -> reply -> answer
-    # First get a real pending_id
+    # Test dedicated /reply endpoint
+    # First get a real pending_id from /ask
     r1 = client.post("/ask", json={"question": "vertel eens wat algemeen"})
     assert r1.status_code == 200
     data1 = r1.json()
     assert data1["type"] == "ask_user"
     pending_id = data1["pending_id"]
     
-    # Then reply with that pending_id
-    r2 = client.post("/ask", json={"pending_id": pending_id, "message": "Ik wil info over verkoop"})
+    # Then use /reply endpoint
+    r2 = client.post("/reply", json={
+        "pending_id": pending_id, 
+        "message": "Ik wil info over verkoop"
+    })
     assert r2.status_code == 200
     data2 = r2.json()
     assert data2["type"] == "answer"
     assert "mock" in data2["text"].lower()
+    
+    # Test invalid pending_id on /reply
+    r3 = client.post("/reply", json={"pending_id": "invalid-123", "message": "extra context"})
+    assert r3.status_code == 200
+    data3 = r3.json()
+    assert data3["type"] == "error"
+    assert "ongeldig" in data3["reason"].lower()
 
 
 def test_pixie_core_unit():
@@ -135,36 +138,43 @@ def test_pending_id_management():
 def test_api_error_handling():
     """Test API error handling for various edge cases."""
     
-    # Test missing question
+    # Test missing question on /ask
     r = client.post("/ask", json={})
     assert r.status_code == 200
     data = r.json()
     assert data["type"] == "error"
     assert "question" in data["reason"].lower()
     
-    # Test empty question
+    # Test empty question on /ask
     r = client.post("/ask", json={"question": ""})
     assert r.status_code == 200
     data = r.json()
     assert data["type"] == "error"
     assert "non-empty" in data["reason"].lower()
     
-    # Test whitespace-only question
+    # Test whitespace-only question on /ask
     r = client.post("/ask", json={"question": "   "})
     assert r.status_code == 200
     data = r.json()
     assert data["type"] == "error"
     assert "non-empty" in data["reason"].lower()
     
-    # Test both pending_id and question (conflicting)
-    r = client.post("/ask", json={"pending_id": "test", "question": "test"})
+    # Test pending_id on /ask (should redirect to /reply)
+    r = client.post("/ask", json={"pending_id": "test", "message": "test"})
     assert r.status_code == 200
     data = r.json()
     assert data["type"] == "error"
-    assert "cannot contain both" in data["reason"].lower()
+    assert "/reply endpoint" in data["reason"].lower()
     
-    # Test missing message in reply
-    r = client.post("/ask", json={"pending_id": "test-123"})
+    # Test missing message on /reply
+    r = client.post("/reply", json={"pending_id": "test-123"})
+    assert r.status_code == 200
+    data = r.json()
+    assert data["type"] == "error"
+    assert "invalid reply" in data["reason"].lower()
+    
+    # Test missing pending_id on /reply
+    r = client.post("/reply", json={"message": "test message"})
     assert r.status_code == 200
     data = r.json()
     assert data["type"] == "error"
