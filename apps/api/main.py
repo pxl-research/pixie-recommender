@@ -59,7 +59,6 @@ async def add_trace_id(request: Request, call_next):
     return response
 
 
-
 @app.get("/health")
 def health():
     return {"status": "ok"}
@@ -67,5 +66,6 @@ def health():
 
 @app.post("/ask", response_model=AskResponse)
 def ask(req: AskRequest):
-    # v0.0: deterministisch mock-antwoord via Pixie helper
-    return Pixie.answer(req.question)
+    # v0.0: deterministic mock-antwoord via Pixie core service
+    pixie = Pixie()
+    return pixie.answer(req)
