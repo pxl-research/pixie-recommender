@@ -1,8 +1,8 @@
 import pytest
-
-from pixie.core.pixie import Pixie
-from pixie.core.contracts import AskRequest, AskResponse
 from pydantic import ValidationError
+
+from pixie.core.contracts import AskRequest, AskResponse
+from pixie.core.pixie import Pixie
 
 
 def test_pixie_answer_core():
