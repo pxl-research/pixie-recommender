@@ -45,11 +45,13 @@ class Pixie:
         if "meer info" in question.lower():
             # craft a pending ask asking an open question the user can answer
             pending_id = "pending-1234"
-            payload = {
-                "question": "Kunt u iets meer context geven? (open antwoord)",
-                "pending_id": pending_id,
-            }
-            resp = AskResponse(type="ask_user", payload=payload)  # type: ignore[arg-type]
+            resp = AskResponse(
+                type="ask_user",
+                prompt=(
+                    "Kunt u iets meer context geven? (open antwoord)"
+                ),
+                pending_id=pending_id,
+            )
         else:
             text = self._rag.answer(question)
             resp = AskResponse(type="answer", text=text)
@@ -87,7 +89,11 @@ class Pixie:
 
         logger.info(
             "pixie.reply.response",
-            extra={"response_type": resp.type, "response_text": resp.text, "ts": ts},
+            extra={
+                "response_type": getattr(resp, "type", None),
+                "response_text": getattr(resp, "text", None),
+                "ts": ts,
+            },
         )
 
         return resp

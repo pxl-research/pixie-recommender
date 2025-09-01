@@ -6,7 +6,7 @@ from uuid import uuid4
 from fastapi import FastAPI, Request
 
 from pixie.core import logging as pixie_logging
-from pixie.core.contracts import AskResponse, InteractRequest
+from pixie.core.contracts import AskResponse, ReplyRequest
 from pixie.core.pixie import Pixie
 
 
@@ -68,7 +68,7 @@ def health():
 
 
 @app.post("/ask", response_model=AskResponse)
-def ask(req: InteractRequest):
+def ask(req: dict):
     logger = logging.getLogger(__name__)
 
     # Generate a single timestamp for this request and reuse it for both
@@ -76,32 +76,31 @@ def ask(req: InteractRequest):
     ts = datetime.now(timezone.utc).isoformat()
 
     # Log the incoming /ask/interact request with timestamp
-    logger.info("api.ask.request", extra={"payload": req.model_dump(), "ts": ts})
+    logger.info("api.ask.request", extra={"payload": req, "ts": ts})
 
     pixie = Pixie()
 
-    # Dispatch: if pending_id is present this is a reply, otherwise a new question
-    if req.pending_id is not None:
-        # InteractRequest validator guarantees reply_text is present when pending_id is set
-        assert req.reply_text is not None
-        resp = pixie.reply(req.pending_id, req.reply_text)
+    # Dispatch: if pending_id present this is a reply using ReplyRequest shape,
+    # otherwise treat it as a new question with a 'question' field.
+    if "pending_id" in req:
+        rr = ReplyRequest.model_validate(req)
+        resp = pixie.reply(rr.pending_id, rr.message)
     else:
-        # construct AskRequest-like object
-        # InteractRequest validator guarantees question is present when pending_id is not set
-        assert req.question is not None
-        resp = pixie.answer(req.question)
+        question = req.get("question")
+        if not question:
+            raise ValueError("'question' is required for new asks")
+        resp = pixie.answer(question)
 
     # Log the AskResponse being returned (reuse the same timestamp)
+    # Log a compact summary of the response
     logger.info(
         "api.ask.response",
-        extra={
-            "response_type": resp.type,
-            "response_text": resp.text,
-            "ts": ts,
-        },
+        extra={"response_type": getattr(resp, "type", None), "ts": ts},
     )
 
     return resp
 
 
-# Note: /reply endpoint removed in favor of single /ask (InteractRequest) endpoint.
+# Note: /reply endpoint removed in favor of single /ask endpoint.
+# The endpoint accepts either a simple {"question": "..."} body or a
+# ReplyRequest: {"pending_id": "...", "message": "..."}.

@@ -1,47 +1,67 @@
-from typing import Literal
+from typing import Literal, List, Optional
 
-from pydantic import BaseModel, model_validator
+from pydantic import BaseModel, Field, model_validator
+
+
+# Discriminated union for AskResponse (LLM-first)
+class AnswerResponse(BaseModel):
+    type: Literal["answer"] = "answer"
+    text: str
+
+
+class AskUserResponse(BaseModel):
+    type: Literal["ask_user"] = "ask_user"
+    prompt: str
+    pending_id: str
+    needed_info: Optional[List[str]] = None
+
+
+class ErrorResponse(BaseModel):
+    type: Literal["error"] = "error"
+    reason: str
 
 
 class AskResponse(BaseModel):
-    """Minimal response model supporting direct answers and ask-user flows.
+    """Discriminated union wrapper for AskResponse variants.
 
-    For ask_user responses the `payload` is a simple mapping which must
-    include a non-empty `pending_id` to correlate replies.
+    This model uses the explicit `type` field as a discriminator and
+    validates each variant according to the acceptance criteria in Issue 9.
     """
 
-    type: Literal["answer", "ask_user"] = "answer"
-    text: str | None = None
-    payload: dict | None = None
+    # Basic fields that may appear on variants; kept optional so the
+    # wrapper can accept any variant shape and the validator enforces
+    # presence where required.
+    type: str
+    text: Optional[str] = None
+    prompt: Optional[str] = None
+    pending_id: Optional[str] = None
+    needed_info: Optional[List[str]] = None
+    reason: Optional[str] = None
 
     @model_validator(mode="after")
-    def _validate_variant(self):
-        if self.type == "answer":
-            if not self.text:
-                raise ValueError("'text' is required when type == 'answer'")
-        elif self.type == "ask_user":
-            if not self.payload or not isinstance(self.payload, dict):
-                raise ValueError("'payload' dict is required when type == 'ask_user'")
-            # ensure pending_id present and non-empty
-            pending = self.payload.get("pending_id")
-            if not pending or not isinstance(pending, str):
-                raise ValueError("payload must contain a non-empty 'pending_id'")
-        return self
-
-
-class InteractRequest(BaseModel):
-    """Unified request model for clients: either a new question or a reply."""
-
-    pending_id: str | None = None
-    question: str | None = None
-    reply_text: str | None = None
-
-    @model_validator(mode="after")
-    def _validate_shape(self):
-        if self.pending_id is not None:
-            if not self.reply_text:
-                raise ValueError("reply_text is required when pending_id is present")
+    def _validate_union(self):
+        t = getattr(self, "type", None)
+        if t == "answer":
+            # ensure 'text' present
+            if not getattr(self, "text", None):
+                raise ValueError("'text' is required for type 'answer'")
+        elif t == "ask_user":
+            if not getattr(self, "prompt", None):
+                raise ValueError("'prompt' is required for type 'ask_user'")
+            if not getattr(self, "pending_id", None):
+                raise ValueError("'pending_id' is required for type 'ask_user'")
+            nif = getattr(self, "needed_info", None)
+            if nif is not None:
+                if not isinstance(nif, list) or not all(isinstance(x, str) for x in nif):
+                    raise ValueError("'needed_info' must be a list of strings if provided")
+        elif t == "error":
+            if not getattr(self, "reason", None):
+                raise ValueError("'reason' is required for type 'error'")
         else:
-            if not self.question:
-                raise ValueError("question is required when pending_id is not present")
+            raise ValueError("invalid AskResponse type")
         return self
+
+
+class ReplyRequest(BaseModel):
+    pending_id: str = Field(...)
+    message: str = Field(...)
