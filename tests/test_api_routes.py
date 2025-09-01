@@ -4,7 +4,7 @@ from pydantic import ValidationError
 
 from apps.api.main import app
 from pixie.core.contracts import AskResponse
-from pixie.core.pixie import Pixie, FakeTabularRAG
+from pixie.core.pixie import Pixie, FakeTabularRAG, Orchestrator, FakeRAGAdapter
 
 client = TestClient(app)
 
@@ -16,16 +16,22 @@ def test_health():
 
 
 def test_ask_endpoint():
-    # Test basic question flow
+    # Test basic question flow - now triggers ask_user because orchestrator finds it vague
     r = client.post("/ask", json={"question": "Wat is Pixie?"})
     assert r.status_code == 200
     data = r.json()
+    assert data["type"] == "ask_user"  # Orchestrator finds this too vague
+    assert "pending_id" in data
+
+    # Test specific question that should get direct answer
+    r = client.post("/ask", json={"question": "Wat is de hoofdstad van Nederland?"})
+    assert r.status_code == 200
+    data = r.json()
     assert data["type"] == "answer"
-    assert "mock" in data["text"]
     assert "X-Trace-Id" in r.headers
 
-    # Test ask_user flow
-    r = client.post("/ask", json={"question": "meer info please"})
+    # Test ask_user flow with explicit vague question
+    r = client.post("/ask", json={"question": "vertel eens wat meer algemeen"})
     assert r.status_code == 200
     data = r.json()
     assert data["type"] == "ask_user"
@@ -42,13 +48,44 @@ def test_reply_flow():
 
 
 def test_pixie_core_unit():
-    """Test core Pixie functionality directly."""
-    q = "Wie ben je?"
+    """Test core Pixie functionality with orchestrator decisions."""
     pixie = Pixie()
-    res = pixie.answer(q)
+    
+    # Test specific question that gets direct answer
+    res = pixie.answer("Wat is de hoofdstad van Frankrijk?")
     assert isinstance(res, AskResponse)
     assert res.type == "answer"
-    assert getattr(res, "text", None) == f"(mock) antwoord op: {q}"
+    assert res.text is not None
+    assert "mock" in res.text.lower()
+    
+    # Test vague question that triggers ask_user
+    res = pixie.answer("Wie ben je?")  # This is now considered vague
+    assert isinstance(res, AskResponse)
+    assert res.type == "ask_user"
+    assert res.pending_id is not None
+
+
+def test_pixie_orchestrator_integration():
+    """Test Pixie using orchestrator for different question types."""
+    pixie = Pixie()
+    
+    # Test data question → should get combined answer
+    res = pixie.answer("Geef me cijfers over verkoop")
+    assert res.type == "answer"
+    assert res.text is not None
+    assert "mock" in res.text.lower()
+    assert "cijfers" in res.text.lower()
+    
+    # Test vague question → should trigger ask_user
+    res = pixie.answer("Vertel eens wat algemeen")  
+    assert res.type == "ask_user"
+    assert res.pending_id is not None
+    
+    # Test simple question → should get text-only answer
+    res = pixie.answer("Wat is je naam?")
+    assert res.type == "answer"
+    assert res.text is not None
+    assert "mock" in res.text.lower()
 
 
 def test_askresponse_validation():
@@ -69,3 +106,25 @@ def test_fake_tabular_rag():
     # Test with non-data query  
     result = tabular.query("Wat is de hoofdstad?")
     assert result["found_data"] is False
+
+
+def test_orchestrator_analysis():
+    """Test Orchestrator decision making logic."""
+    rag = FakeRAGAdapter()
+    tabular = FakeTabularRAG()
+    orchestrator = Orchestrator(rag, tabular)
+    
+    # Test specific question with data → high confidence  
+    analysis = orchestrator.analyze_question("Geef me cijfers over verkoop")
+    assert analysis["confidence"] > 0.7
+    assert analysis["strategy"] == "answer_with_data"
+    assert analysis["tabular_result"]["found_data"] is True
+    
+    # Test vague question → low confidence, ask_user
+    analysis = orchestrator.analyze_question("Vertel eens wat meer")
+    assert analysis["confidence"] < 0.7
+    assert analysis["strategy"] == "ask_user"
+    
+    # Test specific question without data → text only
+    analysis = orchestrator.analyze_question("Wat is de hoofdstad van Frankrijk?")
+    assert analysis["strategy"] == "answer_text_only"

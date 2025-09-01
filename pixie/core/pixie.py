@@ -38,8 +38,65 @@ class FakeTabularRAG:
             }
 
 
+class Orchestrator:
+    """Central orchestrator that combines multiple RAG sources and makes decisions."""
+    
+    def __init__(self, rag_adapter: FakeRAGAdapter, tabular_rag: FakeTabularRAG):
+        self._rag = rag_adapter
+        self._tabular = tabular_rag
+        
+    def analyze_question(self, question: str) -> dict:
+        """Analyze question and determine best response strategy."""
+        # Get responses from both sources
+        text_result = self._rag.answer(question)
+        tabular_result = self._tabular.query(question)
+        
+        # Decision logic based on question content and available data
+        confidence_score = self._calculate_confidence(question, tabular_result)
+        
+        return {
+            "question": question,
+            "text_result": text_result,
+            "tabular_result": tabular_result,
+            "confidence": confidence_score,
+            "needs_clarification": confidence_score < 0.7,
+            "strategy": self._determine_strategy(question, confidence_score, tabular_result)
+        }
+    
+    def _calculate_confidence(self, question: str, tabular_result: dict) -> float:
+        """Calculate confidence score based on question analysis."""
+        confidence = 0.6  # higher baseline
+        
+        # Increase confidence if we have relevant tabular data
+        if tabular_result.get("found_data"):
+            confidence += 0.3
+            
+        # Decrease confidence for truly vague questions
+        vague_indicators = ["algemeen", "meer info", "vertel eens", "wat meer"]
+        if any(indicator in question.lower() for indicator in vague_indicators):
+            confidence -= 0.3
+            
+        # Increase confidence for specific questions
+        specific_indicators = [
+            "cijfers", "data", "tabel", "statistiek", "wanneer", "waar", "hoofdstad", "naam"
+        ]
+        if any(indicator in question.lower() for indicator in specific_indicators):
+            confidence += 0.2
+            
+        return max(0.0, min(1.0, confidence))  # clamp between 0 and 1
+    
+    def _determine_strategy(self, question: str, confidence: float, tabular_result: dict) -> str:
+        """Determine the best response strategy."""
+        if confidence < 0.7:
+            return "ask_user"
+        elif tabular_result.get("found_data"):
+            return "answer_with_data"
+        else:
+            return "answer_text_only"
+
+
 class Pixie:
-    """Small helper service that returns deterministic mock answers."""
+    """Smart service that uses an orchestrator to decide response strategies."""
 
     def __init__(
         self, 
@@ -48,23 +105,37 @@ class Pixie:
     ):
         self._rag = rag_adapter or FakeRAGAdapter()
         self._tabular = tabular_rag or FakeTabularRAG()
+        self._orchestrator = Orchestrator(self._rag, self._tabular)
 
     def answer(self, question: str) -> AskResponse:
-        """Return a deterministic AskResponse for the provided question string."""
+        """Use orchestrator to determine best response for the question."""
         logger = logging.getLogger(__name__)
         logger.info("pixie.answer", extra={"question": question})
 
-        if "meer info" in question.lower():
-            pending_id = "pending-1234"
+        # Use orchestrator to analyze question
+        analysis = self._orchestrator.analyze_question(question)
+        
+        if analysis["strategy"] == "ask_user":
+            pending_id = "pending-1234"  # TODO: Generate unique ID in next step
             resp = AskResponse(
                 type="ask_user",
-                prompt=("Kunt u iets meer context geven? (open antwoord)"),
+                prompt="Kunt u wat meer specifieke informatie geven? "
+                       "Dit helpt me een beter antwoord te formuleren.",
                 pending_id=pending_id,
             )
-        else:
-            text = self._rag.answer(question)
-            resp = AskResponse(type="answer", text=text)
+        elif analysis["strategy"] == "answer_with_data":
+            # Combine text and tabular results
+            tabular_summary = analysis["tabular_result"]["summary"]
+            text_result = analysis["text_result"]
+            combined_text = f"{text_result} + {tabular_summary}"
+            resp = AskResponse(type="answer", text=combined_text)
+        else:  # answer_text_only
+            resp = AskResponse(type="answer", text=analysis["text_result"])
 
+        logger.info("pixie.answer", extra={
+            "strategy": analysis["strategy"], 
+            "confidence": analysis["confidence"]
+        })
         return resp
 
     def reply(self, pending_id: str, reply_text: str) -> AskResponse:
