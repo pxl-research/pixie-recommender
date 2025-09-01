@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from datetime import datetime, timedelta, timezone
-from typing import Dict, Optional, Protocol, runtime_checkable
+from typing import Dict, Optional
 
 
 @dataclass
@@ -18,37 +18,8 @@ class PendingEntry:
         )
 
 
-@runtime_checkable
-class PendingStore(Protocol):
-    def save_pending(
-        self,
-        pending_id: str,
-        question: str,
-        ttl_seconds: int = 300,
-    ) -> None:  # pragma: no cover - interface
-        ...
-
-    def get_pending(
-        self,
-        pending_id: str,
-    ) -> Optional[PendingEntry]:  # pragma: no cover - interface
-        ...
-
-    def resolve_pending(
-        self,
-        pending_id: str,
-    ) -> None:  # pragma: no cover - interface
-        ...
-
-
 class InMemoryPendingStore:
-    """Simple in-memory pending store with TTL semantics.
-
-    Methods:
-    - save_pending(pending_id, question, ttl_seconds=300)
-    - get_pending(pending_id) -> Optional[PendingEntry]
-    - resolve_pending(pending_id) -> None
-    """
+    """Simple in-memory pending store with TTL semantics."""
 
     def __init__(self):
         self._store: Dict[str, PendingEntry] = {}
@@ -71,18 +42,10 @@ class InMemoryPendingStore:
             return None
         if entry.expired():
             # remove expired entry
-            try:
-                del self._store[pending_id]
-            except KeyError:
-                pass
+            self._store.pop(pending_id, None)
             return None
         return entry
 
     def resolve_pending(self, pending_id: str) -> None:
-        # remove entry if present
+        """Remove pending entry."""
         self._store.pop(pending_id, None)
-
-
-def default_pending_store() -> PendingStore:
-    """Factory returning the default in-process pending store."""
-    return InMemoryPendingStore()

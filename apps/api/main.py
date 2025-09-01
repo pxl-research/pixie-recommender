@@ -1,6 +1,5 @@
-from contextlib import asynccontextmanager
 import logging
-from datetime import datetime, timezone
+from contextlib import asynccontextmanager
 from uuid import uuid4
 
 from fastapi import FastAPI, Request
@@ -61,10 +60,7 @@ def health():
 @app.post("/ask", response_model=AskResponse)
 def ask(req: dict):
     logger = logging.getLogger(__name__)
-
-    # single timestamp for request/response logs
-    ts = datetime.now(timezone.utc).isoformat()
-    logger.info("api.ask.request", extra={"payload": req, "ts": ts})
+    logger.info("api.ask", extra={"payload": req})
 
     pixie = Pixie()
 
@@ -77,12 +73,6 @@ def ask(req: dict):
         if not question:
             raise ValueError("'question' is required for new asks")
         resp = pixie.answer(question)
-
-    # Log a compact summary of the response
-    logger.info(
-        "api.ask.response",
-        extra={"response_type": getattr(resp, "type", None), "ts": ts},
-    )
 
     return resp
 
