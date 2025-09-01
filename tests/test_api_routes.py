@@ -132,6 +132,45 @@ def test_pending_id_management():
     assert "ongeldig" in error_res2.reason.lower()
 
 
+def test_api_error_handling():
+    """Test API error handling for various edge cases."""
+    
+    # Test missing question
+    r = client.post("/ask", json={})
+    assert r.status_code == 200
+    data = r.json()
+    assert data["type"] == "error"
+    assert "question" in data["reason"].lower()
+    
+    # Test empty question
+    r = client.post("/ask", json={"question": ""})
+    assert r.status_code == 200
+    data = r.json()
+    assert data["type"] == "error"
+    assert "non-empty" in data["reason"].lower()
+    
+    # Test whitespace-only question
+    r = client.post("/ask", json={"question": "   "})
+    assert r.status_code == 200
+    data = r.json()
+    assert data["type"] == "error"
+    assert "non-empty" in data["reason"].lower()
+    
+    # Test both pending_id and question (conflicting)
+    r = client.post("/ask", json={"pending_id": "test", "question": "test"})
+    assert r.status_code == 200
+    data = r.json()
+    assert data["type"] == "error"
+    assert "cannot contain both" in data["reason"].lower()
+    
+    # Test missing message in reply
+    r = client.post("/ask", json={"pending_id": "test-123"})
+    assert r.status_code == 200
+    data = r.json()
+    assert data["type"] == "error"
+    assert "invalid reply" in data["reason"].lower()
+
+
 def test_askresponse_validation():
     """Test AskResponse validation fails with empty data."""
     with pytest.raises(ValidationError):

@@ -2,7 +2,7 @@ import logging
 from contextlib import asynccontextmanager
 from uuid import uuid4
 
-from fastapi import FastAPI, Request
+from fastapi import FastAPI, Request, HTTPException
 
 from pixie.core import logging as pixie_logging
 from pixie.core.contracts import AskResponse, ReplyRequest
@@ -65,17 +65,47 @@ def ask(req: dict):
     logger = logging.getLogger(__name__)
     logger.info("api.ask", extra={"payload": req})
 
-    # Use shared Pixie instance to maintain pending state
-    pixie = _pixie_instance
+    try:
+        # Use shared Pixie instance to maintain pending state
+        pixie = _pixie_instance
 
-    # Dispatch: reply (has pending_id) or new question (has question)
-    if "pending_id" in req:
-        rr = ReplyRequest.model_validate(req)
-        resp = pixie.reply(rr.pending_id, rr.message)
-    else:
-        question = req.get("question")
-        if not question:
-            raise ValueError("'question' is required for new asks")
-        resp = pixie.answer(question)
+        # Validate request structure
+        if "pending_id" in req and "question" in req:
+            return AskResponse(
+                type="error",
+                reason="Request cannot contain both 'pending_id' and 'question'"
+            )
 
-    return resp
+        # Dispatch: reply (has pending_id) or new question (has question)
+        if "pending_id" in req:
+            try:
+                rr = ReplyRequest.model_validate(req)
+                resp = pixie.reply(rr.pending_id, rr.message)
+            except Exception as e:
+                logger.error("Reply validation error", extra={"error": str(e)})
+                return AskResponse(
+                    type="error", 
+                    reason=f"Invalid reply request: {str(e)}"
+                )
+        else:
+            question = req.get("question")
+            if question is None:
+                return AskResponse(
+                    type="error",
+                    reason="'question' is required for new asks"
+                )
+            if not isinstance(question, str) or len(question.strip()) == 0:
+                return AskResponse(
+                    type="error",
+                    reason="'question' must be a non-empty string"
+                )
+            resp = pixie.answer(question.strip())
+
+        return resp
+        
+    except Exception:
+        logger.exception("Unexpected error in /ask endpoint")
+        return AskResponse(
+            type="error",
+            reason="Internal server error occurred"
+        )
