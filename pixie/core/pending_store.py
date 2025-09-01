@@ -70,7 +70,7 @@ class InMemoryPendingStore:
         if not entry:
             return None
         if entry.expired():
-            # remove expired entry to keep store clean
+            # remove expired entry
             try:
                 del self._store[pending_id]
             except KeyError:
@@ -79,14 +79,10 @@ class InMemoryPendingStore:
         return entry
 
     def resolve_pending(self, pending_id: str) -> None:
-        # remove the entry if present
+    # remove entry if present
         self._store.pop(pending_id, None)
 
 
 def default_pending_store() -> PendingStore:
-    """Factory returning the default in-process pending store.
-
-    Callers should depend on the `PendingStore` protocol and acquire an
-    implementation via this factory so implementations can be swapped later.
-    """
+    """Factory returning the default in-process pending store."""
     return InMemoryPendingStore()

@@ -11,11 +11,10 @@ def test_pixie_answer_core():
     res = pixie.answer(q)
     assert isinstance(res, AskResponse)
     assert res.type == "answer"
-    # response should include the deterministic mock text
     assert getattr(res, "text", None) == f"(mock) antwoord op: {q}"
 
 
 def test_askresponse_validation():
-    # empty AskResponse dict should fail validation
+    # empty AskResponse dict should fail
     with pytest.raises(ValidationError):
         AskResponse.model_validate({})

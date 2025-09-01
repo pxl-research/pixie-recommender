@@ -17,5 +17,4 @@ def test_ask_mock():
     data = r.json()
     assert data["type"] == "answer"
     assert "mock" in data["text"]
-    # trace id header should be present for tracing
     assert "X-Trace-Id" in r.headers

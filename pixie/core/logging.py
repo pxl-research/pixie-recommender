@@ -9,7 +9,6 @@ import json
 import logging
 from contextvars import ContextVar
 
-# ContextVar holding current trace id
 trace_id_ctx: ContextVar[str | None] = ContextVar("trace_id", default=None)
 
 
@@ -32,8 +31,7 @@ class JsonFormatter(logging.Formatter):
             "logger": record.name,
             "trace_id": getattr(record, "trace_id", None),
         }
-        # Include any extra fields that were attached to the LogRecord via
-        # the `extra` argument. We avoid including standard LogRecord attrs.
+        # include extra fields attached to LogRecord via `extra`
         standard_attrs = {
             "name",
             "msg",
@@ -58,14 +56,13 @@ class JsonFormatter(logging.Formatter):
             "message",
         }
 
-        # fields that are known to be noisy or often empty
         noisy_fields = {"taskName", "task", "task_name"}
 
         for k, v in record.__dict__.items():
-            # skip standard logging attrs, private attrs and noisy fields
+            # skip standard attrs, private attrs and noisy fields
             if k in standard_attrs or k.startswith("_") or k in noisy_fields:
                 continue
-            # skip empty / None values to avoid clutter
+            # skip empty / None values
             if v is None or (isinstance(v, str) and v == ""):
                 continue
             # skip fields we already added
@@ -93,7 +90,6 @@ def configure_logging(level: int = logging.INFO) -> None:
     handler.addFilter(TraceIdFilter())
     root.handlers = [handler]
 
-    # attach filter to uvicorn.access so requests logged by uvicorn include trace_id
     logging.getLogger("uvicorn.access").addFilter(TraceIdFilter())
 
     setattr(root, "pixie_configured", True)
