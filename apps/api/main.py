@@ -75,6 +75,3 @@ def ask(req: dict):
         resp = pixie.answer(question)
 
     return resp
-
-
-# Note: /reply endpoint removed in favor of single /ask endpoint.

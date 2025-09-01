@@ -4,7 +4,7 @@ from pydantic import ValidationError
 
 from apps.api.main import app
 from pixie.core.contracts import AskResponse
-from pixie.core.pixie import Pixie
+from pixie.core.pixie import Pixie, FakeTabularRAG
 
 client = TestClient(app)
 
@@ -31,6 +31,7 @@ def test_ask_endpoint():
     assert data["type"] == "ask_user"
     assert "pending_id" in data
 
+
 def test_reply_flow():
     # Test reply flow
     r = client.post("/ask", json={"pending_id": "test-123", "message": "extra context"})
@@ -54,3 +55,17 @@ def test_askresponse_validation():
     """Test AskResponse validation fails with empty data."""
     with pytest.raises(ValidationError):
         AskResponse.model_validate({})
+
+
+def test_fake_tabular_rag():
+    """Test FakeTabularRAG component works correctly."""
+    tabular = FakeTabularRAG()
+    
+    # Test with data query
+    result = tabular.query("Geef me cijfers over verkoop")
+    assert result["found_data"] is True
+    assert "mock_data_table" in result["table"]
+    
+    # Test with non-data query  
+    result = tabular.query("Wat is de hoofdstad?")
+    assert result["found_data"] is False

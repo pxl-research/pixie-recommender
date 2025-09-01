@@ -30,8 +30,12 @@ class AskResponse(BaseModel):
                 raise ValueError("'pending_id' is required for type 'ask_user'")
             nif = getattr(self, "needed_info", None)
             if nif is not None:
-                if not isinstance(nif, list) or not all(isinstance(x, str) for x in nif):
-                    raise ValueError("'needed_info' must be a list of strings if provided")
+                if not isinstance(nif, list) or not all(
+                    isinstance(x, str) for x in nif
+                ):
+                    raise ValueError(
+                        "'needed_info' must be a list of strings if provided"
+                    )
         elif t == "error":
             if not getattr(self, "reason", None):
                 raise ValueError("'reason' is required for type 'error'")
