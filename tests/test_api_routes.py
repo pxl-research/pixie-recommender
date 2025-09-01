@@ -39,12 +39,27 @@ def test_ask_endpoint():
 
 
 def test_reply_flow():
-    # Test reply flow
-    r = client.post("/ask", json={"pending_id": "test-123", "message": "extra context"})
+    # Test invalid pending_id gives error (new behavior with proper validation)
+    r = client.post("/ask", json={"pending_id": "invalid-123", "message": "extra context"})
     assert r.status_code == 200
     data = r.json()
-    assert data["type"] == "answer"
-    assert "received reply" in data["text"]
+    assert data["type"] == "error"
+    assert "ongeldig" in data["reason"].lower()
+    
+    # Test valid flow: ask_user -> reply -> answer
+    # First get a real pending_id
+    r1 = client.post("/ask", json={"question": "vertel eens wat algemeen"})
+    assert r1.status_code == 200
+    data1 = r1.json()
+    assert data1["type"] == "ask_user"
+    pending_id = data1["pending_id"]
+    
+    # Then reply with that pending_id
+    r2 = client.post("/ask", json={"pending_id": pending_id, "message": "Ik wil info over verkoop"})
+    assert r2.status_code == 200
+    data2 = r2.json()
+    assert data2["type"] == "answer"
+    assert "mock" in data2["text"].lower()
 
 
 def test_pixie_core_unit():
@@ -76,16 +91,45 @@ def test_pixie_orchestrator_integration():
     assert "mock" in res.text.lower()
     assert "cijfers" in res.text.lower()
     
-    # Test vague question → should trigger ask_user
+    # Test vague question → should trigger ask_user with unique pending_id
     res = pixie.answer("Vertel eens wat algemeen")  
     assert res.type == "ask_user"
     assert res.pending_id is not None
+    assert res.pending_id.startswith("pending-")
     
     # Test simple question → should get text-only answer
     res = pixie.answer("Wat is je naam?")
     assert res.type == "answer"
     assert res.text is not None
     assert "mock" in res.text.lower()
+
+
+def test_pending_id_management():
+    """Test proper pending ID generation and state management."""
+    pixie = Pixie()
+    
+    # Generate ask_user response
+    res = pixie.answer("Vertel eens wat algemeen")
+    assert res.type == "ask_user"
+    pending_id = res.pending_id
+    assert pending_id is not None
+    
+    # Valid reply should work
+    reply_res = pixie.reply(pending_id, "Ik wil weten over verkoop cijfers")
+    assert reply_res.type == "answer"
+    assert reply_res.text is not None
+    
+    # Reusing same pending_id should fail (already resolved)
+    error_res = pixie.reply(pending_id, "Another reply")
+    assert error_res.type == "error"
+    assert error_res.reason is not None
+    assert "ongeldig" in error_res.reason.lower()
+    
+    # Invalid pending_id should fail
+    error_res2 = pixie.reply("invalid-id", "Some reply")
+    assert error_res2.type == "error"
+    assert error_res2.reason is not None
+    assert "ongeldig" in error_res2.reason.lower()
 
 
 def test_askresponse_validation():

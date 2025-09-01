@@ -18,6 +18,9 @@ async def lifespan(app: FastAPI):
 
 app = FastAPI(title="Pixie Core API", version="0.0.0", lifespan=lifespan)
 
+# Shared Pixie instance to maintain state across requests
+_pixie_instance = Pixie()
+
 
 @app.middleware("http")
 async def add_trace_id(request: Request, call_next):
@@ -62,7 +65,8 @@ def ask(req: dict):
     logger = logging.getLogger(__name__)
     logger.info("api.ask", extra={"payload": req})
 
-    pixie = Pixie()
+    # Use shared Pixie instance to maintain pending state
+    pixie = _pixie_instance
 
     # Dispatch: reply (has pending_id) or new question (has question)
     if "pending_id" in req:

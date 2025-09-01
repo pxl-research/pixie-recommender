@@ -1,8 +1,10 @@
 from __future__ import annotations
 
 import logging
+from uuid import uuid4
 
 from pixie.core.contracts import AskResponse
+from pixie.core.pending_store import InMemoryPendingStore
 
 
 class FakeRAGAdapter:
@@ -101,11 +103,13 @@ class Pixie:
     def __init__(
         self, 
         rag_adapter: FakeRAGAdapter | None = None,
-        tabular_rag: FakeTabularRAG | None = None
+        tabular_rag: FakeTabularRAG | None = None,
+        pending_store: InMemoryPendingStore | None = None
     ):
         self._rag = rag_adapter or FakeRAGAdapter()
         self._tabular = tabular_rag or FakeTabularRAG()
         self._orchestrator = Orchestrator(self._rag, self._tabular)
+        self._pending_store = pending_store or InMemoryPendingStore()
 
     def answer(self, question: str) -> AskResponse:
         """Use orchestrator to determine best response for the question."""
@@ -116,7 +120,10 @@ class Pixie:
         analysis = self._orchestrator.analyze_question(question)
         
         if analysis["strategy"] == "ask_user":
-            pending_id = "pending-1234"  # TODO: Generate unique ID in next step
+            # Generate unique pending_id and store question context
+            pending_id = f"pending-{uuid4().hex[:8]}"
+            self._pending_store.save_pending(pending_id, question, ttl_seconds=300)
+            
             resp = AskResponse(
                 type="ask_user",
                 prompt="Kunt u wat meer specifieke informatie geven? "
@@ -145,7 +152,30 @@ class Pixie:
             "pixie.reply", extra={"pending_id": pending_id, "reply_text": reply_text}
         )
 
-        text = f"(mock) received reply for {pending_id}: {reply_text}"
-        resp = AskResponse(type="answer", text=text)
+        # Validate pending_id and get original question context
+        pending_entry = self._pending_store.get_pending(pending_id)
+        if not pending_entry:
+            return AskResponse(
+                type="error",
+                reason=f"Ongeldig of verlopen pending_id: {pending_id}"
+            )
 
+        # Resolve the pending entry (removes it from store)
+        self._pending_store.resolve_pending(pending_id)
+        
+        # Generate answer based on original question + reply context
+        original_question = pending_entry.question
+        combined_context = f"{original_question} (aanvullende info: {reply_text})"
+        
+        # Use orchestrator again with enriched context
+        analysis = self._orchestrator.analyze_question(combined_context)
+        
+        if analysis["strategy"] == "answer_with_data":
+            tabular_summary = analysis["tabular_result"]["summary"]
+            text_result = analysis["text_result"]
+            combined_text = f"{text_result} + {tabular_summary}"
+        else:
+            combined_text = analysis["text_result"]
+            
+        resp = AskResponse(type="answer", text=combined_text)
         return resp
