@@ -71,6 +71,3 @@ class Pixie:
         )
 
         return resp
-
-
-

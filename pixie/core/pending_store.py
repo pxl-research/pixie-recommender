@@ -79,7 +79,7 @@ class InMemoryPendingStore:
         return entry
 
     def resolve_pending(self, pending_id: str) -> None:
-    # remove entry if present
+        # remove entry if present
         self._store.pop(pending_id, None)
 
 
