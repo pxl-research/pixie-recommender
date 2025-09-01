@@ -72,9 +72,7 @@ class JsonFormatter(logging.Formatter):
             if k in obj:
                 continue
             try:
-                json.dumps(v)
-                obj[k] = v
-            except Exception:
+            except TypeError:
                 # fallback to string representation for non-serializable values
                 obj[k] = str(v)
 
