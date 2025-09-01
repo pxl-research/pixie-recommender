@@ -1,5 +1,6 @@
 import logging
 from contextlib import asynccontextmanager
+from datetime import datetime, timezone
 from uuid import uuid4
 
 from fastapi import FastAPI, Request
@@ -28,7 +29,9 @@ async def add_trace_id(request: Request, call_next):
     # set in ContextVar so logging filter can pick it up
     pixie_logging.trace_id_ctx.set(trace_id)
 
-    logging.getLogger("uvicorn.access").info(
+    # log via uvicorn.error (uvicorn.access uses a special access formatter that
+    # expects tuple args which can raise when we log arbitrary messages here)
+    logging.getLogger("uvicorn.error").info(
         "request_start", extra={"path": request.url.path, "trace_id": trace_id}
     )
 
@@ -39,7 +42,7 @@ async def add_trace_id(request: Request, call_next):
         logging.exception("unhandled_exception")
         raise
 
-    logging.getLogger("uvicorn.access").info(
+    logging.getLogger("uvicorn.error").info(
         "request_end",
         extra={
             "path": request.url.path,
@@ -66,6 +69,26 @@ def health():
 
 @app.post("/ask", response_model=AskResponse)
 def ask(req: AskRequest):
+    logger = logging.getLogger(__name__)
+
+    # Log the incoming /ask request with timestamp
+    logger.info(
+        "api.ask.request",
+        extra={"question": req.question, "ts": datetime.now(timezone.utc).isoformat()},
+    )
+
     # v0.0: deterministic mock-antwoord via Pixie core service
     pixie = Pixie()
-    return pixie.answer(req)
+    resp = pixie.answer(req)
+
+    # Log the AskResponse being returned
+    logger.info(
+        "api.ask.response",
+        extra={
+            "response_type": resp.type,
+            "response_text": resp.text,
+            "ts": datetime.now(timezone.utc).isoformat(),
+        },
+    )
+
+    return resp

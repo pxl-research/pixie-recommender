@@ -1,5 +1,8 @@
 from __future__ import annotations
 
+import logging
+from datetime import datetime, timezone
+
 from pixie.core.contracts import AskRequest, AskResponse
 
 
@@ -27,5 +30,29 @@ class Pixie:
 
     def answer(self, request: AskRequest) -> AskResponse:
         """Return a deterministic AskResponse for the provided AskRequest."""
+        logger = logging.getLogger(__name__)
+
+        # Log the incoming question with an explicit timestamp to make it
+        # easy to correlate in plain-text or JSON logs.
+        logger.info(
+            "pixie.answer.request",
+            extra={
+                "question": request.question,
+                "ts": datetime.now(timezone.utc).isoformat(),
+            },
+        )
+
         text = self._rag.answer(request.question)
-        return AskResponse(type="answer", text=text)
+        resp = AskResponse(type="answer", text=text)
+
+        # Log the response that will be returned
+        logger.info(
+            "pixie.answer.response",
+            extra={
+                "response_type": resp.type,
+                "response_text": resp.text,
+                "ts": datetime.now(timezone.utc).isoformat(),
+            },
+        )
+
+        return resp
