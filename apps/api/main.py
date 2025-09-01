@@ -1,12 +1,12 @@
-import logging
 from contextlib import asynccontextmanager
+import logging
 from datetime import datetime, timezone
 from uuid import uuid4
 
 from fastapi import FastAPI, Request
 
 from pixie.core import logging as pixie_logging
-from pixie.core.contracts import AskRequest, AskResponse
+from pixie.core.contracts import AskResponse, InteractRequest
 from pixie.core.pixie import Pixie
 
 
@@ -68,22 +68,28 @@ def health():
 
 
 @app.post("/ask", response_model=AskResponse)
-def ask(req: AskRequest):
+def ask(req: InteractRequest):
     logger = logging.getLogger(__name__)
 
     # Generate a single timestamp for this request and reuse it for both
     # request and response logs so they remain consistent.
     ts = datetime.now(timezone.utc).isoformat()
 
-    # Log the incoming /ask request with timestamp
-    logger.info(
-        "api.ask.request",
-        extra={"question": req.question, "ts": ts},
-    )
+    # Log the incoming /ask/interact request with timestamp
+    logger.info("api.ask.request", extra={"payload": req.model_dump(), "ts": ts})
 
-    # v0.0: deterministic mock-antwoord via Pixie core service
     pixie = Pixie()
-    resp = pixie.answer(req)
+
+    # Dispatch: if pending_id is present this is a reply, otherwise a new question
+    if req.pending_id is not None:
+        # InteractRequest validator guarantees reply_text is present when pending_id is set
+        assert req.reply_text is not None
+        resp = pixie.reply(req.pending_id, req.reply_text)
+    else:
+        # construct AskRequest-like object
+        # InteractRequest validator guarantees question is present when pending_id is not set
+        assert req.question is not None
+        resp = pixie.answer(req.question)
 
     # Log the AskResponse being returned (reuse the same timestamp)
     logger.info(
@@ -96,3 +102,6 @@ def ask(req: AskRequest):
     )
 
     return resp
+
+
+# Note: /reply endpoint removed in favor of single /ask (InteractRequest) endpoint.
