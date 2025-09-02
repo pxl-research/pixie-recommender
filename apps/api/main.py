@@ -5,7 +5,7 @@ from uuid import uuid4
 from fastapi import FastAPI, Request, HTTPException
 
 from pixie.core import logging as pixie_logging
-from pixie.core.contracts import AskResponse, ReplyRequest
+from pixie.core.contracts import AskResponse
 from pixie.core.pixie import Pixie
 
 
@@ -62,6 +62,12 @@ def health():
 
 @app.post("/ask", response_model=AskResponse)
 def ask(req: dict):
+    """Unified endpoint for both new questions and replies to pending questions.
+    
+    Auto-detects the request type based on presence of pending_id:
+    - No pending_id: New question flow
+    - With pending_id: Reply to existing pending question
+    """
     logger = logging.getLogger(__name__)
     logger.info("api.ask", extra={"payload": req})
 
@@ -69,61 +75,53 @@ def ask(req: dict):
         # Use shared Pixie instance to maintain pending state
         pixie = _pixie_instance
 
-        # Validate this is a question request, not reply
-        if "pending_id" in req:
-            return AskResponse(
-                type="error",
-                reason="Use /reply endpoint for responding to pending questions"
-            )
-
-        question = req.get("question")
-        if question is None:
-            return AskResponse(
-                type="error",
-                reason="'question' is required for new asks"
-            )
-        if not isinstance(question, str) or len(question.strip()) == 0:
-            return AskResponse(
-                type="error",
-                reason="'question' must be a non-empty string"
-            )
+        # Auto-detect request type based on pending_id presence
+        pending_id = req.get("pending_id")
         
-        resp = pixie.answer(question.strip())
-        return resp
+        if pending_id:
+            # Reply flow: responding to a pending question
+            message = req.get("message")
+            if message is None:
+                return AskResponse(
+                    type="error",
+                    reason="'message' is required when replying to pending questions"
+                )
+            if not isinstance(message, str) or len(message.strip()) == 0:
+                return AskResponse(
+                    type="error",
+                    reason="'message' must be a non-empty string"
+                )
+            
+            # Validate pending_id format
+            if not isinstance(pending_id, str) or len(pending_id.strip()) == 0:
+                return AskResponse(
+                    type="error",
+                    reason="'pending_id' must be a non-empty string"
+                )
+            
+            # Process the reply
+            resp = pixie.reply(pending_id.strip(), message.strip())
+            return resp
+            
+        else:
+            # New question flow
+            question = req.get("question")
+            if question is None:
+                return AskResponse(
+                    type="error",
+                    reason="'question' is required for new asks"
+                )
+            if not isinstance(question, str) or len(question.strip()) == 0:
+                return AskResponse(
+                    type="error",
+                    reason="'question' must be a non-empty string"
+                )
+            
+            resp = pixie.answer(question.strip())
+            return resp
         
     except Exception:
         logger.exception("Unexpected error in /ask endpoint")
-        return AskResponse(
-            type="error",
-            reason="Internal server error occurred"
-        )
-
-
-@app.post("/reply", response_model=AskResponse)
-def reply(req: dict):
-    logger = logging.getLogger(__name__)
-    logger.info("api.reply", extra={"payload": req})
-
-    try:
-        # Use shared Pixie instance to maintain pending state
-        pixie = _pixie_instance
-
-        # Validate and parse reply request
-        try:
-            rr = ReplyRequest.model_validate(req)
-        except Exception as e:
-            logger.error("Reply validation error", extra={"error": str(e)})
-            return AskResponse(
-                type="error", 
-                reason=f"Invalid reply request: {str(e)}"
-            )
-
-        # Process the reply
-        resp = pixie.reply(rr.pending_id, rr.message)
-        return resp
-        
-    except Exception:
-        logger.exception("Unexpected error in /reply endpoint")
         return AskResponse(
             type="error",
             reason="Internal server error occurred"

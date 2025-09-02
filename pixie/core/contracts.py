@@ -1,6 +1,6 @@
 from typing import List, Optional
 
-from pydantic import BaseModel, Field, model_validator
+from pydantic import BaseModel, model_validator
 
 
 class AskResponse(BaseModel):
@@ -42,8 +42,3 @@ class AskResponse(BaseModel):
         else:
             raise ValueError("invalid AskResponse type")
         return self
-
-
-class ReplyRequest(BaseModel):
-    pending_id: str = Field(...)
-    message: str = Field(...)

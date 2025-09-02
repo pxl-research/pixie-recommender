@@ -4,13 +4,15 @@ Simplified, API-first rebuild of Pixie with a mock-first approach
 
 ## Features
 
-### v0.2 Ask-User Flow with Orchestrator
+### v0.2 Ask-User Flow with Unified API
 
-The system intelligently handles questions through an orchestrator that combines:
+The system intelligently handles questions through a single `/ask` endpoint that:
 
+- **Auto-detects Request Type**: New question vs. reply to pending question based on request structure
 - **FakeRAGAdapter**: Quick semantic retrieval
-- **FakeTabularRAG**: Structured data analysis
+- **FakeTabularRAG**: Structured data analysis  
 - **Confidence Scoring**: Smart decision-making when to ask users for clarification
+- **Seamless UX**: No endpoint complexity for clients - one endpoint for all interactions
 
 ## Quick Start
 
@@ -29,7 +31,11 @@ uv run python -m pytest tests/ -v
 
 ### API Usage
 
-#### 1. Ask a Question (v0.2 Flow)
+#### Unified /ask Endpoint
+
+The system uses a single, intelligent `/ask` endpoint that automatically detects whether you're asking a new question or replying to a pending question.
+
+**New Question:**
 
 ```bash
 curl -X POST "http://localhost:8000/ask" \
@@ -37,46 +43,44 @@ curl -X POST "http://localhost:8000/ask" \
      -d '{"question": "What is the capital of France?"}'
 ```
 
-Response when confident:
+**Reply to Pending Question:**
+
+```bash
+curl -X POST "http://localhost:8000/ask" \
+     -H "Content-Type: application/json" \
+     -d '{
+       "pending_id": "123e4567-e89b-12d3-a456-426614174000",
+       "message": "I meant the historical significance"
+     }'
+```
+
+**Response Examples:**
+
+Confident answer:
 
 ```json
 {
-  "answer": "The capital of France is Paris.",
-  "confidence": 0.95,
-  "sources": ["mock_source_1"],
-  "pending_id": null
+  "type": "answer",
+  "text": "The capital of France is Paris."
 }
 ```
 
-Response when needs clarification:
+Needs clarification:
 
 ```json
 {
-  "answer": "I need more information. Could you clarify your question about complex topics?",
-  "confidence": 0.3,
-  "sources": ["mock_source_1"],
+  "type": "ask_user",
+  "prompt": "Could you clarify your question about complex topics?",
   "pending_id": "123e4567-e89b-12d3-a456-426614174000"
 }
 ```
 
-#### 2. Reply to Clarification Request
-
-```bash
-curl -X POST "http://localhost:8000/reply" \
-     -H "Content-Type: application/json" \
-     -d '{
-       "pending_id": "123e4567-e89b-12d3-a456-426614174000",
-       "user_response": "I meant the historical significance"
-     }'
-```
-
-Response:
+After clarification:
 
 ```json
 {
-  "answer": "Based on your clarification: The historical significance includes...",
-  "confidence": 0.85,
-  "sources": ["mock_source_1", "mock_source_2"]
+  "type": "answer", 
+  "text": "Based on your clarification: The historical significance includes..."
 }
 ```
 
@@ -84,7 +88,7 @@ Response:
 
 ### Core Components
 
-- **`apps/api/main.py`**: FastAPI application with `/ask` and `/reply` endpoints
+- **`apps/api/main.py`**: FastAPI application with unified `/ask` endpoint for both new questions and replies
 - **`pixie/core/pixie.py`**: Orchestrator combining RAG adapters with confidence scoring
 - **`pixie/core/pending_store.py`**: UUID-based state management for multi-turn conversations
 - **`pixie/core/contracts.py`**: Pydantic models for request/response validation

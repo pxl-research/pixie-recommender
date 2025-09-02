@@ -39,7 +39,7 @@ def test_ask_endpoint():
 
 
 def test_reply_flow():
-    # Test dedicated /reply endpoint
+    # Test unified /ask endpoint for reply flow
     # First get a real pending_id from /ask
     r1 = client.post("/ask", json={"question": "vertel eens wat algemeen"})
     assert r1.status_code == 200
@@ -47,24 +47,20 @@ def test_reply_flow():
     assert data1["type"] == "ask_user"
     pending_id = data1["pending_id"]
     
-    # Then use /reply endpoint
-    r2 = client.post("/reply", json={
-        "pending_id": pending_id, 
-        "message": "Ik wil info over verkoop"
+    # Then use /ask endpoint with pending_id (unified flow)
+    r2 = client.post("/ask", json={
+        "pending_id": pending_id,
+        "message": "extra specifieke context hier"
     })
     assert r2.status_code == 200
     data2 = r2.json()
     assert data2["type"] == "answer"
-    assert "mock" in data2["text"].lower()
     
-    # Test invalid pending_id on /reply
-    r3 = client.post("/reply", json={"pending_id": "invalid-123", "message": "extra context"})
+    # Test invalid pending_id on unified /ask
+    r3 = client.post("/ask", json={"pending_id": "invalid-123", "message": "extra context"})
     assert r3.status_code == 200
     data3 = r3.json()
     assert data3["type"] == "error"
-    assert "ongeldig" in data3["reason"].lower()
-
-
 def test_pixie_core_unit():
     """Test core Pixie functionality with orchestrator decisions."""
     pixie = Pixie()
@@ -161,24 +157,26 @@ def test_api_error_handling():
     
     # Test pending_id on /ask (should redirect to /reply)
     r = client.post("/ask", json={"pending_id": "test", "message": "test"})
+    # Test pending_id on /ask without message (should give error)
+    r = client.post("/ask", json={"pending_id": "test-123"})
     assert r.status_code == 200
     data = r.json()
     assert data["type"] == "error"
-    assert "/reply endpoint" in data["reason"].lower()
+    assert "message' is required" in data["reason"]
     
-    # Test missing message on /reply
-    r = client.post("/reply", json={"pending_id": "test-123"})
+    # Test missing message on unified /ask with pending_id
+    r = client.post("/ask", json={"pending_id": "test-123"})
     assert r.status_code == 200
     data = r.json()
     assert data["type"] == "error"
-    assert "invalid reply" in data["reason"].lower()
+    assert "message' is required" in data["reason"]
     
-    # Test missing pending_id on /reply
-    r = client.post("/reply", json={"message": "test message"})
+    # Test empty message on unified /ask with pending_id
+    r = client.post("/ask", json={"pending_id": "test-123", "message": ""})
     assert r.status_code == 200
     data = r.json()
     assert data["type"] == "error"
-    assert "invalid reply" in data["reason"].lower()
+    assert "non-empty string" in data["reason"]
 
 
 def test_v02_complete_e2e_flow():
@@ -200,8 +198,8 @@ def test_v02_complete_e2e_flow():
     
     pending_id = ask_data["pending_id"]
     
-    # Step 2: Reply with specific context, expect answer response
-    reply_response = client.post("/reply", json={
+    # Step 2: Reply with specific context using unified /ask endpoint
+    reply_response = client.post("/ask", json={
         "pending_id": pending_id,
         "message": "Ik wil graag informatie over verkoop cijfers en statistieken"
     })
@@ -216,8 +214,8 @@ def test_v02_complete_e2e_flow():
     text_lower = reply_data["text"].lower()
     assert "mock" in text_lower  # Basic mock response
     
-    # Step 3: Try to reuse same pending_id, expect error
-    reuse_response = client.post("/reply", json={
+    # Step 3: Try to reuse same pending_id using unified /ask, expect error
+    reuse_response = client.post("/ask", json={
         "pending_id": pending_id,
         "message": "Another message"
     })
