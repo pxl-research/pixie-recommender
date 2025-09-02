@@ -22,89 +22,88 @@ class FakeTabularRAG:
         if "cijfers" in question.lower() or "data" in question.lower():
             return {
                 "found_data": True,
-                "table": "mock_data_table", 
+                "table": "mock_data_table",
                 "rows": 42,
-                "summary": f"(mock) tabeldata voor: {question}"
+                "summary": f"(mock) tabeldata voor: {question}",
             }
         elif "statistiek" in question.lower():
             return {
                 "found_data": True,
                 "table": "statistics_table",
                 "rows": 15,
-                "summary": f"(mock) statistieken voor: {question}"
+                "summary": f"(mock) statistieken voor: {question}",
             }
         else:
-            return {
-                "found_data": False,
-                "reason": "Geen relevante tabeldata gevonden"
-            }
+            return {"found_data": False, "reason": "Geen relevante tabeldata gevonden"}
 
 
 class Orchestrator:
-    """Central orchestrator that combines multiple RAG sources and makes decisions."""
-    
+    """Central orchestrator that simulates LLM decision-making for response strategies."""
+
     def __init__(self, rag_adapter: FakeRAGAdapter, tabular_rag: FakeTabularRAG):
         self._rag = rag_adapter
         self._tabular = tabular_rag
-        
+
     def analyze_question(self, question: str) -> dict:
-        """Analyze question and determine best response strategy."""
+        """Simulate LLM analyzing question and deciding on response strategy."""
         # Get responses from both sources
         text_result = self._rag.answer(question)
         tabular_result = self._tabular.query(question)
-        
-        # Decision logic based on question content and available data
-        confidence_score = self._calculate_confidence(question, tabular_result)
-        
+
+        # Simulate LLM decision: "Should I ask for clarification or answer directly?"
+        decision = self._simulate_llm_decision(question, tabular_result)
+
         return {
             "question": question,
             "text_result": text_result,
             "tabular_result": tabular_result,
-            "confidence": confidence_score,
-            "needs_clarification": confidence_score < 0.7,
-            "strategy": self._determine_strategy(question, confidence_score, tabular_result)
+            "strategy": decision,
         }
-    
-    def _calculate_confidence(self, question: str, tabular_result: dict) -> float:
-        """Calculate confidence score based on question analysis."""
-        confidence = 0.6  # higher baseline
+
+    def _simulate_llm_decision(self, question: str, tabular_result: dict) -> str:
+        """Simulate how an LLM with ask_user MCP tool would decide."""
         
-        # Increase confidence if we have relevant tabular data
-        if tabular_result.get("found_data"):
-            confidence += 0.3
-            
-        # Decrease confidence for truly vague questions
-        vague_indicators = ["algemeen", "meer info", "vertel eens", "wat meer"]
-        if any(indicator in question.lower() for indicator in vague_indicators):
-            confidence -= 0.3
-            
-        # Increase confidence for specific questions
-        specific_indicators = [
-            "cijfers", "data", "tabel", "statistiek", "wanneer", "waar", "hoofdstad", "naam"
+        # Pattern 1: Very vague questions -> LLM would use ask_user tool
+        vague_patterns = [
+            "algemeen", "meer info", "vertel eens", "wat meer", 
+            "help", "uitleg", "informatie", "details"
         ]
-        if any(indicator in question.lower() for indicator in specific_indicators):
-            confidence += 0.2
-            
-        return max(0.0, min(1.0, confidence))  # clamp between 0 and 1
-    
-    def _determine_strategy(self, question: str, confidence: float, tabular_result: dict) -> str:
-        """Determine the best response strategy."""
-        if confidence < 0.7:
+        if any(pattern in question.lower() for pattern in vague_patterns):
+            # LLM thinks: "This is too vague, I need clarification"
             return "ask_user"
-        elif tabular_result.get("found_data"):
+        
+        # Pattern 2: Complex multi-part questions -> LLM might ask for focus
+        if "?" in question and len(question.split("?")) > 2:
+            # LLM thinks: "Multiple questions, let me ask what's most important"
+            return "ask_user"
+            
+        # Pattern 3: Has specific data available -> LLM answers with data
+        if tabular_result.get("found_data"):
+            # LLM thinks: "I have relevant data, I can answer this"
             return "answer_with_data"
-        else:
+            
+        # Pattern 4: Specific, answerable questions -> LLM gives direct answer
+        specific_patterns = [
+            "hoofdstad", "naam", "wanneer", "waar", "wie", "wat is", 
+            "hoeveel", "welke", "hoe"
+        ]
+        if any(pattern in question.lower() for pattern in specific_patterns):
+            # LLM thinks: "This is specific enough, I can answer"
             return "answer_text_only"
+            
+        # Default: When uncertain, LLM tends to ask for clarification
+        # This simulates cautious LLM behavior
+        return "ask_user"
 
 
 class Pixie:
     """Smart service that uses an orchestrator to decide response strategies."""
 
     def __init__(
-        self, 
+        self,
         rag_adapter: FakeRAGAdapter | None = None,
         tabular_rag: FakeTabularRAG | None = None,
-        pending_store: InMemoryPendingStore | None = None
+        pending_store: InMemoryPendingStore | None = None,
     ):
         self._rag = rag_adapter or FakeRAGAdapter()
         self._tabular = tabular_rag or FakeTabularRAG()
@@ -116,33 +115,34 @@ class Pixie:
         logger = logging.getLogger(__name__)
         logger.info("pixie.answer", extra={"question": question})
 
-        # Use orchestrator to analyze question
+        # Use orchestrator to analyze question (simulates LLM decision-making)
         analysis = self._orchestrator.analyze_question(question)
-        
+
         if analysis["strategy"] == "ask_user":
-            # Generate unique pending_id and store question context
+            # LLM decided to use ask_user tool - generate pending_id and store context
             pending_id = f"pending-{uuid4().hex[:8]}"
             self._pending_store.save_pending(pending_id, question, ttl_seconds=300)
-            
+
             resp = AskResponse(
                 type="ask_user",
                 prompt="Kunt u wat meer specifieke informatie geven? "
-                       "Dit helpt me een beter antwoord te formuleren.",
+                "Dit helpt me een beter antwoord te formuleren.",
                 pending_id=pending_id,
             )
         elif analysis["strategy"] == "answer_with_data":
-            # Combine text and tabular results
+            # LLM decided to answer using available tabular data
             tabular_summary = analysis["tabular_result"]["summary"]
             text_result = analysis["text_result"]
             combined_text = f"{text_result} + {tabular_summary}"
             resp = AskResponse(type="answer", text=combined_text)
         else:  # answer_text_only
+            # LLM decided to give direct text answer
             resp = AskResponse(type="answer", text=analysis["text_result"])
 
-        logger.info("pixie.answer", extra={
-            "strategy": analysis["strategy"], 
-            "confidence": analysis["confidence"]
-        })
+        logger.info(
+            "pixie.answer",
+            extra={"strategy": analysis["strategy"]},
+        )
         return resp
 
     def reply(self, pending_id: str, reply_text: str) -> AskResponse:
@@ -156,26 +156,26 @@ class Pixie:
         pending_entry = self._pending_store.get_pending(pending_id)
         if not pending_entry:
             return AskResponse(
-                type="error",
-                reason=f"Ongeldig of verlopen pending_id: {pending_id}"
+                type="error", reason=f"Ongeldig of verlopen pending_id: {pending_id}"
             )
 
         # Resolve the pending entry (removes it from store)
         self._pending_store.resolve_pending(pending_id)
-        
+
         # Generate answer based on original question + reply context
         original_question = pending_entry.question
         combined_context = f"{original_question} (aanvullende info: {reply_text})"
-        
-        # Use orchestrator again with enriched context
+
+        # Use orchestrator again with enriched context (simulates LLM with more info)
         analysis = self._orchestrator.analyze_question(combined_context)
-        
+
+        # With additional context, LLM should typically be able to answer
         if analysis["strategy"] == "answer_with_data":
             tabular_summary = analysis["tabular_result"]["summary"]
             text_result = analysis["text_result"]
             combined_text = f"{text_result} + {tabular_summary}"
         else:
             combined_text = analysis["text_result"]
-            
+
         resp = AskResponse(type="answer", text=combined_text)
         return resp

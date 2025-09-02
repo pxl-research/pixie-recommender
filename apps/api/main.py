@@ -2,7 +2,7 @@ import logging
 from contextlib import asynccontextmanager
 from uuid import uuid4
 
-from fastapi import FastAPI, Request, HTTPException
+from fastapi import FastAPI, Request
 
 from pixie.core import logging as pixie_logging
 from pixie.core.contracts import AskResponse
@@ -63,7 +63,7 @@ def health():
 @app.post("/ask", response_model=AskResponse)
 def ask(req: dict):
     """Unified endpoint for both new questions and replies to pending questions.
-    
+
     Auto-detects the request type based on presence of pending_id:
     - No pending_id: New question flow
     - With pending_id: Reply to existing pending question
@@ -77,52 +77,45 @@ def ask(req: dict):
 
         # Auto-detect request type based on pending_id presence
         pending_id = req.get("pending_id")
-        
+
         if pending_id:
             # Reply flow: responding to a pending question
             message = req.get("message")
             if message is None:
                 return AskResponse(
                     type="error",
-                    reason="'message' is required when replying to pending questions"
+                    reason="'message' is required when replying to pending questions",
                 )
             if not isinstance(message, str) or len(message.strip()) == 0:
                 return AskResponse(
-                    type="error",
-                    reason="'message' must be a non-empty string"
+                    type="error", reason="'message' must be a non-empty string"
                 )
-            
+
             # Validate pending_id format
             if not isinstance(pending_id, str) or len(pending_id.strip()) == 0:
                 return AskResponse(
-                    type="error",
-                    reason="'pending_id' must be a non-empty string"
+                    type="error", reason="'pending_id' must be a non-empty string"
                 )
-            
+
             # Process the reply
             resp = pixie.reply(pending_id.strip(), message.strip())
             return resp
-            
+
         else:
             # New question flow
             question = req.get("question")
             if question is None:
                 return AskResponse(
-                    type="error",
-                    reason="'question' is required for new asks"
+                    type="error", reason="'question' is required for new asks"
                 )
             if not isinstance(question, str) or len(question.strip()) == 0:
                 return AskResponse(
-                    type="error",
-                    reason="'question' must be a non-empty string"
+                    type="error", reason="'question' must be a non-empty string"
                 )
-            
+
             resp = pixie.answer(question.strip())
             return resp
-        
+
     except Exception:
         logger.exception("Unexpected error in /ask endpoint")
-        return AskResponse(
-            type="error",
-            reason="Internal server error occurred"
-        )
+        return AskResponse(type="error", reason="Internal server error occurred")
