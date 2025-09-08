@@ -1,6 +1,28 @@
 #!/usr/bin/env python3
+"""Minimal container smoke test:
+
+Checks:
+ - GET /health -> {"status":"ok"}
+ - One minimal product discovery flow (ask -> reply budget -> reply brand -> reply tech)
+
+On any assertion failure the script exits non‑zero so CI can fail fast.
+"""
+
 import http.client
 import json
+import sys
+
+
+def get(path):
+    conn = http.client.HTTPConnection("localhost", 8000)
+    conn.request("GET", path)
+    r = conn.getresponse()
+    data = r.read().decode()
+    conn.close()
+    try:
+        return r.status, json.loads(data)
+    except Exception:
+        return r.status, {"raw": data}
 
 
 def post(body):
@@ -15,40 +37,71 @@ def post(body):
     data = r.read().decode()
     conn.close()
     try:
-        return json.loads(data)
+        return r.status, json.loads(data)
     except Exception:
-        return {"raw": data}
+        return r.status, {"raw": data}
 
 
-out = {"flows": []}
+out = {"health": None, "flow": []}
 
-# Flow 1
-r1 = post({"question": "Ik zoek een nieuwe printer"})
-pid = r1.get("pending_id")
-r2 = post({"pending_id": pid, "message": "Maximaal 200€"})
-r3 = post({"pending_id": pid, "message": "Brother"})
-r4 = post({"pending_id": pid, "message": "laser"})
-out["flows"].append({"flow1": [r1, r2, r3, r4]})
+# Health check
+status, body = get("/health")
+out["health"] = {"status_code": status, "body": body}
+if status != 200 or not isinstance(body, dict) or body.get("status") != "ok":
+    print("Health check failed:", status, body)
+    with open("/app/pixie_test_output.json", "w", encoding="utf-8") as f:
+        f.write(json.dumps(out, ensure_ascii=False, indent=2))
+    sys.exit(2)
 
-# Flow 2
-r = post({"question": "Ik zoek mijn mama"})
-out["flows"].append({"flow2": r})
+# Minimal product discovery smoke flow
+status, r1 = post({"question": "Ik zoek een nieuwe printer"})
+out["flow"].append({"step": 1, "status": status, "resp": r1})
+if status != 200 or r1.get("type") != "ask_user":
+    print("Step 1 failed:", status, r1)
+    with open("/app/pixie_test_output.json", "w", encoding="utf-8") as f:
+        f.write(json.dumps(out, ensure_ascii=False, indent=2))
+    sys.exit(3)
 
-# Flow 3
-r1 = post({"question": "Ik wil graag meer informatie over een Brother laserprinter"})
-pid2 = r1.get("pending_id")
-r2 = post({"pending_id": pid2, "message": "Minder dan 50€"})
-out["flows"].append({"flow3": [r1, r2]})
+pending = r1.get("pending_id")
+if not pending:
+    print("No pending_id returned in step 1")
+    with open("/app/pixie_test_output.json", "w", encoding="utf-8") as f:
+        f.write(json.dumps(out, ensure_ascii=False, indent=2))
+    sys.exit(4)
 
-# Flow 4
-r1 = post({"question": "Ik zoek een nieuwe printer"})
-pid3 = r1.get("pending_id")
-r2 = post({"pending_id": pid3, "message": "Weet ik niet"})
-r3 = post({"pending_id": pid3, "message": "Weet ik niet"})
-r4 = post({"pending_id": pid3, "message": "Weet ik niet"})
-r5 = post({"pending_id": pid3, "message": "Gesorteerd op prijs"})
-out["flows"].append({"flow4": [r1, r2, r3, r4, r5]})
+# Reply budget -> expect ask_user
+status, r2 = post({"pending_id": pending, "message": "Maximaal 200€"})
+out["flow"].append({"step": 2, "status": status, "resp": r2})
+if status != 200 or r2.get("type") != "ask_user":
+    print("Step 2 failed:", status, r2)
+    with open("/app/pixie_test_output.json", "w", encoding="utf-8") as f:
+        f.write(json.dumps(out, ensure_ascii=False, indent=2))
+    sys.exit(5)
+
+pending = r2.get("pending_id") or pending
+
+# Reply brand -> expect ask_user
+status, r3 = post({"pending_id": pending, "message": "Brother"})
+out["flow"].append({"step": 3, "status": status, "resp": r3})
+if status != 200 or r3.get("type") != "ask_user":
+    print("Step 3 failed:", status, r3)
+    with open("/app/pixie_test_output.json", "w", encoding="utf-8") as f:
+        f.write(json.dumps(out, ensure_ascii=False, indent=2))
+    sys.exit(6)
+
+pending = r3.get("pending_id") or pending
+
+# Reply tech -> expect answer
+status, r4 = post({"pending_id": pending, "message": "laser"})
+out["flow"].append({"step": 4, "status": status, "resp": r4})
+if status != 200 or r4.get("type") != "answer":
+    print("Step 4 failed:", status, r4)
+    with open("/app/pixie_test_output.json", "w", encoding="utf-8") as f:
+        f.write(json.dumps(out, ensure_ascii=False, indent=2))
+    sys.exit(7)
 
 with open("/app/pixie_test_output.json", "w", encoding="utf-8") as f:
     f.write(json.dumps(out, ensure_ascii=False, indent=2))
-print("Wrote /app/pixie_test_output.json")
+
+print("Smoke test succeeded; wrote /app/pixie_test_output.json")
+sys.exit(0)
