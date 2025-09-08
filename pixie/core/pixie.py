@@ -200,8 +200,8 @@ class Pixie:
                     type="no_results",
                     text=(
                         "Ik heb helaas geen printers gevonden die voldoen aan uw criteria. "
-                        "Probeer het misschien opnieuw met wat ruimere criteria of contacteer een \
-                          van onze medewerkers voor meer informatie."
+                        "Probeer het misschien opnieuw met wat ruimere criteria of contacteer een "
+                        "van onze medewerkers voor meer informatie."
                     ),
                 )
 
