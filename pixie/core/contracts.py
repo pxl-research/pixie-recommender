@@ -5,7 +5,7 @@ from pydantic import BaseModel, model_validator
 
 class Product(BaseModel):
     """Product model for product discovery responses."""
-    
+
     id: str
     name: str
     price: float
@@ -62,7 +62,9 @@ class AskResponse(BaseModel):
             if not getattr(self, "text", None):
                 raise ValueError("'text' is required for type 'not_relevant'")
             if not getattr(self, "supported_domains", None):
-                raise ValueError("'supported_domains' is required for type 'not_relevant'")
+                raise ValueError(
+                    "'supported_domains' is required for type 'not_relevant'"
+                )
         elif t == "no_results":
             if not getattr(self, "text", None):
                 raise ValueError("'text' is required for type 'no_results'")

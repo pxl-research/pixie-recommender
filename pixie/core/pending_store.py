@@ -26,11 +26,11 @@ class InMemoryPendingStore:
         self._store: Dict[str, PendingEntry] = {}
 
     def save_pending(
-        self, 
-        pending_id: str, 
-        question: str, 
+        self,
+        pending_id: str,
+        question: str,
         ttl_seconds: int = 300,
-        conversation_context: Optional[Dict[str, Any]] = None
+        conversation_context: Optional[Dict[str, Any]] = None,
     ) -> None:
         now = datetime.now(timezone.utc)
         entry = PendingEntry(

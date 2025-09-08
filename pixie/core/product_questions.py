@@ -1,4 +1,5 @@
 """Product refinement question generation patterns."""
+
 from typing import Dict, List, Optional
 
 
@@ -14,7 +15,7 @@ class ProductQuestionGenerator:
 
     SUPPORTED_BRANDS = [
         "Brother",
-        "BenQ", 
+        "BenQ",
         "HP",
         "Kyocera",
         "Canon",
@@ -32,9 +33,7 @@ class ProductQuestionGenerator:
         self._question_order = ["budget", "brand", "technology"]
 
     def get_next_question(
-        self, 
-        category: str, 
-        applied_filters: Optional[Dict[str, str]] = None
+        self, category: str, applied_filters: Optional[Dict[str, str]] = None
     ) -> Optional[str]:
         """Generate the next refinement question based on applied filters."""
         if applied_filters is None:
@@ -46,6 +45,14 @@ class ProductQuestionGenerator:
                 return self._generate_question(question_type, category)
 
         return None  # All questions have been answered
+
+    def get_next_question_type(self, applied_filters: Dict[str, str]) -> str:
+        """Determine what type of question we should be asking next."""
+        for question_type in self._question_order:
+            if question_type not in applied_filters:
+                return question_type
+
+        return "done"  # All questions answered
 
     def _generate_question(self, question_type: str, category: str) -> str:
         """Generate a specific refinement question."""
@@ -64,15 +71,17 @@ class ProductQuestionGenerator:
         return f"What is your budget? {options}?"
 
     def _generate_brand_question(self) -> str:
-        """Generate brand refinement question.""" 
-        brands = ", ".join(self.SUPPORTED_BRANDS[:-1]) + f", {self.SUPPORTED_BRANDS[-1]}"
+        """Generate brand refinement question."""
+        brands = (
+            ", ".join(self.SUPPORTED_BRANDS[:-1]) + f", {self.SUPPORTED_BRANDS[-1]}"
+        )
         return f"Which brand do you prefer? {brands}, or no preference?"
 
     def _generate_technology_question(self, category: str) -> str:
         """Generate technology-specific question based on product category."""
         technologies = self.TECHNOLOGY_OPTIONS.get(category, ["Standard", "Premium"])
         tech_options = ", ".join(technologies[:-1]) + f", {technologies[-1]}"
-        
+
         if category == "printer":
             return f"Which printing technology? {tech_options}, or no preference?"
         elif category == "laptop":
@@ -85,19 +94,59 @@ class ProductQuestionGenerator:
     def parse_budget_response(self, response: str) -> Optional[Dict[str, float]]:
         """Parse budget response into min/max values."""
         response_lower = response.lower()
-        
+
+        # Try natural language parsing first
+        import re
+
+        # Pattern: "maximum €200", "max €150", "under €300"
+        max_patterns = [
+            r"max(?:imum)?\s*[€$]*(\d+)",
+            r"under\s*[€$]*(\d+)",
+            r"below\s*[€$]*(\d+)",
+            r"less than\s*[€$]*(\d+)",
+        ]
+
+        for pattern in max_patterns:
+            match = re.search(pattern, response_lower)
+            if match:
+                max_price = float(match.group(1))
+                return {"min": 0, "max": max_price}
+
+        # Pattern: "minimum €200", "over €300", "above €150"
+        min_patterns = [
+            r"min(?:imum)?\s*[€$]*(\d+)",
+            r"over\s*[€$]*(\d+)",
+            r"above\s*[€$]*(\d+)",
+            r"more than\s*[€$]*(\d+)",
+        ]
+
+        for pattern in min_patterns:
+            match = re.search(pattern, response_lower)
+            if match:
+                min_price = float(match.group(1))
+                return {"min": min_price, "max": float("inf")}
+
+        # Fall back to original multiple choice parsing
         for budget_range in self.BUDGET_RANGES:
             label_lower = budget_range["label"].lower()
-            if "less than" in label_lower and ("less than" in response_lower or "onder" in response_lower):
+            if "less than" in label_lower and (
+                "less than" in response_lower or "onder" in response_lower
+            ):
                 if "150" in response_lower:
                     return {"min": 0, "max": 150}
-            elif "between" in label_lower and ("between" in response_lower or "tussen" in response_lower):
+            elif "between" in label_lower and (
+                "between" in response_lower or "tussen" in response_lower
+            ):
                 if "150" in response_lower and "300" in response_lower:
                     return {"min": 150, "max": 300}
-            elif "more than" in label_lower and ("more than" in response_lower or "meer dan" in response_lower):
+            elif "more than" in label_lower and (
+                "more than" in response_lower or "meer dan" in response_lower
+            ):
                 if "300" in response_lower:
                     return {"min": 300, "max": float("inf")}
-            elif "no preference" in label_lower and ("no preference" in response_lower or "geen" in response_lower):
+            elif "no preference" in label_lower and (
+                "no preference" in response_lower or "geen" in response_lower
+            ):
                 return {"min": 0, "max": float("inf")}
 
         return None
@@ -105,26 +154,26 @@ class ProductQuestionGenerator:
     def parse_brand_response(self, response: str) -> Optional[str]:
         """Parse brand response."""
         response_lower = response.lower()
-        
+
         for brand in self.SUPPORTED_BRANDS:
             if brand.lower() in response_lower:
                 return brand
-                
+
         if "no preference" in response_lower or "geen" in response_lower:
             return "any"
-            
+
         return None
 
     def parse_technology_response(self, response: str, category: str) -> Optional[str]:
         """Parse technology response based on category."""
         response_lower = response.lower()
         technologies = self.TECHNOLOGY_OPTIONS.get(category, [])
-        
+
         for tech in technologies:
             if tech.lower() in response_lower:
                 return tech
-                
+
         if "no preference" in response_lower or "geen" in response_lower:
             return "any"
-            
+
         return None
