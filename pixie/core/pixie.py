@@ -172,8 +172,8 @@ class Pixie:
                         type="ask_user",
                         prompt=(
                             "Ik heb 152 verschillende printers gevonden. "
-                            "Wilt u graag de top 5 zien gesorteerd op prijs of dat ik er 5 \
-                              willekeurig selecteer?"
+                            "Wilt u graag de top 5 zien gesorteerd op prijs of dat ik er 5 "
+                            "willekeurig selecteer?"
                         ),
                         pending_id=pending_id,
                     )
@@ -200,8 +200,8 @@ class Pixie:
                     type="no_results",
                     text=(
                         "Ik heb helaas geen printers gevonden die voldoen aan uw criteria. "
-                        "Probeer het misschien opnieuw met wat ruimere criteria of contacteer een \
-                          van onze medewerkers voor meer informatie."
+                        "Probeer het misschien opnieuw met wat ruimere criteria of contacteer een "
+                        "van onze medewerkers voor meer informatie."
                     ),
                 )
 
