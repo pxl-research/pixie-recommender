@@ -28,56 +28,54 @@ class Pixie:
         logger.info("pixie.answer", extra={"question": question})
 
         key = question.strip().lower()
-
-        # 2) Not relevant
-        if key in ("i'm looking for my mom", "i am looking for my mom"):
+        # Exact Dutch literal flows only
+        if key == "ik zoek mijn mama":
             return AskResponse(
                 type="not_relevant",
                 text=(
-                    "Sorry, I can't help with that. I only have information about"
-                    " printers, laptops, smartphones, ..."
+                    "Sorry, daar kan ik je niet bij helpen. "
+                    "Ik heb enkel informatie over printers, laptops, smartphones, ..."
                 ),
             )
 
-        # 3) No results
-        if key in (
-            "i want a brother laser printer under €50",
-            "i want a brother laser printer under 50 euros",
-        ):
-            return AskResponse(
-                type="no_results",
-                text=(
-                    "Unfortunately, no printers match your criteria. Please try again with a "
-                    "broader budget or contact support for assistance."
-                ),
-            )
-
-        # 1 & 4) Start product discovery flow
-        if key in ("i'm looking for a new printer", "i am looking for a new printer"):
+        if key == "ik wil graag meer informatie over een brother laserprinter":
             pending_id = f"pending-{uuid4().hex[:8]}"
-            context: dict[str, Any] = {
-                "flow": "product",
-                "stage": "ask_budget",
-                "filters": {},
-            }
+            context: dict[str, Any] = {"flow": "brother_laser", "stage": "ask_budget"}
             self._pending_store.save_pending(
                 pending_id, question, ttl_seconds=300, conversation_context=context
             )
             return AskResponse(
                 type="ask_user",
                 prompt=(
-                    "What is your budget for a printer? Less than €150, between €150–€300,"
-                    " more than €300, or no preference?"
+                    "Wat is uw budget voor een Brother laserprinter? "
+                    "Minder dan 150€, tussen 150€ en 300€, meer dan 300€ of maakt het niet uit?"
                 ),
                 pending_id=pending_id,
             )
 
+        if key == "ik zoek een nieuwe printer":
+            pending_id = f"pending-{uuid4().hex[:8]}"
+            context: dict[str, Any] = {"flow": "product", "stage": "ask_budget"}
+            self._pending_store.save_pending(
+                pending_id, question, ttl_seconds=300, conversation_context=context
+            )
+            return AskResponse(
+                type="ask_user",
+                prompt=(
+                    "Wat is uw budget voor een printer? "
+                    "Minder dan 150€, tussen 150€ en 300€, meer dan 300€ of maakt het niet uit?"
+                ),
+                pending_id=pending_id,
+            )
+
+        # fallback for any other literal input
         return AskResponse(
             type="not_relevant",
             text=(
-                "Question not recognized; use one of the example sentences:"
-                " 'I'm looking for a new printer', 'I want a Brother laser printer under €50',"
-                " or 'I'm looking for my mom'."
+                "Vraag niet herkend; gebruik letterlijk één van de voorbeeldzinnen zoals:\n"
+                "'Ik zoek een nieuwe printer',\n"
+                "'Ik wil graag meer informatie over een Brother laserprinter',\n"
+                "of 'Ik zoek mijn mama'."
             ),
         )
 
@@ -92,207 +90,156 @@ class Pixie:
             return AskResponse(type="error", reason="Invalid or expired pending_id")
 
         ctx = pending_entry.conversation_context or {}
-        if ctx.get("flow") != "product":
-            self._pending_store.resolve_pending(pending_id)
-            return AskResponse(type="error", reason="Unsupported pending flow")
-
+        flow = ctx.get("flow")
         stage = ctx.get("stage")
-        filters: dict[str, Any] = ctx.setdefault("filters", {})
         key = reply_text.strip().lower()
 
-        # tiny fixed catalog
-        catalog = [
-            {
-                "name": "Brother XC 2570",
-                "brand": "Brother",
-                "tech": "laser",
-                "price": 199,
-                "desc": "short description",
-            },
-            {
-                "name": "Brother XT 3560",
-                "brand": "Brother",
-                "tech": "laser",
-                "price": 159,
-                "desc": "short description",
-            },
-            {
-                "name": "Brother ZX 1570",
-                "brand": "Brother",
-                "tech": "inkjet",
-                "price": 69,
-                "desc": "short description",
-            },
-            {
-                "name": "HP Inkjet 234",
-                "brand": "HP",
-                "tech": "inkjet",
-                "price": 79,
-                "desc": "short description",
-            },
-            {
-                "name": "Kyocera T70",
-                "brand": "Kyocera",
-                "tech": "laser",
-                "price": 99,
-                "desc": "short description",
-            },
-            {
-                "name": "HP Inkjet 1234",
-                "brand": "HP",
-                "tech": "inkjet",
-                "price": 109,
-                "desc": "short description",
-            },
-        ]
-
-        # ask_budget
-        if stage == "ask_budget":
-            if "no preference" in key or key == "no preference":
-                filters["max_price"] = None
-            elif "maximum" in key or "€" in key or "eur" in key:
-                import re
-
-                m = re.search(r"(\d+)", key)
-                if m:
-                    filters["max_price"] = int(m.group(1))
-                else:
-                    filters["max_price"] = None
-            else:
-                filters["max_price"] = None
-
-            ctx["stage"] = "ask_brand"
-            self._pending_store.save_pending(
-                pending_id,
-                pending_entry.question,
-                conversation_context=ctx,
-            )
-            return AskResponse(
-                type="ask_user",
-                prompt=(
-                    "Which brand do you prefer? Brother, BenQ, HP, Kyocera, … or no preference?"
-                ),
-                pending_id=pending_id,
-            )
-
-        # ask_brand
-        if stage == "ask_brand":
-            if "no preference" in key or key == "no preference":
-                filters["brand"] = None
-            else:
-                filters["brand"] = key.split()[0].capitalize()
-
-            ctx["stage"] = "ask_tech"
-            self._pending_store.save_pending(
-                pending_id,
-                pending_entry.question,
-                conversation_context=ctx,
-            )
-            return AskResponse(
-                type="ask_user",
-                prompt=(
-                    "Which printing technology? Inkjet, laser, thermal inkjet, or no preference?"
-                ),
-                pending_id=pending_id,
-            )
-
-        # ask_tech
-        if stage == "ask_tech":
-            if "no preference" in key or key == "no preference":
-                filters["tech"] = None
-            else:
-                filters["tech"] = key.split()[0].lower()
-
-            # apply filters
-            results = []
-            for p in catalog:
+        # Flow: brother_laser (specialized)
+        if flow == "brother_laser":
+            if stage == "ask_budget":
+                # user literal: Minder dan 50€ -> no results
                 if (
-                    filters.get("brand")
-                    and p["brand"].lower() != filters["brand"].lower()
+                    key == "minder dan 50€"
+                    or key == "minder dan 50"
+                    or key == "minder dan 50eur"
                 ):
-                    continue
-                tech_filter = filters.get("tech")
-                if tech_filter and p["tech"].lower() != tech_filter.lower():
-                    continue
-                maxp = filters.get("max_price")
-                if maxp and p["price"] > maxp:
-                    continue
-                results.append(p)
-
-            THRESHOLD = 5
-            if len(results) == 0:
-                self._pending_store.resolve_pending(pending_id)
-                return AskResponse(
-                    type="no_results",
-                    text=(
-                        "Unfortunately, no printers match your criteria. Please try again with a broader"
-                        " budget or contact support for assistance."
-                    ),
-                )
-
-            if len(results) > THRESHOLD:
-                ctx["stage"] = "choose_result_view"
-                ctx["results"] = results
-                ctx["total_count"] = len(results)
+                    self._pending_store.resolve_pending(pending_id)
+                    return AskResponse(
+                        type="no_results",
+                        text=(
+                            "Ik heb helaas geen printers gevonden die voldoen aan uw criteria. "
+                            "Probeer het misschien opnieuw met wat ruimere criteria of "
+                            "contacteer een van onze medewerkers voor meer informatie."
+                        ),
+                    )
+                # any other reply -> ask brand (follow the minimal literal flow)
+                ctx["stage"] = "ask_brand"
                 self._pending_store.save_pending(
-                    pending_id,
-                    pending_entry.question,
-                    conversation_context=ctx,
+                    pending_id, pending_entry.question, conversation_context=ctx
                 )
                 return AskResponse(
                     type="ask_user",
                     prompt=(
-                        f"I found {len(results)} printers. Would you like to see the top 5 "
-                        "sorted by price, or a random sample of 5?"
+                        "Welk merk van printer had u in gedachte? "
+                        "U kan kiezen uit Brother, Benq, HP, Kyocera, ... of weet u het nog niet?"
                     ),
                     pending_id=pending_id,
                 )
 
-            # return manageable list
-            self._pending_store.resolve_pending(pending_id)
-            lines = [
-                f"{i+1}. {p['name']} – €{p['price']} – {p['desc']}"
-                for i, p in enumerate(results)
-            ]
-            return AskResponse(
-                type="answer", text="Here are matching printers:\n" + "\n".join(lines)
-            )
-
-        # choose_result_view
-        if stage == "choose_result_view":
-            results = ctx.get("results", [])
-            if not results:
-                self._pending_store.resolve_pending(pending_id)
-                return AskResponse(type="error", reason="No results cached")
-
-            if "sorted" in key:
-                sorted_res = sorted(results, key=lambda r: r["price"])[:5]
-                self._pending_store.resolve_pending(pending_id)
-                lines = [
-                    f"{i+1}. {p['name']} – €{p['price']} – {p['desc']}"
-                    for i, p in enumerate(sorted_res)
-                ]
+        # Flow: product (general product discovery)
+        if flow == "product":
+            # stage: ask_budget
+            if stage == "ask_budget":
+                # record budget literally but we only need to check a few exact phrases
+                ctx["stage"] = "ask_brand"
+                self._pending_store.save_pending(
+                    pending_id, pending_entry.question, conversation_context=ctx
+                )
                 return AskResponse(
-                    type="answer",
-                    text="Here are the top 5 printers sorted by price:\n"
-                    + "\n".join(lines),
+                    type="ask_user",
+                    prompt=(
+                        "Welk merk van printer had u in gedachte? "
+                        "U kan kiezen uit Brother, Benq, HP, Kyocera, ... of weet u het nog niet?"
+                    ),
+                    pending_id=pending_id,
                 )
 
-            if "random" in key or "sample" in key:
-                sample = results[:5]
-                self._pending_store.resolve_pending(pending_id)
-                lines = [
-                    f"{i+1}. {p['name']} – €{p['price']} – {p['desc']}"
-                    for i, p in enumerate(sample)
-                ]
+            # stage: ask_brand
+            if stage == "ask_brand":
+                ctx["stage"] = "ask_tech"
+                self._pending_store.save_pending(
+                    pending_id, pending_entry.question, conversation_context=ctx
+                )
                 return AskResponse(
-                    type="answer",
-                    text="Here is a sample of 5 printers:\n" + "\n".join(lines),
+                    type="ask_user",
+                    prompt=(
+                        "Welke printtechnologie had u in gedachte? "
+                        "U kan kiezen uit inkjet, laser, thermal inkjet of weet u het nog niet?"
+                    ),
+                    pending_id=pending_id,
                 )
 
-            self._pending_store.resolve_pending(pending_id)
-            return AskResponse(type="error", reason="Unknown choice")
+            # stage: ask_tech
+            if stage == "ask_tech":
+                # If user answered "weet ik niet" for all stages we simulate many results
+                if key == "weet ik niet":
+                    ctx["stage"] = "choose_result_view"
+                    ctx["total_count"] = 152
+                    self._pending_store.save_pending(
+                        pending_id, pending_entry.question, conversation_context=ctx
+                    )
+                    return AskResponse(
+                        type="ask_user",
+                        prompt=(
+                            "Ik heb 152 verschillende printers gevonden. "
+                            "Wilt u graag de top 5 zien gesorteerd op prijs of dat ik er 5 willekeurig selecteer?"
+                        ),
+                        pending_id=pending_id,
+                    )
 
-        # fallback
+                # If user gives a concrete technology like "laser", return two Brother results
+                if key == "laser":
+                    self._pending_store.resolve_pending(pending_id)
+                    return AskResponse(
+                        type="answer",
+                        text=(
+                            "Ik heb volgende printers voor u gevonden\n"
+                            "1. Brother XC 2570\n"
+                            "Prijs: 199€\n"
+                            "Beschrijving: ....\n"
+                            "2. Brother XT 3560\n"
+                            "Prijs: 159€\n"
+                            "Beschrijving: ..."
+                        ),
+                    )
+
+                # any other literal -> no results
+                self._pending_store.resolve_pending(pending_id)
+                return AskResponse(
+                    type="no_results",
+                    text=(
+                        "Ik heb helaas geen printers gevonden die voldoen aan uw criteria. "
+                        "Probeer het misschien opnieuw met wat ruimere criteria of contacteer een van onze medewerkers voor meer informatie."
+                    ),
+                )
+
+            # stage: choose_result_view
+            if stage == "choose_result_view":
+                # expect literal 'gesorteerd op prijs' or 'willekeurig'
+                if key == "gesorteerd op prijs":
+                    self._pending_store.resolve_pending(pending_id)
+                    return AskResponse(
+                        type="answer",
+                        text=(
+                            "Ik heb volgende printers voor u gevonden\n"
+                            "1. Brother ZX 1570\n"
+                            "Prijs: 69€\n"
+                            "Beschrijving: ....\n"
+                            "2. HP inkjet 234\n"
+                            "Prijs: 79€\n"
+                            "Beschrijving: ...\n"
+                            "3. Kyocera T70\n"
+                            "Prijs: 99€\n"
+                            "Beschrijving: ....\n"
+                            "4. Brother XT 3560\n"
+                            "Prijs: 99€\n"
+                            "Beschrijving: ...\n"
+                            "5. HP inkjet 1234\n"
+                            "Prijs: 109€\n"
+                            "Beschrijving: ...."
+                        ),
+                    )
+
+                if key == "willekeurig" or key == "willekeurig selecteer":
+                    self._pending_store.resolve_pending(pending_id)
+                    return AskResponse(
+                        type="answer",
+                        text=("Hier is een willekeurige selectie van 5 printers."),
+                    )
+
+                self._pending_store.resolve_pending(pending_id)
+                return AskResponse(type="error", reason="Onbekende keuze")
+
+        # unsupported flow
         self._pending_store.resolve_pending(pending_id)
-        return AskResponse(type="error", reason="Unsupported conversation stage")
+        return AskResponse(type="error", reason="Unsupported pending flow")

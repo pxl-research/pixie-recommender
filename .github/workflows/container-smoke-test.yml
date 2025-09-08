@@ -1,0 +1,52 @@
+name: Container smoke test
+
+on:
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+  smoke-test:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Build and start compose (dev)
+        run: |
+          docker compose -f docker-compose.dev.yml up --build -d
+
+      - name: Wait for API health
+        run: |
+          container=$(docker compose -f docker-compose.dev.yml ps -q api)
+          echo "waiting for container: $container"
+          for i in $(seq 1 30); do
+            status=$(docker exec "$container" /bin/sh -c "python - <<'PY'\nimport http.client\nc=http.client.HTTPConnection('localhost',8000)\ntry:\n r=c.request('GET','/health')\n r=c.getresponse()\n print(r.status)\nexcept Exception:\n print('err')\nPY")
+            echo "health: $status"
+            if echo "$status" | grep -q "200"; then
+              echo ok
+              break
+            fi
+            sleep 2
+          done
+
+      - name: Run container smoke tests
+        run: |
+          container=$(docker compose -f docker-compose.dev.yml ps -q api)
+          docker exec "$container" python /app/scripts/run_in_container_tests.py
+
+      - name: Collect test output
+        run: |
+          container=$(docker compose -f docker-compose.dev.yml ps -q api)
+          docker cp "$container":/app/pixie_test_output.json ./pixie_test_output.json || true
+
+      - name: Upload test artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: pixie-container-smoke-test
+          path: pixie_test_output.json
+
+      - name: Teardown
+        if: always()
+        run: |
+          docker compose -f docker-compose.dev.yml down -v

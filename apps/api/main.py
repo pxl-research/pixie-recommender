@@ -1,142 +1,69 @@
 import logging
-from contextlib import asynccontextmanager
-from uuid import uuid4
 
-# FastAPI and some dependencies may not be available during quick local runs
-try:
-    from fastapi import FastAPI, Request  # type: ignore
-
-    _HAS_FASTAPI = True
-except Exception:  # pragma: no cover - dev environment fallback
-    FastAPI = None  # type: ignore
-    Request = object  # type: ignore
-    _HAS_FASTAPI = False
+from fastapi import Body, FastAPI
 
 from pixie.core import logging as pixie_logging
 from pixie.core.contracts import AskResponse
 from pixie.core.pixie import Pixie
 
 
-@asynccontextmanager
-async def lifespan(app):
-    # configure logging once at startup
+# Configure logging at startup
+app = FastAPI(title="Pixie Core API", version="0.0.0")
+
+
+@app.on_event("startup")
+def on_startup():
     pixie_logging.configure_logging()
-    yield
 
 
-if _HAS_FASTAPI:
-    app = FastAPI(title="Pixie Core API", version="0.0.0", lifespan=lifespan)
-
-    # Shared Pixie instance to maintain state across requests
-    _pixie_instance = Pixie()
-
-    @app.middleware("http")
-    async def add_trace_id(request, call_next):
-        """Assign a trace_id and make it available to structured logs."""
-        trace_id = str(uuid4())
-        pixie_logging.trace_id_ctx.set(trace_id)
-
-        logging.getLogger("uvicorn.error").info(
-            "request_start", extra={"path": request.url.path, "trace_id": trace_id}
-        )
-
-        try:
-            response = await call_next(request)
-        except Exception:
-            logging.exception("unhandled_exception")
-            raise
-
-        logging.getLogger("uvicorn.error").info(
-            "request_end",
-            extra={
-                "path": request.url.path,
-                "status_code": getattr(response, "status_code", None),
-                "trace_id": trace_id,
-            },
-        )
-
-        try:
-            response.headers["X-Trace-Id"] = trace_id
-        except Exception:
-            pass
-
-        return response
-
-else:
-    # When FastAPI is not available (local dev without pydantic_core), still expose
-    # a Pixie instance so the `ask` function below can be imported and used.
-    _pixie_instance = Pixie()
+# Shared Pixie instance
+_pixie_instance = Pixie()
 
 
-if _HAS_FASTAPI:
-
-    @app.get("/health")
-    def health():
-        return {"status": "ok"}
+@app.get("/health")
+def health():
+    return {"status": "ok"}
 
 
-def ask(req: dict):
+@app.post("/ask")
+def ask(req: dict = Body(...)):
     """Unified endpoint for both new questions and replies to pending questions.
 
-    Auto-detects the request type based on presence of pending_id:
-    - No pending_id: New question flow
-    - With pending_id: Reply to existing pending question
+    - If `pending_id` is present we treat the payload as a reply (requires `message`).
+    - Otherwise `question` must be provided for a new ask.
     """
     logger = logging.getLogger(__name__)
     logger.info("api.ask", extra={"payload": req})
 
     try:
-        # Use shared Pixie instance to maintain pending state
         pixie = _pixie_instance
 
-        # Auto-detect request type based on pending_id presence
         pending_id = req.get("pending_id")
-
         if pending_id:
-            # Reply flow: responding to a pending question
             message = req.get("message")
-            if message is None:
-                return AskResponse(
-                    type="error",
-                    reason="'message' is required when replying to pending questions",
-                )
-            if not isinstance(message, str) or len(message.strip()) == 0:
-                return AskResponse(
-                    type="error", reason="'message' must be a non-empty string"
+            if not message or not isinstance(message, str):
+                return (
+                    AskResponse(
+                        type="error", reason="'message' is required and must be a string"
+                    )
+                    .dict()
                 )
 
-            # Validate pending_id format
-            if not isinstance(pending_id, str) or len(pending_id.strip()) == 0:
-                return AskResponse(
-                    type="error", reason="'pending_id' must be a non-empty string"
-                )
-
-            # Process the reply
             resp = pixie.reply(pending_id.strip(), message.strip())
             return resp.dict()
 
-        else:
-            # New question flow
-            question = req.get("question")
-            if question is None:
-                return AskResponse(
-                    type="error", reason="'question' is required for new asks"
+        question = req.get("question")
+        if not question or not isinstance(question, str):
+            return (
+                AskResponse(
+                    type="error", reason="'question' is required and must be a string"
                 )
-            if not isinstance(question, str) or len(question.strip()) == 0:
-                return AskResponse(
-                    type="error", reason="'question' must be a non-empty string"
-                )
+                .dict()
+            )
 
-            resp = pixie.answer(question.strip())
-            return resp.dict()
+        resp = pixie.answer(question.strip())
+        return resp.dict()
 
     except Exception:
         logger.exception("Unexpected error in /ask endpoint")
         return AskResponse(type="error", reason="Internal server error occurred").dict()
-
-
-if _HAS_FASTAPI:
-    # register the function as a route in the running FastAPI app
-    _app = globals().get("app")
-    if _app is not None:
-        _app.post("/ask")(ask)
