@@ -4,8 +4,8 @@ from uuid import uuid4
 from fastapi import Body, FastAPI
 
 from pixie.core import logging as pixie_logging
-from pixie.core.logging import trace_id_ctx
 from pixie.core.contracts import AskResponse
+from pixie.core.logging import trace_id_ctx
 from pixie.core.pixie import Pixie
 
 # Configure logging at startup
