@@ -2,7 +2,15 @@ import logging
 from contextlib import asynccontextmanager
 from uuid import uuid4
 
-from fastapi import FastAPI, Request
+# FastAPI and some dependencies may not be available during quick local runs
+try:
+    from fastapi import FastAPI, Request  # type: ignore
+
+    _HAS_FASTAPI = True
+except Exception:  # pragma: no cover - dev environment fallback
+    FastAPI = None  # type: ignore
+    Request = object  # type: ignore
+    _HAS_FASTAPI = False
 
 from pixie.core import logging as pixie_logging
 from pixie.core.contracts import AskResponse
@@ -10,57 +18,63 @@ from pixie.core.pixie import Pixie
 
 
 @asynccontextmanager
-async def lifespan(app: FastAPI):
+async def lifespan(app):
     # configure logging once at startup
     pixie_logging.configure_logging()
     yield
 
 
-app = FastAPI(title="Pixie Core API", version="0.0.0", lifespan=lifespan)
+if _HAS_FASTAPI:
+    app = FastAPI(title="Pixie Core API", version="0.0.0", lifespan=lifespan)
 
-# Shared Pixie instance to maintain state across requests
-_pixie_instance = Pixie()
+    # Shared Pixie instance to maintain state across requests
+    _pixie_instance = Pixie()
+
+    @app.middleware("http")
+    async def add_trace_id(request, call_next):
+        """Assign a trace_id and make it available to structured logs."""
+        trace_id = str(uuid4())
+        pixie_logging.trace_id_ctx.set(trace_id)
+
+        logging.getLogger("uvicorn.error").info(
+            "request_start", extra={"path": request.url.path, "trace_id": trace_id}
+        )
+
+        try:
+            response = await call_next(request)
+        except Exception:
+            logging.exception("unhandled_exception")
+            raise
+
+        logging.getLogger("uvicorn.error").info(
+            "request_end",
+            extra={
+                "path": request.url.path,
+                "status_code": getattr(response, "status_code", None),
+                "trace_id": trace_id,
+            },
+        )
+
+        try:
+            response.headers["X-Trace-Id"] = trace_id
+        except Exception:
+            pass
+
+        return response
+
+else:
+    # When FastAPI is not available (local dev without pydantic_core), still expose
+    # a Pixie instance so the `ask` function below can be imported and used.
+    _pixie_instance = Pixie()
 
 
-@app.middleware("http")
-async def add_trace_id(request: Request, call_next):
-    """Assign a trace_id and make it available to structured logs."""
-    trace_id = str(uuid4())
-    pixie_logging.trace_id_ctx.set(trace_id)
+if _HAS_FASTAPI:
 
-    logging.getLogger("uvicorn.error").info(
-        "request_start", extra={"path": request.url.path, "trace_id": trace_id}
-    )
-
-    try:
-        response = await call_next(request)
-    except Exception:
-        logging.exception("unhandled_exception")
-        raise
-
-    logging.getLogger("uvicorn.error").info(
-        "request_end",
-        extra={
-            "path": request.url.path,
-            "status_code": getattr(response, "status_code", None),
-            "trace_id": trace_id,
-        },
-    )
-
-    try:
-        response.headers["X-Trace-Id"] = trace_id
-    except Exception:
-        pass
-
-    return response
+    @app.get("/health")
+    def health():
+        return {"status": "ok"}
 
 
-@app.get("/health")
-def health():
-    return {"status": "ok"}
-
-
-@app.post("/ask", response_model=AskResponse)
 def ask(req: dict):
     """Unified endpoint for both new questions and replies to pending questions.
 
@@ -99,7 +113,7 @@ def ask(req: dict):
 
             # Process the reply
             resp = pixie.reply(pending_id.strip(), message.strip())
-            return resp
+            return resp.dict()
 
         else:
             # New question flow
@@ -114,8 +128,15 @@ def ask(req: dict):
                 )
 
             resp = pixie.answer(question.strip())
-            return resp
+            return resp.dict()
 
     except Exception:
         logger.exception("Unexpected error in /ask endpoint")
-        return AskResponse(type="error", reason="Internal server error occurred")
+        return AskResponse(type="error", reason="Internal server error occurred").dict()
+
+
+if _HAS_FASTAPI:
+    # register the function as a route in the running FastAPI app
+    _app = globals().get("app")
+    if _app is not None:
+        _app.post("/ask")(ask)
