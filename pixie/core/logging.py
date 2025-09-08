@@ -87,9 +87,28 @@ def configure_logging(level: int = logging.INFO) -> None:
     root.setLevel(level)
     handler = logging.StreamHandler()
     handler.setFormatter(JsonFormatter())
-    handler.addFilter(TraceIdFilter())
+    # Ensure trace_id is attached at logger level so test capture handlers
+    # (pytest caplog) and any other handlers see the attribute on the LogRecord.
+    trace_filter = TraceIdFilter()
+    handler.addFilter(trace_filter)
+    root.addFilter(trace_filter)
     root.handlers = [handler]
 
     logging.getLogger("uvicorn.access").addFilter(TraceIdFilter())
+
+    # Wrap the LogRecord factory so every new LogRecord contains a trace_id
+    # attribute at creation time. This ensures test capture (caplog) and
+    # third-party handlers receive records with the attribute already set.
+    orig_factory = logging.getLogRecordFactory()
+
+    def record_factory(*args, **kwargs):
+        rec = orig_factory(*args, **kwargs)
+        try:
+            rec.trace_id = trace_id_ctx.get(None)
+        except Exception:
+            rec.trace_id = None
+        return rec
+
+    logging.setLogRecordFactory(record_factory)
 
     setattr(root, "pixie_configured", True)
