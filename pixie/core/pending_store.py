@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from datetime import datetime, timedelta, timezone
-from typing import Dict, Optional
+from typing import Any, Dict, Optional
 
 
 @dataclass
@@ -11,6 +11,7 @@ class PendingEntry:
     question: str
     created_at: datetime
     ttl_seconds: int = 300
+    conversation_context: Optional[Dict[str, Any]] = None
 
     def expired(self) -> bool:
         return datetime.now(timezone.utc) > self.created_at + timedelta(
@@ -25,7 +26,11 @@ class InMemoryPendingStore:
         self._store: Dict[str, PendingEntry] = {}
 
     def save_pending(
-        self, pending_id: str, question: str, ttl_seconds: int = 300
+        self, 
+        pending_id: str, 
+        question: str, 
+        ttl_seconds: int = 300,
+        conversation_context: Optional[Dict[str, Any]] = None
     ) -> None:
         now = datetime.now(timezone.utc)
         entry = PendingEntry(
@@ -33,6 +38,7 @@ class InMemoryPendingStore:
             question=question,
             created_at=now,
             ttl_seconds=ttl_seconds,
+            conversation_context=conversation_context,
         )
         self._store[pending_id] = entry
 
