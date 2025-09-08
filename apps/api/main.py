@@ -42,24 +42,18 @@ def ask(req: dict = Body(...)):
         if pending_id:
             message = req.get("message")
             if not message or not isinstance(message, str):
-                return (
-                    AskResponse(
-                        type="error", reason="'message' is required and must be a string"
-                    )
-                    .dict()
-                )
+                return AskResponse(
+                    type="error", reason="'message' is required and must be a string"
+                ).dict()
 
             resp = pixie.reply(pending_id.strip(), message.strip())
             return resp.dict()
 
         question = req.get("question")
         if not question or not isinstance(question, str):
-            return (
-                AskResponse(
-                    type="error", reason="'question' is required and must be a string"
-                )
-                .dict()
-            )
+            return AskResponse(
+                type="error", reason="'question' is required and must be a string"
+            ).dict()
 
         resp = pixie.answer(question.strip())
         return resp.dict()
