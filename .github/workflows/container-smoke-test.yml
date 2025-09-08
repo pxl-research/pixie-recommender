@@ -14,6 +14,11 @@ jobs:
 
       - name: Build and start compose (dev)
         run: |
+          # Ensure a .env.dev exists (we commit a safe example) so docker-compose
+          # won't fail in CI where .env* is ignored.
+          if [ -f .env.example ] && [ ! -f .env.dev ]; then
+            cp .env.example .env.dev
+          fi
           docker compose -f docker-compose.dev.yml up --build -d
 
       - name: Wait for API health

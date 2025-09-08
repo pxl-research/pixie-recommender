@@ -157,6 +157,17 @@ curl -X POST "http://localhost:8000/ask" \
   -d '{"question": "Ik zoek een nieuwe printer"}'
 ```
 
+Opmerkingen over environment files
+
+- De repository bevat een veilig voorbeeldbestand `.env.dev.example` dat minimale, niet-gevoelige defaults bevat (bijv. poort). Het echte `.env.dev` is in `.gitignore` omdat het eventueel secrets kan bevatten.
+- Maak lokaal een `.env.dev` aan voordat je `docker compose` gebruikt, bijvoorbeeld:
+
+```bash
+# copy the general example to the dev-specific filename used by compose
+cp .env.example .env.dev
+# pas .env.dev aan als je extra waarden of secrets wilt
+```
+
 Als je wil dat ik de docker-compose of Dockerfile aanpas (bijv. andere poort, healthchecks, of een klein Makefile) dan maak ik die wijziging graag.
 
 ## Container smoke test (CI)
@@ -167,6 +178,8 @@ Er is een GitHub Actions workflow toegevoegd (`.github/workflows/container-smoke
 - wacht op de `/health` endpoint
 - voert het container-side testscript `/app/scripts/run_in_container_tests.py` uit
 - uploadt `pixie_test_output.json` als artifact
+
+CI-opmerking: de GitHub Actions workflow maakt in CI een `.env.dev` aan uit `.env.example` voordat `docker compose` draait. Daardoor faalt de workflow niet met "env file not found". Als je extra, gevoelige environment-variabelen nodig hebt in CI (bijv. API keys), voeg die dan toe via GitHub Secrets en pas de workflow aan om ze in te vullen.
 
 Je kunt dezelfde smoke test lokaal uitvoeren met:
 
