@@ -6,7 +6,6 @@ from pixie.core import logging as pixie_logging
 from pixie.core.contracts import AskResponse
 from pixie.core.pixie import Pixie
 
-
 # Configure logging at startup
 app = FastAPI(title="Pixie Core API", version="0.0.0")
 
