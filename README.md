@@ -23,7 +23,6 @@ The system intelligently handles questions through a single `/ask` endpoint that
 uv install
 
 # Run development server
-```markdown
 # pixie-core
 
 Eenvoudige, API-first mock van Pixie gericht op een paar hardgecodeerde voorbeeldflows.
