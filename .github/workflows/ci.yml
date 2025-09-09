@@ -27,6 +27,11 @@ jobs:
           # install pinned deps into the runner environment
           uv sync --frozen --extra dev
 
+      - name: Run formatter (black)
+        run: |
+          # ensure formatting matches Black rules
+          uv run python -m black --check .
+
       - name: Run linter (ruff)
         run: |
           uv run python -m ruff check .

@@ -1,4 +1,5 @@
 import logging
+from contextlib import asynccontextmanager
 from uuid import uuid4
 
 from fastapi import Body, FastAPI
@@ -8,19 +9,21 @@ from pixie.core.contracts import AskResponse
 from pixie.core.logging import trace_id_ctx
 from pixie.core.pixie import Pixie
 
-# Configure logging at startup
-app = FastAPI(title="Pixie Core API", version="0.0.0")
-
-
 # Also configure logging at import time so test runners that create a
 # TestClient during module import (common in test files) have the LogRecord
 # factory and filters installed before any requests are processed.
 pixie_logging.configure_logging()
 
 
-@app.on_event("startup")
-def on_startup():
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    # Configure logging at startup using the lifespan handler (replacement for on_event)
     pixie_logging.configure_logging()
+    yield
+
+
+# Configure FastAPI app with explicit lifespan handler to avoid on_event deprecation
+app = FastAPI(title="Pixie Core API", version="0.0.0", lifespan=lifespan)
 
 
 @app.middleware("http")
