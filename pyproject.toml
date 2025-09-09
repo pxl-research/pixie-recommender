@@ -31,3 +31,17 @@ target-version = "py312"
 [tool.ruff.lint]
 select = ["E", "F", "I"]   # pyflakes/pycodestyle/imports
 ignore = []
+
+[build-system]
+requires = ["setuptools>=61.0", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[tool.setuptools.packages.find]
+where = ["."]
+include = ["pixie*", "apps*"]
+exclude = ["infra", "tests", ".copilot-tracking"]
+
+[tool.uv]
+dev-dependencies = [
+    "black==23.12.0",
+]

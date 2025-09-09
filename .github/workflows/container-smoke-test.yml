@@ -26,20 +26,7 @@ jobs:
           container=$(docker compose -f docker-compose.dev.yml ps -q api)
           echo "waiting for container: $container"
           for i in $(seq 1 30); do
-            # Run python directly in the container and feed the script via stdin from the runner.
-            # Using -i avoids invoking a shell inside the container to execute a heredoc,
-            # which can cause parsing issues for certain container shells.
-            status=$(docker exec -i "$container" python - <<'EOF'
-          import http.client
-          c=http.client.HTTPConnection('localhost',8000)
-          try:
-              c.request('GET','/health')
-              r=c.getresponse()
-              print(r.status)
-          except Exception:
-              print('err')
-          EOF
-          )
+            status=$(docker exec "$container" python /app/scripts/wait_for_health_container.py || true)
             echo "health: $status"
             if echo "$status" | grep -q "200"; then
               echo ok

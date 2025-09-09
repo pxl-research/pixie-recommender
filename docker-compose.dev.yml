@@ -16,3 +16,13 @@ services:
       interval: 10s
       timeout: 3s
       retries: 5
+  dev:
+    build:
+      context: .
+      dockerfile: infra/docker/Dockerfile.dev
+    volumes:
+      - .:/app
+    working_dir: /app
+    environment:
+      - ENV=dev
+    command: ["bash"]

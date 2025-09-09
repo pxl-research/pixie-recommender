@@ -1,5 +1,7 @@
 # pixie-core
 
+[![Container smoke test](https://github.com/pxl-research/pixie-core/actions/workflows/container-smoke-test.yml/badge.svg)](https://github.com/pxl-research/pixie-core/actions/workflows/container-smoke-test.yml)
+
 Mock implementation van Pixie met vier hardgecodeerde flows: product discovery, geen resultaten, niet relevant, en te veel resultaten.
 
 ## Quick Start
@@ -15,6 +17,13 @@ docker compose -f docker-compose.dev.yml up --build
 ```
 
 API is beschikbaar op `http://localhost:8000`
+
+Note on checks:
+
+- `CI` (github) runs lint and unit tests in the runner.
+- `Container smoke` builds the dev image and runs integration smoke tests (PRs or manual dispatch).
+
+Recommended local test command: `./scripts/dev_test.sh pytest` (or `make dev-test`).
 
 ### 2. Stel vragen
 
@@ -41,15 +50,28 @@ curl -X POST "http://localhost:8000/ask" \
 - **Niet relevant:** `"Waar kan ik mijn moeder vinden?"` → `{"type": "not_relevant"}`
 - **Te veel resultaten:** `"Ik heb een printer nodig"` → vraagt om verfijning
 
-## Tests
+docker compose -f docker-compose.dev.yml up --build -d
+docker compose -f docker-compose.dev.yml down -v
+<!-- Tests are documented in .github/workflows/copilot-instructions.md -->
+
+Lokale en CI container-smoke tests delen nu dezelfde helper. Raadpleeg
+`.github/workflows/copilot-instructions.md` voor korte, up-to-date instructies.
+
+De CI workflow gebruikt `/app/scripts/wait_for_health_container.py` en
+`/app/scripts/run_in_container_tests.py` zodat lokale runs en CI sterk op
+elkaar lijken.
+
+## Running tests inside the dev container (recommended)
+
+Use the `dev` service to run tests from a hermetic environment that uses the
+project lockfile (`uv.lock`) and `uv` to create the venv. This is the
+recommended way to run tests locally so they mirror CI.
+
+Quick command (recommended):
 
 ```bash
-# Lokale smoke test
-docker compose -f docker-compose.dev.yml up --build -d
-container=$(docker compose -f docker-compose.dev.yml ps -q api)
-docker exec "$container" python /app/scripts/run_in_container_tests.py
-docker compose -f docker-compose.dev.yml down -v
-
-# Unit tests
-uv run python -m pytest tests/ -v
+./scripts/dev_test.sh pytest
 ```
+
+Or use the Makefile target `make dev-test` which delegates to the canonical
+helper script `./scripts/dev_test.sh`.
