@@ -101,7 +101,8 @@ def test_choose_result_view_large_results():
     def search_fn(sql_query, attrs):
         # first call (initial) empty, subsequent calls return many
         calls["count"] += 1
-        # return empty for first two calls (initial and after ask_tech) so we reach choose_result_view
+        # return empty for the first two calls (initial and after ask_tech)
+        # this makes the manager reach the choose_result_view stage
         if calls["count"] <= 2:
             return []
         return engine.search(sql_query, attrs)
