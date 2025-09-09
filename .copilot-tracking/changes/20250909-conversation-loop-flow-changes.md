@@ -2,7 +2,7 @@
 
 - 2025-09-09: Started Task 1.1 (validated `LLM`), no changes made to code.
 
-## Task 1.2: MockLLMs specification (planned)
+## Task 1.2: MockLLMs specification (implemented)
 
 Planned files: `pixie/core/mock_relevance_llm.py`, `pixie/core/mock_sql_llm.py`, `pixie/core/mock_refinement_llm.py` (do not create without approval)
 
@@ -43,6 +43,9 @@ Error modes / behavior:
 Testing notes:
 - Unit tests will assert exact outputs when deterministic=True for each specialized class.
 
+Validation:
+- The mock LLM classes and the `create_mock_llm_set` factory are present in `pixie/core/` and the selective unit tests `tests/test_mock_llms.py` and `tests/test_conversation_loop.py` passed locally when run via `python3 -m pytest`.
+
 
 ## Progress
 - [x] Task 1.1 validated (no code changes)
@@ -78,6 +81,8 @@ docker compose -f docker-compose.dev.yml run --rm dev python -m black .
 Impact on workflow:
 - Low risk, provides reproducible dev tooling. Implementation can be done once Task 2.2 wiring is stable.
 - Next action when approved: add `infra/docker/Dockerfile.dev`, update `docker-compose.dev.yml`, and add a brief README snippet explaining commands.
+- Actions taken: dev container artifacts were added and validated; README was updated with the canonical test command and a GitHub Actions workflow was added to run the containerized tests on PRs.
+- Dev CI badge: added a badge to the README pointing at the consolidated `container-smoke-test.yml` workflow (removed duplicate `dev-tests.yml`).
 
 ## Status update (2025-09-09)
 

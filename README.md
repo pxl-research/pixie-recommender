@@ -1,5 +1,7 @@
 # pixie-core
 
+[![Container smoke test](https://github.com/pxl-research/pixie-core/actions/workflows/container-smoke-test.yml/badge.svg)](https://github.com/pxl-research/pixie-core/actions/workflows/container-smoke-test.yml)
+
 Mock implementation van Pixie met vier hardgecodeerde flows: product discovery, geen resultaten, niet relevant, en te veel resultaten.
 
 ## Quick Start
@@ -15,6 +17,13 @@ docker compose -f docker-compose.dev.yml up --build
 ```
 
 API is beschikbaar op `http://localhost:8000`
+
+Note on checks:
+
+- `CI` (github) runs lint and unit tests in the runner.
+- `Container smoke` builds the dev image and runs integration smoke tests (PRs or manual dispatch).
+
+Recommended local test command: `./scripts/dev_test.sh pytest` (or `make dev-test`).
 
 ### 2. Stel vragen
 
@@ -58,14 +67,11 @@ Use the `dev` service to run tests from a hermetic environment that uses the
 project lockfile (`uv.lock`) and `uv` to create the venv. This is the
 recommended way to run tests locally so they mirror CI.
 
-Quick command:
+Quick command (recommended):
 
 ```bash
-docker compose -f docker-compose.dev.yml run --rm dev uv sync --extra dev && \
-  docker compose -f docker-compose.dev.yml run --rm dev uv run python -m pytest -q
+./scripts/dev_test.sh pytest
 ```
 
-Or use the Makefile target `make dev-test` (added to the repo) which runs the
-same commands. The Makefile now delegates to the canonical helper script so
-`./scripts/dev_test.sh` is the single-source of truth for dev/test orchestration
-and `make dev-test` simply calls `./scripts/dev_test.sh pytest`.
+Or use the Makefile target `make dev-test` which delegates to the canonical
+helper script `./scripts/dev_test.sh`.
