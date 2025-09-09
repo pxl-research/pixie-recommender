@@ -103,4 +103,18 @@ class ConversationLoopManager:
             self.pending_store.resolve_pending(pending_id)
             return AskResponse(type="no_results", text="No results found")
 
+        if stage == "choose_result_view":
+            # user selects a view (e.g., 'gesorteerd op prijs' or 'willekeurig')
+            ctx["view"] = reply
+            ctx["iterations"] = ctx.get("iterations", 0) + 1
+            # regenerate SQL with chosen view and perform search
+            sql = self.sql_model.generate_sql(pending_entry.question, ctx)
+            results = self.search_fn(sql, ctx)
+            if results:
+                self.pending_store.resolve_pending(pending_id)
+                return AskResponse(type="answer", text=str(results))
+            # nothing found after choosing view -> finish with no_results
+            self.pending_store.resolve_pending(pending_id)
+            return AskResponse(type="no_results", text="No results found")
+
         return AskResponse(type="error", reason="unsupported_stage")
