@@ -80,3 +80,27 @@ Impact on workflow:
 - Low risk, provides reproducible dev tooling. Implementation can be done once Task 2.2 wiring is stable.
 - Next action when approved: add `infra/docker/Dockerfile.dev`, update `docker-compose.dev.yml`, and add a brief README snippet explaining commands.
 
+## Status update (2025-09-09)
+
+- Branch: `v0.3_pixie_mock_real_flow`
+- Latest local commit: `32fed90` (feat(core): add ConversationLoopManager, integrate into Pixie, tests and dev container plan)
+- Tests: the newly-added tests for the mock LLMs and the ConversationLoopManager pass when run selectively (`tests/test_mock_llms.py` and `tests/test_conversation_loop.py`).
+- Full test-suite note: running `pytest` for the whole repo currently fails during collection due to a missing optional dependency (`fastapi`). This is an environment issue, not a logic failure in the new code.
+
+Immediate next recommended steps:
+
+- Install dev/test dependencies locally and run the full test suite:
+
+```bash
+python3 -m pip install -r requirements-dev.txt  # or install fastapi/tests deps manually
+python3 -m pytest -q
+```
+
+- Or: create the planned dev-container and run the full tests inside it for a hermetic run.
+
+If you want, I can either install the missing dev deps here and re-run the full test-suite, or I can add the dev-container artifacts and run tests inside the container — tell me which you prefer and I'll do it.
+
+- 2025-09-09 (revert): Reverted transient `deterministic` flag changes to
+  `mock_*_llm.py` and `mock_llm_set.py` after review — the defaults and tests
+  are unchanged and behavior remains stable. Kept this note for audit/history.
+

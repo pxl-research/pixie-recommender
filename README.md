@@ -51,3 +51,21 @@ Lokale en CI container-smoke tests delen nu dezelfde helper. Raadpleeg
 De CI workflow gebruikt `/app/scripts/wait_for_health_container.py` en
 `/app/scripts/run_in_container_tests.py` zodat lokale runs en CI sterk op
 elkaar lijken.
+
+## Running tests inside the dev container (recommended)
+
+Use the `dev` service to run tests from a hermetic environment that uses the
+project lockfile (`uv.lock`) and `uv` to create the venv. This is the
+recommended way to run tests locally so they mirror CI.
+
+Quick command:
+
+```bash
+docker compose -f docker-compose.dev.yml run --rm dev uv sync --extra dev && \
+  docker compose -f docker-compose.dev.yml run --rm dev uv run python -m pytest -q
+```
+
+Or use the Makefile target `make dev-test` (added to the repo) which runs the
+same commands. The Makefile now delegates to the canonical helper script so
+`./scripts/dev_test.sh` is the single-source of truth for dev/test orchestration
+and `make dev-test` simply calls `./scripts/dev_test.sh pytest`.
