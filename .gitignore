@@ -45,5 +45,5 @@ htmlcov/
 # Project specific
 uv.lock.bak
 # MacOS
-.DS_Storepixie_test_output.json
+.DS_Store
 pixie_test_output.json
