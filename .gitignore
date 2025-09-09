@@ -54,4 +54,4 @@ htmlcov/
 uv.lock.bak
 
 # MacOS
-.DS_Store
+.DS_Storepixie_test_output.json
