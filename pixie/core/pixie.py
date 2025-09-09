@@ -5,6 +5,7 @@ from typing import Any
 from uuid import uuid4
 
 from pixie.core.contracts import AskResponse
+from pixie.core.conversation_loop import ConversationLoopManager
 from pixie.core.pending_store import InMemoryPendingStore
 
 
@@ -20,8 +21,13 @@ class Pixie:
       ask_budget -> ask_brand -> ask_tech -> (results or choose_result_view)
     """
 
-    def __init__(self, pending_store: InMemoryPendingStore | None = None):
+    def __init__(
+        self,
+        pending_store: InMemoryPendingStore | None = None,
+        conversation_manager: ConversationLoopManager | None = None,
+    ):
         self._pending_store = pending_store or InMemoryPendingStore()
+        self._conversation_manager = conversation_manager
 
     def answer(self, question: str) -> AskResponse:
         logger = logging.getLogger(__name__)
@@ -54,10 +60,19 @@ class Pixie:
             )
 
         if key == "ik zoek een nieuwe printer":
+            # delegate to conversation manager when available
+            if self._conversation_manager:
+                return self._conversation_manager.handle_new_question(question)
             pending_id = f"pending-{uuid4().hex[:8]}"
-            context: dict[str, Any] = {"flow": "product", "stage": "ask_budget"}
+            context: dict[str, Any] = {
+                "flow": "product",
+                "stage": "ask_budget",
+            }
             self._pending_store.save_pending(
-                pending_id, question, ttl_seconds=300, conversation_context=context
+                pending_id,
+                question,
+                ttl_seconds=300,
+                conversation_context=context,
             )
             return AskResponse(
                 type="ask_user",

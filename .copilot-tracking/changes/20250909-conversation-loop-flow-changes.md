@@ -54,3 +54,29 @@ Notes / impact on next tasks:
 - Tests and subsequent planning (Task 2.1/2.2) should assume the three-role injection pattern.
 - No changes to abstract `LLM` required.
 
+## Dev environment: minimal dev container (planning-only)
+
+Rationale:
+- Some developers run tools inside containers; earlier we observed PATH/shebang mismatches for host-installed tools. A minimal dev container standardizes tooling (python, pytest, black, ruff) and ensures consistent CI/dev behavior.
+
+Planned artifacts (do not create without approval):
+- `infra/docker/dev.Dockerfile` — small image (python:3.12-slim) with pip, ruff, black, pytest installed
+- `docker-compose.dev.yml` (or extend existing) — service `dev` mounting the repo and exposing a tiny command entrypoint for running linters/tests
+
+Minimal dev image spec (summary):
+- Base: `python:3.12-slim`
+- Install: `pip install --upgrade pip && pip install ruff black pytest`
+- Workdir: `/workspace` with a mounted volume from host
+- Entrypoint: none (use `docker compose run dev <cmd>`)
+
+Example dev-compose usage (for docs):
+```
+docker compose -f docker-compose.dev.yml run --rm dev python -m pytest
+docker compose -f docker-compose.dev.yml run --rm dev python -m ruff check . --fix
+docker compose -f docker-compose.dev.yml run --rm dev python -m black .
+```
+
+Impact on workflow:
+- Low risk, provides reproducible dev tooling. Implementation can be done once Task 2.2 wiring is stable.
+- Next action when approved: add `infra/docker/Dockerfile.dev`, update `docker-compose.dev.yml`, and add a brief README snippet explaining commands.
+
