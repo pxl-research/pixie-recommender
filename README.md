@@ -41,15 +41,13 @@ curl -X POST "http://localhost:8000/ask" \
 - **Niet relevant:** `"Waar kan ik mijn moeder vinden?"` → `{"type": "not_relevant"}`
 - **Te veel resultaten:** `"Ik heb een printer nodig"` → vraagt om verfijning
 
-## Tests
-
-```bash
-# Lokale smoke test
 docker compose -f docker-compose.dev.yml up --build -d
-container=$(docker compose -f docker-compose.dev.yml ps -q api)
-docker exec "$container" python /app/scripts/run_in_container_tests.py
 docker compose -f docker-compose.dev.yml down -v
+<!-- Tests are documented in .github/workflows/copilot-instructions.md -->
 
-# Unit tests
-uv run python -m pytest tests/ -v
-```
+Lokale en CI container-smoke tests delen nu dezelfde helper. Raadpleeg
+`.github/workflows/copilot-instructions.md` voor korte, up-to-date instructies.
+
+De CI workflow gebruikt `/app/scripts/wait_for_health_container.py` en
+`/app/scripts/run_in_container_tests.py` zodat lokale runs en CI sterk op
+elkaar lijken.
