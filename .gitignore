@@ -5,7 +5,6 @@ __pycache__/
 
 # C extensions
 *.so
-
 # Distribution / packaging
 .Python
 build/
@@ -22,37 +21,29 @@ var/
 *.egg-info/
 .installed.cfg
 *.egg
-
 # Virtual environments
 .venv/
 .uv/
-
 # Unit test / coverage reports
 htmlcov/
 .tox/
 .nox/
 .coverage
 .pytest_cache/
-
 # VS Code
 .vscode/
-
 # Environment files
 .env*
 *.env
 !.env.example
-
 # Logs
 *.log
-
 # Docker
 *.pid
 **/.docker/
 **/docker-compose.override.yml
-
 # Project specific
 uv.lock.bak
-
 # MacOS
 .DS_Storepixie_test_output.json
 pixie_test_output.json
