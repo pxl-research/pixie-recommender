@@ -12,34 +12,33 @@ Rationale:
 Specifications:
 
 - Class: MockRelevanceLLM(LLM)
-  - Constructor: def __init__(self, model_name: str = "mock-relevance-llm", deterministic: bool = True)
+  - Constructor: def __init__(self, model_name: str = "mock-relevance-llm")
   - Methods:
     - is_relevant(question: str) -> bool
       - Detects presence of words "printer" or "printers" (case-insensitive)
       - Returns True on match, False otherwise
-    - Behavior: deterministic=True returns a strict boolean; deterministic=False may add a small probability of false/true to simulate model noise
+    - Behavior: deterministic behavior only (no probabilistic noise in this repo)
 
 - Class: MockSQLLLM(LLM)
-  - Constructor: def __init__(self, model_name: str = "mock-sql-llm", deterministic: bool = True)
+  - Constructor: def __init__(self, model_name: str = "mock-sql-llm")
   - Methods:
     - generate_sql(question: str, attributes: dict | None = None) -> str
       - Returns a canonical query for the product domain. For the initial scope always return: "SELECT * FROM printers;"
-    - Behavior: deterministic=True returns exact string; deterministic=False may vary whitespace or add a harmless ORDER BY clause
+    - Behavior: deterministic behaviour only; generator returns the canonical string
 
 - Class: MockRefinementLLM(LLM)
-  - Constructor: def __init__(self, model_name: str = "mock-refinement-llm", deterministic: bool = True)
+  - Constructor: def __init__(self, model_name: str = "mock-refinement-llm")
   - Methods:
     - generate_refinement_question(context: dict) -> str | None
       - Question sequencing: ask about `budget` first, then `brand`, then `technology`.
       - If `budget` missing -> ask budget-related question; else if `brand` missing -> ask brand; else if `technology` missing -> ask technology; else return None
-    - Behavior: deterministic=True returns consistent phrasing; deterministic=False may pick from a small set of paraphrases
+    - Behavior: deterministic phrasing only
 
 Orchestration:
 - Later we will provide a thin factory or composite adapter (`MockLLMSet`) that groups these three classes so `ConversationLoopManager` can request the appropriate model for each subtask.
 
 Error modes / behavior:
-- Default deterministic=True. When deterministic=False slight randomized variations are allowed for realism.
-- Methods should be side-effect free and fast.
+- Deterministic behaviour only. Methods should be side-effect free and fast.
 
 Testing notes:
 - Unit tests will assert exact outputs when deterministic=True for each specialized class.
@@ -103,4 +102,14 @@ If you want, I can either install the missing dev deps here and re-run the full 
 - 2025-09-09 (revert): Reverted transient `deterministic` flag changes to
   `mock_*_llm.py` and `mock_llm_set.py` after review — the defaults and tests
   are unchanged and behavior remains stable. Kept this note for audit/history.
+
+## 2025-09-09 (dev infra changes)
+
+- Updated Makefile `dev-test` target to delegate to the canonical helper script: `./scripts/dev_test.sh pytest` so the script is the single-source of truth for dev/test orchestration.
+- Added README documentation clarifying the `make dev-test` behavior and recommending the hermetic dev-container flow.
+- Made small dev infra edits during verification: updated `docker-compose.dev.yml` (added/adjusted `dev` service), fixed packaging discovery in `pyproject.toml`, and validated `uv.lock` dev extras are used by the dev image.
+- Verified tests inside the hermetic dev container: full test run passed (all tests green). A non-fatal FastAPI deprecation warning was observed during collection.
+- Committed these workspace changes on branch `v0.3_pixie_mock_real_flow` (commit `373f25b`).
+
+These items bring the repo's dev/test workflow into a reproducible state and centralize orchestration in `scripts/dev_test.sh`.
 
