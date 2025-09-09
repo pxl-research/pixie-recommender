@@ -40,3 +40,8 @@ build-backend = "setuptools.build_meta"
 where = ["."]
 include = ["pixie*", "apps*"]
 exclude = ["infra", "tests", ".copilot-tracking"]
+
+[tool.uv]
+dev-dependencies = [
+    "black==23.12.0",
+]
