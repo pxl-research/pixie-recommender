@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from typing import Optional
+import logging
 
 from pixie.core.azure_openai_llm import AzureOpenAILLM
 
@@ -31,7 +32,7 @@ class AzureRelevanceLLM(AzureOpenAILLM):
         # Try to use the Azure model if available. If anything goes wrong,
         # fall back to the conservative keyword heuristic (like the mock).
         try:
-            if hasattr(self.model, "generate"):
+            if hasattr(self.model, "generate") and self.model is not None:
                 prompt = (
                     "Is the following question related to printers? Answer 'yes' or 'no'.\n\n"
                     f"Question: {text}"
@@ -50,9 +51,13 @@ class AzureRelevanceLLM(AzureOpenAILLM):
                 if ans:
                     a = ans.lower()
                     return "yes" in a or "true" in a
-        except Exception:
-            # Swallow errors here; caller should handle service outages.
-            pass
+        except Exception as e:
+            logging.getLogger(__name__).warning(
+                "AzureRelevanceLLM failed to classify relevance for question=%r: %s",
+                text,
+                e,
+            )
+            # fall through to heuristic fallback
 
         # Fallback heuristic identical to the original mock implementation.
         return "printer" in text.lower() or "printers" in text.lower()

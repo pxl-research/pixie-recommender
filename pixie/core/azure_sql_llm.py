@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from typing import Optional
+import logging
 
 from pixie.core.azure_openai_llm import AzureOpenAILLM
 
@@ -29,7 +30,7 @@ class AzureSQLLLM(AzureOpenAILLM):
         q = (question or "").strip()
         attrs = attributes or {}
         try:
-            if hasattr(self.model, "generate"):
+            if hasattr(self.model, "generate") and self.model is not None:
                 prompt = (
                     "Generate a single concise SQL query (no explanation) that"
                     " answers the user's request. Use the table `printers` and"
@@ -43,8 +44,13 @@ class AzureSQLLLM(AzureOpenAILLM):
                         return getattr(gens[0][0], "text", None) or str(gens[0][0])
                 if hasattr(resp, "text"):
                     return resp.text
-        except Exception:
-            pass
+        except Exception as e:
+            logging.getLogger(__name__).warning(
+                "AzureSQLLLM failed to generate SQL for question=%r attrs=%r: %s",
+                q,
+                attrs,
+                e,
+            )
 
         # Fallback to the previous mock default
         return "SELECT * FROM printers;"

@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from typing import Optional
+import logging
 
 from pixie.core.azure_openai_llm import AzureOpenAILLM
 
@@ -28,7 +29,7 @@ class AzureRefinementLLM(AzureOpenAILLM):
     def generate_refinement_question(self, context: Optional[dict] = None) -> Optional[str]:
         ctx = context or {}
         try:
-            if hasattr(self.model, "generate"):
+            if hasattr(self.model, "generate") and self.model is not None:
                 prompt = (
                     "Given the conversation context as JSON, return a single short"
                     " follow-up question aimed at clarifying the user's needs about"
@@ -43,8 +44,12 @@ class AzureRefinementLLM(AzureOpenAILLM):
                         return getattr(gens[0][0], "text", None) or str(gens[0][0])
                 if hasattr(resp, "text"):
                     return resp.text
-        except Exception:
-            pass
+        except Exception as e:
+            logging.getLogger(__name__).warning(
+                "AzureRefinementLLM failed to generate refinement question for context=%r: %s",
+                ctx,
+                e,
+            )
 
         # Fallback deterministic sequence matching the mock behaviour
         if "budget" not in ctx:

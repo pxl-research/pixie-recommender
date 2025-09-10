@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from typing import Any, Callable
+import logging
 from uuid import uuid4
 
 from pixie.core.contracts import AskResponse
@@ -31,10 +32,24 @@ class ConversationLoopManager:
         self.max_iterations = max_iterations
 
     def handle_new_question(self, question: str) -> AskResponse:
-        if not self.relevance_model.is_relevant(question):
+        try:
+            relevant = self.relevance_model.is_relevant(question)
+        except Exception as e:
+            logging.getLogger(__name__).warning(
+                "relevance_model.is_relevant failed for question=%r: %s", question, e
+            )
+            return AskResponse(type="error", reason="relevance_failed")
+
+        if not relevant:
             return AskResponse(type="not_relevant", text="Not relevant")
 
-        sql = self.sql_model.generate_sql(question, None)
+        try:
+            sql = self.sql_model.generate_sql(question, None)
+        except Exception as e:
+            logging.getLogger(__name__).warning(
+                "sql_model.generate_sql failed for question=%r: %s", question, e
+            )
+            return AskResponse(type="error", reason="sql_generation_failed")
         results = self.search_fn(sql, None)
         if results:
             return AskResponse(type="answer", text=str(results))
@@ -50,7 +65,15 @@ class ConversationLoopManager:
         self.pending_store.save_pending(
             pending_id, question, ttl_seconds=300, conversation_context=context
         )
-        prompt = self.refinement_model.generate_refinement_question(context)
+        try:
+            prompt = self.refinement_model.generate_refinement_question(context)
+        except Exception as e:
+            logging.getLogger(__name__).warning(
+                "refinement_model.generate_refinement_question failed for context=%r: %s",
+                context,
+                e,
+            )
+            prompt = None
         return AskResponse(type="ask_user", prompt=prompt, pending_id=pending_id)
 
     def handle_reply(self, pending_id: str, reply: str) -> AskResponse:
@@ -68,7 +91,15 @@ class ConversationLoopManager:
             self.pending_store.save_pending(
                 pending_id, pending_entry.question, conversation_context=ctx
             )
-            prompt = self.refinement_model.generate_refinement_question(ctx)
+            try:
+                prompt = self.refinement_model.generate_refinement_question(ctx)
+            except Exception as e:
+                logging.getLogger(__name__).warning(
+                    "refinement_model.generate_refinement_question failed for context=%r: %s",
+                    ctx,
+                    e,
+                )
+                prompt = None
             return AskResponse(type="ask_user", prompt=prompt, pending_id=pending_id)
 
         if stage == "ask_brand":
@@ -78,7 +109,15 @@ class ConversationLoopManager:
             self.pending_store.save_pending(
                 pending_id, pending_entry.question, conversation_context=ctx
             )
-            prompt = self.refinement_model.generate_refinement_question(ctx)
+            try:
+                prompt = self.refinement_model.generate_refinement_question(ctx)
+            except Exception as e:
+                logging.getLogger(__name__).warning(
+                    "refinement_model.generate_refinement_question failed for context=%r: %s",
+                    ctx,
+                    e,
+                )
+                prompt = None
             return AskResponse(type="ask_user", prompt=prompt, pending_id=pending_id)
 
         if stage == "ask_tech":
