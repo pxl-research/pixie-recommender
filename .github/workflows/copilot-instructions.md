@@ -1,183 +1,232 @@
+# PiXie Agent - Copilot Instructions
+
+## CONTAINER-FIRST ONTWIKKELING — Nooit lokaal testen
+
+**BELANGRIJK:** Deze repository werkt uitsluitend container-first. Alle ontwikkel-activiteiten (testen, linting, formattering) gebeuren binnen de dev-container.
+
+### Waarom container-first?
+- **Geen lokale Python-problemen:** Voorkomt "bad interpreter", shebang-fouten, en dependency-conflicts
+- **Identieke omgeving:** Iedereen gebruikt exact dezelfde Python-versie, venv, en tooling als CI
+- **Eenvoudige onboarding:** Geen lokale setup vereist, direct productief
+
+### Wat NIET te doen:
+- ❌ `pytest` lokaal uitvoeren
+- ❌ `ruff` of `black` lokaal installeren/draaien  
+- ❌ Python packages lokaal installeren
+- ❌ Lokale venv aanmaken
+
+### Wat WEL te doen:
+- ✅ Alle commands via `docker compose -f docker-compose.dev.yml`
+- ✅ Tests uitvoeren in de `api` service
+- ✅ Helper scripts gebruiken (`./scripts/dev_test.sh`)
+
+---
+````instructions
 ## Tests
+## Run & test (CONTAINER-FIRST — nooit lokaal)
+BELANGRIJK: werk altijd container-first. Deze repository ondersteunt expliciet een hermetische dev-container die de juiste Python-versie, dependencies en tooling bevat. Draai tests en debug-commands alleen binnen de `api` dev-service. Lokale runs (bijv. `pytest` op uw machine) zijn niet ondersteund en leiden vaak tot shebang/interpreter mismatches of ontbrekende dev-deps.
+
+Waarom container-first?
+- Voorkomt "bad interpreter" / shebang fouten wanneer contributors verschillende Python-installaties hebben.
+- Zorgt dat iedereen exact dezelfde venv, PATH en dev-extras gebruikt (mirror CI).
+- Vereenvoudigt onboarding en troubleshooting: één, betrouwbare manier om tests te draaien.
+
+Als je dit document leest: stop vóórdat je `pytest` lokaal uitvoert — volg de container-commando's hieronder.
+
 ## Run & test (Docker-first)
 Deze repo wordt ontwikkeld en getest in een ontwikkelcontainer. Gebruik altijd de dev Dockerfile / compose flow
 om de applicatie te proberen en om pytest binnen de container te draaien — dat voorkomt lokale interpreter- of dependency-mismatch.
-### 1) App snel uitproberen
-1. Build en start de dev container (detach):
+## App snel uitproberen
+
+1. **Build en start de dev container:**
 ```bash
 docker compose -f docker-compose.dev.yml up --build -d
 ```
-2. Controleer de health endpoint:
+
+2. **Controleer de health endpoint:**
 ```bash
-curl -fsS http://localhost:${PORT_API:-8012}/health
+curl -fsS http://localhost:8000/health
 ```
-3. Stuur een voorbeeldvraag:
+
+3. **Stuur een voorbeeldvraag:**
 ```bash
-curl -s -X POST "http://localhost:${PORT_API:-8012}/ask" \
+curl -s -X POST "http://localhost:8000/ask" \
   -H "Content-Type: application/json" \
   -d '{"question": "Ik zoek een nieuwe printer"}' | jq
 ```
-4. Stop en ruim op als je klaar bent:
+
+4. **Stop en ruim op:**
 ```bash
 docker compose -f docker-compose.dev.yml down -v
 ```
-### 2) Tests draaien binnen de container (aanbevolen)
-Gebruik de service naam `api` om commands in de container te draaien. Zo weet je zeker dat je tests met dezelfde Python/venv en dependencies lopen als de app.
-- Smoke tests (repository bevat een helper):
+
+## Tests uitvoeren (container-only)
+
+### Alle tests uitvoeren
 ```bash
-docker compose -f docker-compose.dev.yml up --build -d
-container=$(docker compose -f docker-compose.dev.yml ps -q api)
-docker exec -it "$container" /bin/bash -lc "python /app/scripts/run_in_container_tests.py"
-docker compose -f docker-compose.dev.yml down -v
-```
-- Pytest (hele test-suite):
-```bash
-# optioneel: start container first
 docker compose -f docker-compose.dev.yml up --build -d
 docker compose -f docker-compose.dev.yml exec api /bin/bash -lc "uv run python -m pytest -q"
 docker compose -f docker-compose.dev.yml down -v
 ```
-- Pytest voor één testbestand of testcase:
-```bash
-docker compose -f docker-compose.dev.yml exec api /bin/bash -lc "uv run python -m pytest tests/test_logging.py::test_some_case -q -k some_name"
-```
-### 3) Controleer of pytest beschikbaar is in de container
-Probleem: soms is pytest niet aanwezig in de container (bijvoorbeeld wanneer dev-extras niet zijn geïnstalleerd). Controleer zo:
+
+### Specifieke test uitvoeren
 ```bash
 docker compose -f docker-compose.dev.yml up --build -d
-docker compose -f docker-compose.dev.yml exec api /bin/bash -lc "which pytest || (echo 'pytest missing' && python -m pip list | grep -E 'pytest|uv')"
+docker compose -f docker-compose.dev.yml exec api /bin/bash -lc "uv run python -m pytest tests/test_logging.py::test_some_case -v"
+docker compose -f docker-compose.dev.yml down -v
 ```
-Als pytest ontbreekt, zijn mogelijke oorzaken en oplossingen:
-- Oorzaak: de dev extras (project optional-dependencies dev) zijn niet geïnstalleerd tijdens image build.
-  - Oplossing: zorg dat de dev build-stap `uv sync --extra dev` wordt uitgevoerd (Dockerfile.dev doet dit standaard). Herbuild expliciet:
+
+### Helper scripts gebruiken (aanbevolen)
 ```bash
+# Pytest via helper script
+./scripts/dev_test.sh pytest
+
+# Of via Makefile
+make dev-test
+```
+## Code quality & linting (container-only)
+
+### Formatteren met Black
+```bash
+docker compose -f docker-compose.dev.yml exec api /bin/bash -lc "uv run black ."
+```
+
+### Linting met Ruff  
+```bash
+docker compose -f docker-compose.dev.yml exec api /bin/bash -lc "uv run ruff check ."
+```
+
+### All-in-one quality check
+```bash
+docker compose -f docker-compose.dev.yml exec api /bin/bash -lc "uv run ruff check . && uv run black --check ."
+```
+
+## Troubleshooting
+
+### Pytest ontbreekt in container
+Als `pytest` niet beschikbaar is:
+
+```bash
+# Controleer dev dependencies
+docker compose -f docker-compose.dev.yml exec api /bin/bash -lc "python -m pip list | grep pytest"
+
+# Forceer rebuild met dev dependencies
 docker compose -f docker-compose.dev.yml build --no-cache api
 ```
-- Oorzaak: oude image / cache; Oplossing: forceer een rebuild en herstart (zie boven).
-- Oorzaak: container draait niet in de venv; Oplossing: gebruik `uv run` of controleer PATH in container. Voor consistente runs raden we `uv run python -m pytest ...` aan.
-### 4) Snelle non-interactieve runs (CI style)
-Je kunt in CI of scripts de container éénmalig starten, tests runnen en verwijderen met `docker compose run --rm`:
-```bash
-docker compose -f docker-compose.dev.yml run --rm api /bin/bash -lc "uv run python -m pytest -q"
-```
-Dit start de service image, voert het command uit en verwijdert de container daarna.
-### 5) Tips en best practices
-- Gebruik altijd de `api` service uit `docker-compose.dev.yml` om tests en debug-commands uit te voeren.
-- Gebruik `uv run` zodat de image's venv en PATH consistent zijn met de runtime van de app.
-- Voeg in CI dezelfde build-step toe die dev-extras installeert wanneer je tests wil draaien.
-- Overweeg een korte Makefile of script (bv. `scripts/dev_test.sh`) die de voorbeeld-commando's bundelt zodat contributors niet telkens hoeven te onthouden welke flags.
 
+### Container issues
+```bash
+# Volledige cleanup en rebuild
+docker compose -f docker-compose.dev.yml down -v
+docker compose -f docker-compose.dev.yml build --no-cache
+docker compose -f docker-compose.dev.yml up --build -d
+```
+
+## Helper scripts
+
+Het project bevat helper scripts voor veelgebruikte workflows:
+
+```bash
+# Pytest uitvoeren  
+./scripts/dev_test.sh pytest
+
+# Makefile shortcuts
+make dev-test        # pytest
+make up              # start containers
+make down            # stop en cleanup
+```
 ---
 
-Deze instructies minimaliseren fouten door lokaal verschillende Pythons of missende dev dependencies. Als je wilt, voeg ik een kleine `scripts/dev_test.sh` helper en een `Makefile` target toe zodat teams één commando hoeven te onthouden.
+# PiXie Agent - Project Overview
 
-### Developer helper script
+## Over het project
 
-We voegen een helper script `scripts/dev_test.sh` dat veelvoorkomende flows automatiseert:
+PiXie is een AI-gestuurde conversational shopping assistant die klanten helpt producten te vinden via natuurlijke taalinteractie. Het systeem gebruikt intern toegankelijke bedrijfsinformatie om complexe productvragen te begrijpen, analyseren en relevante aanbevelingen te genereren.
 
-- `./scripts/dev_test.sh smoke` — build + start container, run smoke tests helper, teardown
-- `./scripts/dev_test.sh pytest` — build + start container, run full pytest suite, teardown
-- `./scripts/dev_test.sh all` — smoke then pytest
+## Core concept
 
-Of gebruik de Makefile shortcuts:
+Het systeem werkt als een digitale verkoopmedewerker die:
 
-```bash
-make dev-test-smoke
-make dev-test-pytest
-make dev-test-all
-```
+- **Klantvragen begrijpt** in natuurlijke taal, ongeacht hoe complex of vaag ze geformuleerd zijn
+- **Intelligente vervolgvragen stelt** om productspecificaties te verfijnen  
+- **Productcatalogi doorzoekt** met zowel gestructureerde data als ongestructureerde documentatie
+- **Gepersonaliseerde aanbevelingen geeft** met uitleg en bronverwijzingen
 
-Het script is idempotent en ruimt op na voltooiing (down -v). Gebruik het als de canonical developer entrypoint voor lokale test runs.
-# PiXie Agent - Copilot Instructions
+## Technische architectuur
 
-## Project Overview
+Het systeem faciliteert **natuurlijke productontdekking** door klanten te begeleiden van vage intenties naar specifieke productmatches. Het beheert **complexe gesprekken** die zich ontwikkelen over meerdere interacties, waarbij context en voorkeuren behouden blijven.
 
-PiXie is an AI-powered conversational shopping assistant that helps customers find products through natural language interaction. The system uses internally accessible business information to understand, analyze complex product questions, and generate relevant recommendations.
+De architectuur ondersteunt **multi-source informatie-ophaling**, waardoor zowel gestructureerde productdata als ongestructureerde documentatie doorzoekbaar worden voor nauwkeurige en volledige antwoorden.
 
-## Core Concept
+## Bedrijfswaarde
 
-The system works as a digital sales assistant that:
+PiXie automatiseert het productadviesproces door menselijke gesprekken te voeren terwijl het tegelijkertijd toegang heeft tot complete productcatalogi en documentatie. Dit resulteert in betere klantervaring en verhoogde conversie zonder de overhead van menselijke klantenservice.
 
-- **Understands customer questions** in natural language, no matter how complex or vague they are formulated
-- **Asks intelligent follow-up questions** to refine product specifications
-- **Searches product catalogs** with both structured data and unstructured documentation
-- **Provides personalized recommendations** with explanations and source references
+## Core flows
 
-## Technical Architecture
+Pixie ondersteunt verschillende gesprekspatronen. Hieronder enkele voorbeeldflows:
 
-The system facilitates **natural product discovery** by guiding customers from vague intentions to specific product matches. It manages **complex conversations** that develop over multiple interactions, maintaining context and preferences.
+### 1. Product gevonden
+Een vage productaanvraag wordt geleidelijk verfijnd door vervolgvragen totdat een concrete productlijst kan worden geretourneerd.
 
-The architecture supports **multi-source information retrieval**, making both structured product data and unstructured documentation searchable for accurate and complete answers.
+**Voorbeeld:**
+- **V:** Ik zoek een nieuwe printer  
+- **A:** Wat is uw budget? Minder dan €150, tussen €150-€300, meer dan €300, of maakt niet uit?  
+- **V:** Maximaal €200  
+- **A:** Welk merk heeft uw voorkeur? Brother, BenQ, HP, Kyocera, … of maakt niet uit?  
+- **V:** Brother  
+- **A:** Welke printtechnologie? Inkjet, laser, thermal inkjet, of maakt niet uit?  
+- **V:** Laser  
+- **A:** Hier zijn matchende printers:  
+  1. Brother XC 2570 – €199 – korte beschrijving  
+  2. Brother XT 3560 – €159 – korte beschrijving  
 
-## Business Value
+### 2. Niet relevant
+Wanneer de vraag buiten ondersteunde domeinen valt, geeft Pixie een duidelijke vroege exit.
 
-PiXie automates the product advisory process by conducting human-like conversations while simultaneously having access to complete product catalogs and documentation. This results in better customer experience and increased conversion without the overhead of human customer service agents.
+**Voorbeeld:**
+- **V:** Ik zoek mijn mama  
+- **A:** Sorry, daar kan ik niet bij helpen. Ik heb alleen informatie over printers, laptops, smartphones, …
 
-## Core Flows
+### 3. Geen resultaten
+Geldige filters worden toegepast maar de query levert nul matches op. Pixie reageert netjes en stelt alternatieven voor.
 
-Pixie supports several conversation patterns. A number of flows are illustrated with a simplified example dialogue. These flows summarize the most typical user interactions with Pixie and are representative of how the assistant behaves in practice.
+**Voorbeeld:**
+- **V:** Ik wil een Brother laserprinter onder €50  
+- **A:** Helaas geen printers die voldoen aan uw criteria. Probeer opnieuw met ruimere criteria of neem contact op voor hulp.
 
-### 1. Product found
-A vague product request is gradually refined through follow-up questions until a concrete product list can be returned.
+### 4. Te veel resultaten
+Wanneer de query meer dan N resultaten oplevert, biedt Pixie verfijningsstrategieën of een hanteerbare subset.
 
-**Example**
-- **Q:** I’m looking for a new printer  
-- **A:** What is your budget for a printer? Less than €150, between €150–€300, more than €300, or no preference?  
-- **Q:** Maximum €200  
-- **A:** Which brand do you prefer? Brother, BenQ, HP, Kyocera, … or no preference?  
-- **Q:** Brother  
-- **A:** Which printing technology? Inkjet, laser, thermal inkjet, or no preference?  
-- **Q:** Laser  
-- **A:** Here are matching printers:  
-  1. Brother XC 2570 – €199 – short description  
-  2. Brother XT 3560 – €159 – short description  
+**Voorbeeld:**
+- **V:** Ik zoek een nieuwe printer  
+- **A:** Wat is uw budget?  
+- **V:** Maakt niet uit  
+- **A:** Welk merk?  
+- **V:** Maakt niet uit  
+- **A:** Welke printtechnologie?  
+- **V:** Maakt niet uit  
+- **A:** Ik vond 152 printers. Wilt u de top 5 op prijs, of een willekeurige selectie van 5?  
+- **V:** Op prijs gesorteerd  
+- **A:** Hier zijn de top 5 printers:  
+  1. Brother ZX 1570 – €69 – korte beschrijving  
+  2. HP Inkjet 234 – €79 – korte beschrijving  
+  3. Kyocera T70 – €99 – korte beschrijving  
+  4. Brother XT 3560 – €99 – korte beschrijving  
+  5. HP Inkjet 1234 – €109 – korte beschrijving
 
-### 2. Not relevant
-When the question falls outside supported domains, Pixie gives a clear early exit.
+## Visie en lange termijn doelen
 
-**Example**
-- **Q:** I’m looking for my mom  
-- **A:** Sorry, I can’t help with that. I only have information about printers, laptops, smartphones, …
+Pixie is ontworpen om te evolueren naar een modulair en uitbreidbaar systeem dat kan integreren met verschillende databronnen en reasoning engines. In de huidige versie zijn adapters gemockt, maar het lange termijn doel is om ze te verbinden als onafhankelijke services via het Model Context Protocol (MCP).
 
-### 3. No results
-Valid filters are applied but the query yields zero matches. Pixie responds gracefully and suggests alternatives.
+De assistent moet uiteindelijk kunnen:
+- Naadloos informatie combineren van meerdere adapters zoals RAG, TabularRAG, en toekomstige gespecialiseerde modules
+- Betrouwbaar beslissen wanneer meer informatie nodig is en natuurlijke vervolgvragen formuleren
+- Transparante antwoorden geven met traceerbare oorsprong
+- Functioneren als plug-and-play component dat in verschillende user interfaces kan worden ingebed
 
-**Example**
-- **Q:** I want a Brother laser printer under €50  
-- **A:** Unfortunately, no printers match your criteria. Please try again with a broader budget or contact support for assistance.
+## Ontwikkelingsbenadering
 
-### 4. Too many results
-When the query returns more than N results, Pixie offers refinement strategies or provides a manageable subset.
-
-**Example**
-- **Q:** I’m looking for a new printer  
-- **A:** What is your budget?  
-- **Q:** No preference  
-- **A:** Which brand?  
-- **Q:** No preference  
-- **A:** Which printing technology?  
-- **Q:** No preference  
-- **A:** I found 152 printers. Would you like to see the top 5 sorted by price, or a random sample of 5?  
-- **Q:** Sorted by price  
-- **A:** Here are the top 5 printers:  
-  1. Brother ZX 1570 – €69 – short description  
-  2. HP Inkjet 234 – €79 – short description  
-  3. Kyocera T70 – €99 – short description  
-  4. Brother XT 3560 – €99 – short description  
-  5. HP Inkjet 1234 – €109 – short description
-
-## Vision and Long-term Goal
-
-Pixie is designed to evolve into a modular and extensible system that can integrate with different data sources and reasoning engines. In the current version, adapters are mocked, but the long-term goal is to connect them as independent services through the Model Context Protocol (MCP).
-
-The assistant should ultimately be able to:
-- Seamlessly combine information from multiple adapters such as RAG, TabularRAG, and future specialized modules
-- Reliably decide when more information is needed and phrase natural follow-up questions
-- Provide transparent answers with traceable origins
-- Function as a plug-and-play component that can be embedded in various user interfaces
-
-## Development Approach
-
-Pixie is intentionally built in incremental milestones.  
-We start with a fully mocked prototype to validate flows and contracts, and gradually replace mocked components with real adapters and services.  
-This step-by-step approach ensures that the system remains testable, understandable, and stable while steadily increasing functionality and realism.
+Pixie wordt bewust gebouwd in incrementele mijlpalen.  
+We starten met een volledig gemockt prototype om flows en contracten te valideren, en vervangen geleidelijk gemockte componenten door echte adapters en services.  
+Deze stap-voor-stap benadering zorgt ervoor dat het systeem testbaar, begrijpelijk en stabiel blijft terwijl functionaliteit en realisme gestaag toenemen.
