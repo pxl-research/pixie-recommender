@@ -8,6 +8,7 @@ This is intended to be executed inside the api container. For example:
 The script prints the numeric status (e.g. 200) or 'err' on failure and
 exits 0 on success.
 """
+
 import http.client
 import sys
 

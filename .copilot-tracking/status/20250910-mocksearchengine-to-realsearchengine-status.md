@@ -94,3 +94,20 @@ De basis is klaar voor:
 - **Code coverage:** RealSearchEngine volledig getest
 - **Performance:** < 100ms response tijd (JSON-based)
 - **Compatibility:** 100% backward compatible met bestaande API
+
+## 🔄 Recent Cleanup Actions (this run)
+
+- Verwijderd `pixie/core/mock_search.py` (ongebruikt) en lege directory `pixie/core/repositories/` van de filesystem.
+- Geformatteerd met `black` en gecontroleerd met `ruff` in de dev Docker-container.
+- De opvolgende `.copilot-tracking/steps/01-09` bestanden zijn verwijderd uit de tracker en staged for commit (nog niet gecommit).
+
+## 🧪 Test & Lint Results
+
+- Pytest (in Docker dev container): 24 passed
+- Ruff (checked in container): no selected errors (E,F,I)
+- Black: applied formatting to several files (7-8 files reformatted)
+
+## 🎯 Status Nu
+
+- Cleanup ready for commit: code removals and tracker updates staged but not committed.
+- Next step: explicit approval to commit and optionally push, or continue with any remaining follow-ups.
