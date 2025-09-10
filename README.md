@@ -21,7 +21,7 @@ API is beschikbaar op `http://localhost:8000`
 Note on checks:
 
 - `CI` (github) runs lint and unit tests in the runner.
-- `Container smoke` builds the dev image and runs integration smoke tests (PRs or manual dispatch).
+- `Container smoke` builds the dev image and runs integration smoke tests (PRs of manual dispatch).
 
 Recommended local test command: `./scripts/dev_test.sh pytest` (or `make dev-test`).
 
@@ -75,3 +75,20 @@ Quick command (recommended):
 
 Or use the Makefile target `make dev-test` which delegates to the canonical
 helper script `./scripts/dev_test.sh`.
+
+## Azure OpenAI configuration
+
+To run the application with real Azure OpenAI LLMs, set the following
+environment variables in your `.env.dev` file (or your environment):
+
+- `AZURE_OPENAI_API_VERSION`: e.g. `2024-10-01`
+- `AZURE_OPENAI_ENDPOINT`: your Azure OpenAI endpoint, e.g. `https://<your-resource>.openai.azure.com/`
+- `AZURE_OPENAI_KEY`: your Azure OpenAI API key
+- `AZURE_OPENAI_MODEL`: deployed model name (deployment id), e.g. `gpt-5-chat`
+
+You can copy the example file and update the values:
+
+```bash
+cp .env.example .env.dev
+# edit .env.dev and add the Azure values
+```
