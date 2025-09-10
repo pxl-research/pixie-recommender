@@ -1,17 +1,4 @@
-from __future__ import annotations
-
-from typing import Optional
-
-from pixie.core.abstractclasses.llm import LLM
-
-
-class MockSQLLLM(LLM):
-    """Literal SQL generator: always returns SELECT * FROM printers;"""
-
-    def __init__(self, model_name: str = "mock-sql-llm"):
-        super().__init__(model_name)
-
-    def generate_sql(
-        self, question: Optional[str], attributes: Optional[dict] = None
-    ) -> str:
-        return "SELECT * FROM printers;"
+raise ImportError(
+    "Mock LLMs have been removed. Use the Azure LLM implementations in pixie.core.azure_* or"
+    " configure AZURE_OPENAI_* env vars so create_mock_llm_set returns Azure LLMs."
+)

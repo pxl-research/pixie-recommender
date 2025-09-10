@@ -1,4 +1,4 @@
-from pixie.core.mock_llm_set import create_mock_llm_set
+from pixie.core.azure_llm_set import create_azure_llm_set as create_mock_llm_set
 
 
 def test_relevance_detects_printer():

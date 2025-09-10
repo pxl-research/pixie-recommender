@@ -1,16 +1,4 @@
-from __future__ import annotations
-
-from typing import Optional
-
-from pixie.core.abstractclasses.llm import LLM
-
-
-class MockRelevanceLLM(LLM):
-    """Minimal mock that returns True iff the question contains 'printer' or 'printers'."""
-
-    def __init__(self, model_name: str = "mock-relevance-llm"):
-        super().__init__(model_name)
-
-    def is_relevant(self, question: Optional[str]) -> bool:
-        text = (question or "").lower()
-        return "printer" in text or "printers" in text
+raise ImportError(
+    "Mock LLMs have been removed. Use the Azure LLM implementations in pixie.core.azure_* or"
+    " configure AZURE_OPENAI_* env vars so create_mock_llm_set returns Azure LLMs."
+)

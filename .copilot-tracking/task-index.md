@@ -12,11 +12,11 @@ Replace all mock LLM implementations (MockRelevanceLLM, MockSQLLLM, MockRefineme
 - [ ] Step 4: Implement error handling → `./steps/04-implement-error-handling.md`
 - [ ] Step 5: Update environment configuration → `./steps/05-update-environment-config.md`
 - [ ] Step 6: Update tests → `./steps/06-update-tests.md`
-- [ ] Step 7: Remove old mock LLM files → `./steps/07-cleanup-mock-files.md`
+ - [x] Step 7: Remove old mock LLM files → `./steps/07-cleanup-mock-files.md`
 - [ ] Step 8: Test complete flow → `./steps/08-test-complete-flow.md`
 
 ## Current Status
-**Next Step**: `./steps/01-create-azure-llm-wrappers.md`
+**Next Step**: `./steps/03-update-conversation-manager.md`
 
 ## Completion
 When all steps are checked off and their files deleted, delete this index file.
