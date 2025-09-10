@@ -6,6 +6,7 @@ from uuid import uuid4
 
 from pixie.core.contracts import AskResponse
 from pixie.core.conversation_loop import ConversationLoopManager
+from pixie.core import azure_llm_set
 from pixie.core.pending_store import InMemoryPendingStore
 
 
@@ -27,7 +28,31 @@ class Pixie:
         conversation_manager: ConversationLoopManager | None = None,
     ):
         self._pending_store = pending_store or InMemoryPendingStore()
-        self._conversation_manager = conversation_manager
+        # If no conversation_manager was provided, attempt to create one using
+        # the Azure LLM factory. This keeps existing behavior when a manager
+        # (usually from tests) is injected.
+        if conversation_manager is not None:
+            self._conversation_manager = conversation_manager
+        else:
+            try:
+                relevance, sql, refinement = azure_llm_set.create_azure_llm_set()
+                # Provide a default search function that will be used by the
+                # ConversationLoopManager. Import lazily to avoid cycles.
+                from pixie.core.search_engine import RealSearchEngine
+
+                engine = RealSearchEngine()
+                self._conversation_manager = ConversationLoopManager(
+                    relevance, sql, refinement, engine.search, pending_store=self._pending_store
+                )
+            except Exception as e:
+                # If Azure isn't configured (e.g., in local test runs), leave
+                # the conversation manager unset so existing fallback flows
+                # remain functional. Log the reason.
+                logging.getLogger(__name__).warning(
+                    "Could not initialize Azure LLMs for ConversationLoopManager: %s",
+                    e,
+                )
+                self._conversation_manager = None
 
     def answer(self, question: str) -> AskResponse:
         logger = logging.getLogger(__name__)

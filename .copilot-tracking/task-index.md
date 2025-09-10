@@ -5,7 +5,9 @@ Replace all mock LLM implementations (MockRelevanceLLM, MockSQLLLM, MockRefineme
 
 ## Progress Tracking
 - [ ] Step 1: Create Azure LLM wrapper classes → `./steps/01-create-azure-llm-wrappers.md`
+ - [x] Step 1: Create Azure LLM wrapper classes → `./steps/01-create-azure-llm-wrappers.md`
 - [ ] Step 2: Update LLM factory/creation logic → `./steps/02-update-llm-factory.md`
+ - [x] Step 2: Update LLM factory/creation logic → `./steps/02-update-llm-factory.md`
 - [ ] Step 3: Update ConversationLoopManager initialization → `./steps/03-update-conversation-manager.md`
 - [ ] Step 4: Implement error handling → `./steps/04-implement-error-handling.md`
 - [ ] Step 5: Update environment configuration → `./steps/05-update-environment-config.md`
