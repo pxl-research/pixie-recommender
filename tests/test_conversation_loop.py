@@ -29,6 +29,7 @@ def test_refinement_then_answer():
     first = mgr.handle_new_question("Ik zoek een nieuwe printer")
     assert first.type == "ask_user"
     pending_id = first.pending_id
+    assert pending_id is not None
     # reply to ask_budget
     second = mgr.handle_reply(pending_id, "minder dan 150€")
     assert second.type == "ask_user"
@@ -66,6 +67,7 @@ def test_max_iterations_reached():
     assert first.type == "ask_user"
     assert first.pending_id is not None
     pending_id = first.pending_id
+    assert pending_id is not None
 
     # reply to ask_budget
     second = mgr.handle_reply(pending_id, "minder dan 150€")
@@ -84,9 +86,9 @@ def test_choose_result_view_large_results():
     relevance, sql, refinement = create_mock_llm_set()
 
     # Use MockSearchEngine so initial search (attributes None) returns many results
-    from pixie.core.mock_search import create_mock_search_engine
+    from pixie.core.search_engine import RealSearchEngine
 
-    engine = create_mock_search_engine()
+    engine = RealSearchEngine()
     # make the sql model generate SQL that will return empty until refinements are provided
     mgr = ConversationLoopManager(relevance, sql, refinement, engine.search)
 
@@ -131,11 +133,8 @@ def test_choose_result_view_large_results():
 
 def test_ttl_integration():
     relevance, sql, refinement = create_mock_llm_set()
-    from pixie.core.mock_search import create_mock_search_engine
     from pixie.core.pending_store import InMemoryPendingStore
 
-    # engine not assigned to a variable; we only need its .search when used elsewhere
-    _ = create_mock_search_engine()
     store = InMemoryPendingStore()
 
     # use a search that returns empty so pending is created
@@ -149,6 +148,7 @@ def test_ttl_integration():
     assert first.type == "ask_user"
     assert first.pending_id is not None
     pending_id = first.pending_id
+    assert pending_id is not None
 
     # shorten TTL to simulate expiry
     entry = store.get_pending(pending_id)
@@ -194,6 +194,7 @@ def test_conversation_refinement_then_answer_with_real_search():
     first = mgr.handle_new_question("Ik zoek een nieuwe printer")
     assert first.type == "ask_user"
     pending_id = first.pending_id
+    assert pending_id is not None
 
     second = mgr.handle_reply(pending_id, "minder dan 150€")
     assert second.type == "ask_user"
