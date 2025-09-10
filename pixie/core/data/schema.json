@@ -1,0 +1,36 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "Printers",
+  "type": "object",
+  "properties": {
+    "printers": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "id": { "type": "integer" },
+          "name": { "type": "string" },
+          "brand": { "type": "string" },
+          "technology": { "type": "string" },
+          "price_cents": { "type": "integer" },
+          "price": { "type": "number" },
+          "currency": { "type": "string" },
+          "description": { "type": "string" },
+          "has_wifi": { "type": "boolean" },
+          "has_duplex": { "type": "boolean" },
+          "has_color": { "type": "boolean" },
+          "is_multifunction": { "type": "boolean" },
+          "print_speed_ppm": { "type": "integer" },
+          "resolution_dpi": { "type": "string" },
+          "max_paper_size": { "type": "string" },
+          "availability_status": { "type": "string" },
+          "stock_level": { "type": "integer" },
+          "created_at": { "type": "string", "format": "date-time" },
+          "updated_at": { "type": "string", "format": "date-time" }
+        },
+        "required": ["id", "name", "brand", "technology", "price_cents"]
+      }
+    }
+  },
+  "required": ["printers"]
+}

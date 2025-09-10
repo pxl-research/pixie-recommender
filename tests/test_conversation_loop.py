@@ -29,6 +29,7 @@ def test_refinement_then_answer():
     first = mgr.handle_new_question("Ik zoek een nieuwe printer")
     assert first.type == "ask_user"
     pending_id = first.pending_id
+    assert pending_id is not None
     # reply to ask_budget
     second = mgr.handle_reply(pending_id, "minder dan 150€")
     assert second.type == "ask_user"
@@ -66,6 +67,7 @@ def test_max_iterations_reached():
     assert first.type == "ask_user"
     assert first.pending_id is not None
     pending_id = first.pending_id
+    assert pending_id is not None
 
     # reply to ask_budget
     second = mgr.handle_reply(pending_id, "minder dan 150€")
@@ -83,10 +85,10 @@ def test_max_iterations_reached():
 def test_choose_result_view_large_results():
     relevance, sql, refinement = create_mock_llm_set()
 
-    # Use MockSearchEngine so initial search (attributes None) returns many results
-    from pixie.core.mock_search import create_mock_search_engine
+    # Use RealSearchEngine so initial search (attributes None) returns many results
+    from pixie.core.search_engine import RealSearchEngine
 
-    engine = create_mock_search_engine()
+    engine = RealSearchEngine()
     # make the sql model generate SQL that will return empty until refinements are provided
     mgr = ConversationLoopManager(relevance, sql, refinement, engine.search)
 
@@ -131,11 +133,8 @@ def test_choose_result_view_large_results():
 
 def test_ttl_integration():
     relevance, sql, refinement = create_mock_llm_set()
-    from pixie.core.mock_search import create_mock_search_engine
     from pixie.core.pending_store import InMemoryPendingStore
 
-    # engine not assigned to a variable; we only need its .search when used elsewhere
-    _ = create_mock_search_engine()
     store = InMemoryPendingStore()
 
     # use a search that returns empty so pending is created
@@ -149,6 +148,7 @@ def test_ttl_integration():
     assert first.type == "ask_user"
     assert first.pending_id is not None
     pending_id = first.pending_id
+    assert pending_id is not None
 
     # shorten TTL to simulate expiry
     entry = store.get_pending(pending_id)
@@ -161,3 +161,46 @@ def test_ttl_integration():
     # now replying should yield invalid_pending_id
     resp = mgr.handle_reply(pending_id, "minder dan 50€")
     assert resp.type == "error"
+
+
+def test_conversation_with_real_search_initial_answer():
+    # integration: ConversationLoopManager with RealSearchEngine
+    relevance, sql, refinement = create_mock_llm_set()
+    from pixie.core.search_engine import RealSearchEngine
+
+    engine = RealSearchEngine()
+    mgr = ConversationLoopManager(relevance, sql, refinement, engine.search)
+
+    resp = mgr.handle_new_question("Ik zoek een nieuwe printer")
+    # RealSearchEngine returns many items for attributes None -> immediate answer
+    assert resp.type == "answer"
+
+
+def test_conversation_refinement_then_answer_with_real_search():
+    relevance, sql, refinement = create_mock_llm_set()
+    from pixie.core.search_engine import RealSearchEngine
+
+    engine = RealSearchEngine()
+
+    calls = {"count": 0}
+
+    def search_fn(sql_query, attrs):
+        calls["count"] += 1
+        if calls["count"] == 1:
+            return []
+        return engine.search(sql_query, attrs)
+
+    mgr = ConversationLoopManager(relevance, sql, refinement, search_fn)
+    first = mgr.handle_new_question("Ik zoek een nieuwe printer")
+    assert first.type == "ask_user"
+    pending_id = first.pending_id
+    assert pending_id is not None
+
+    second = mgr.handle_reply(pending_id, "minder dan 150€")
+    assert second.type == "ask_user"
+
+    third = mgr.handle_reply(pending_id, "Brother")
+    assert third.type == "ask_user"
+
+    fourth = mgr.handle_reply(pending_id, "laser")
+    assert fourth.type == "answer"
