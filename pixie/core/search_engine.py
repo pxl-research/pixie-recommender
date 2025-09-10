@@ -29,9 +29,13 @@ class RealSearchEngine:
             # fail gracefully to empty dataset
             return []
 
-    def search(self, sql: str, attributes: Optional[Dict[str, Any]]) -> List[Dict[str, Any]]:
+    def search(
+        self, sql: str, attributes: Optional[Dict[str, Any]]
+    ) -> List[Dict[str, Any]]:
         # If attributes is None or empty, return many items (mimic previous behaviour)
-        if attributes is None or (isinstance(attributes, dict) and len(attributes) == 0):
+        if attributes is None or (
+            isinstance(attributes, dict) and len(attributes) == 0
+        ):
             return [self._map_item(i) for i in self._data]
 
         items = list(self._data)
@@ -61,7 +65,9 @@ class RealSearchEngine:
         if isinstance(attributes, dict):
             tech = attributes.get("technology") or attributes.get("Technology")
         if isinstance(tech, str):
-            items = [it for it in items if it.get("technology", "").lower() == tech.lower()]
+            items = [
+                it for it in items if it.get("technology", "").lower() == tech.lower()
+            ]
 
         # return mapped items (keep structure similar to mock: id, name, price)
         return [self._map_item(it) for it in items]
@@ -69,7 +75,11 @@ class RealSearchEngine:
     def _map_item(self, item: Dict[str, Any]) -> Dict[str, Any]:
         # Accept either item object or dict of full fields
         if isinstance(item, dict) and "id" in item and "name" in item:
-            return {"id": item.get("id"), "name": item.get("name"), "price": item.get("price")}
+            return {
+                "id": item.get("id"),
+                "name": item.get("name"),
+                "price": item.get("price"),
+            }
         return item
 
 
