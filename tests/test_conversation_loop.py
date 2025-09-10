@@ -85,7 +85,7 @@ def test_max_iterations_reached():
 def test_choose_result_view_large_results():
     relevance, sql, refinement = create_mock_llm_set()
 
-    # Use MockSearchEngine so initial search (attributes None) returns many results
+    # Use RealSearchEngine so initial search (attributes None) returns many results
     from pixie.core.search_engine import RealSearchEngine
 
     engine = RealSearchEngine()
