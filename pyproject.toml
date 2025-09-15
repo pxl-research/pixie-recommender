@@ -23,6 +23,9 @@ dev = [
 addopts = "-q"
 testpaths = ["tests"]
 pythonpath = ["."]
+markers = [
+    "integration: marks tests as integration tests",
+]
 # filterwarnings = ["ignore::DeprecationWarning"]
 
 [tool.ruff]

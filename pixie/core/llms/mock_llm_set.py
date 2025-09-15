@@ -5,7 +5,20 @@ from typing import Any, Tuple
 
 class MockRelevance:
     def is_relevant(self, text: str) -> bool:
-        return True
+        # Check for product-related keywords
+        product_keywords = [
+            "printer", "laptop", "computer", "phone", "tablet", "monitor",
+            "keyboard", "mouse", "headphones", "speaker", "camera", "tv",
+            "koop", "prijs", "budget", "merk", "brand", "laser", "inkjet"
+        ]
+        text_lower = text.lower()
+
+        # Exclude personal/family questions
+        personal_keywords = ["mama", "papa", "moeder", "vader", "familie", "vriend"]
+        if any(personal in text_lower for personal in personal_keywords):
+            return False
+
+        return any(keyword in text_lower for keyword in product_keywords)
 
 
 class MockSQL:
@@ -16,6 +29,8 @@ class MockSQL:
 class MockRefinement:
     def generate_refinement_question(self, context: dict) -> "str | None":
         if not context:
+            return "Wat is je budget?"
+        if "budget" not in context:
             return "Wat is je budget?"
         if "budget" in context and "brand" not in context:
             return "Heb je een voorkeur voor een merk?"

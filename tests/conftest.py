@@ -131,14 +131,19 @@ def mock_llm_set():
         # Try to use real Azure LLMs if properly configured
         azure_endpoint = os.getenv("AZURE_OPENAI_ENDPOINT", "")
         azure_key = os.getenv("AZURE_OPENAI_KEY", "")
+        azure_api_version = os.getenv("AZURE_OPENAI_API_VERSION", "")
+        azure_model = os.getenv("AZURE_OPENAI_MODEL", "")
 
-        # Check if Azure is properly configured (not default dev values)
-        if (
+        # Check if Azure is properly configured (all required vars present)
+        azure_configured = (
             azure_endpoint
             and azure_endpoint != "https://example.openai.azure.com/"
             and azure_key
             and azure_key != "dummy-key-for-development"
-        ):
+            and azure_api_version
+            and azure_model
+        )
+        if azure_configured:
             try:
                 # Attempt to create real Azure LLMs
                 real_llms = azure_llm_set.create_azure_llm_set()

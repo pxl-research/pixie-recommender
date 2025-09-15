@@ -21,16 +21,20 @@ import pytest
 from pixie.core.llms import azure_llm_set
 
 
-def is_azure_configured():
+def is_azure_configured() -> bool:
     """Check if Azure LLMs are properly configured."""
     endpoint = os.getenv("AZURE_OPENAI_ENDPOINT", "")
     key = os.getenv("AZURE_OPENAI_KEY", "")
+    api_version = os.getenv("AZURE_OPENAI_API_VERSION", "")
+    model = os.getenv("AZURE_OPENAI_MODEL", "")
 
     return (
         endpoint
         and endpoint != "https://example.openai.azure.com/"
         and key
         and key != "dummy-key-for-development"
+        and api_version
+        and model
         and os.getenv("PIXIE_FORCE_MOCKS", "0") != "1"
     )
 

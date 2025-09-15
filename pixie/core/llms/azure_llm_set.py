@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import os
 from typing import Any, Tuple
 
 from ..utils.config import get_config
@@ -13,6 +14,11 @@ def create_azure_llm_set() -> Tuple[Any, Any, Any]:
 
     Raises ValueError if Azure environment variables are not properly configured.
     """
+    # Check if we should force mock usage
+    if os.getenv("PIXIE_FORCE_MOCKS", "0") == "1":
+        from .mock_llm_set import create_mock_llm_set
+        return create_mock_llm_set()
+
     azure_config = get_config().azure
 
     # Check if endpoint and key are properly configured

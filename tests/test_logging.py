@@ -1,8 +1,23 @@
 import logging
+import os
 
+import pytest
 from fastapi.testclient import TestClient
 
 from apps.api.main import app
+
+
+@pytest.fixture(autouse=True)
+def force_mocks():
+    """Force mock usage for all tests in this file to avoid Azure LLM initialization."""
+    original_value = os.environ.get("PIXIE_FORCE_MOCKS")
+    os.environ["PIXIE_FORCE_MOCKS"] = "1"
+    yield
+    # Restore original value
+    if original_value is not None:
+        os.environ["PIXIE_FORCE_MOCKS"] = original_value
+    else:
+        os.environ.pop("PIXIE_FORCE_MOCKS", None)
 
 client = TestClient(app)
 
