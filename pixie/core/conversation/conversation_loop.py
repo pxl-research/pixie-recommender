@@ -3,6 +3,8 @@ from __future__ import annotations
 from typing import Any, Callable
 from uuid import uuid4
 
+import logging
+
 from ..llms import azure_llm_set
 from ..storage.pending_store import InMemoryPendingStore
 from ..utils.contracts import AskResponse
@@ -31,7 +33,12 @@ class ConversationLoopManager:
         self.max_iterations = max_iterations
 
     def handle_new_question(self, question: str) -> AskResponse:
-        relevant = self.relevance_model.is_relevant(question)
+        logger = logging.getLogger(__name__)
+        try:
+            relevant = self.relevance_model.is_relevant(question)
+        except Exception as e:
+            logger.error("Failed to check relevance for question", exc_info=e)
+            return AskResponse(type="error", reason="llm_failure")
 
         if not relevant:
             return AskResponse(type="not_relevant", text="Not relevant")
@@ -51,11 +58,19 @@ class ConversationLoopManager:
         self.pending_store.save_pending(
             pending_id, question, ttl_seconds=300, conversation_context=context
         )
-        prompt = self.refinement_model.generate_refinement_question(context)
+        try:
+            prompt = self.refinement_model.generate_refinement_question(context)
+        except Exception as e:
+            logger.error("Failed to generate refinement question", exc_info=e)
+            prompt = None
 
         # If refinement model could not provide a prompt, fall back to SQL/search
         if prompt is None:
-            sql = self.sql_model.generate_sql(question, None)
+            try:
+                sql = self.sql_model.generate_sql(question, None)
+            except Exception as e:
+                logger.error("Failed to generate SQL for fallback", exc_info=e)
+                return AskResponse(type="error", reason="llm_failure")
             results = self.search_fn(sql, None)
             if results:
                 # resolve pending entry since we have an immediate answer
@@ -65,6 +80,7 @@ class ConversationLoopManager:
         return AskResponse(type="ask_user", prompt=prompt, pending_id=pending_id)
 
     def handle_reply(self, pending_id: str, reply: str) -> AskResponse:
+        logger = logging.getLogger(__name__)
         pending_entry = self.pending_store.get_pending(pending_id)
         if not pending_entry:
             return AskResponse(type="error", reason="invalid_pending_id")
@@ -79,7 +95,11 @@ class ConversationLoopManager:
             self.pending_store.save_pending(
                 pending_id, pending_entry.question, conversation_context=ctx
             )
-            prompt = self.refinement_model.generate_refinement_question(ctx)
+            try:
+                prompt = self.refinement_model.generate_refinement_question(ctx)
+            except Exception as e:
+                logger.error("Failed to generate refinement question for ask_brand", exc_info=e)
+                return AskResponse(type="error", reason="llm_failure")
             return AskResponse(type="ask_user", prompt=prompt, pending_id=pending_id)
 
         if stage == "ask_brand":
@@ -89,13 +109,21 @@ class ConversationLoopManager:
             self.pending_store.save_pending(
                 pending_id, pending_entry.question, conversation_context=ctx
             )
-            prompt = self.refinement_model.generate_refinement_question(ctx)
+            try:
+                prompt = self.refinement_model.generate_refinement_question(ctx)
+            except Exception as e:
+                logger.error("Failed to generate refinement question for ask_tech", exc_info=e)
+                return AskResponse(type="error", reason="llm_failure")
             return AskResponse(type="ask_user", prompt=prompt, pending_id=pending_id)
 
         if stage == "ask_tech":
             ctx["technology"] = reply
             ctx["iterations"] = ctx.get("iterations", 0) + 1
-            sql = self.sql_model.generate_sql(pending_entry.question, ctx)
+            try:
+                sql = self.sql_model.generate_sql(pending_entry.question, ctx)
+            except Exception as e:
+                logger.error("Failed to generate SQL for ask_tech", exc_info=e)
+                return AskResponse(type="error", reason="llm_failure")
             results = self.search_fn(sql, ctx)
             if results:
                 self.pending_store.resolve_pending(pending_id)
@@ -119,7 +147,11 @@ class ConversationLoopManager:
             ctx["view"] = reply
             ctx["iterations"] = ctx.get("iterations", 0) + 1
             # regenerate SQL with chosen view and perform search
-            sql = self.sql_model.generate_sql(pending_entry.question, ctx)
+            try:
+                sql = self.sql_model.generate_sql(pending_entry.question, ctx)
+            except Exception as e:
+                logger.error("Failed to generate SQL for choose_result_view", exc_info=e)
+                return AskResponse(type="error", reason="llm_failure")
             results = self.search_fn(sql, ctx)
             if results:
                 self.pending_store.resolve_pending(pending_id)

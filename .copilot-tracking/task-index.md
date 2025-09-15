@@ -6,7 +6,7 @@ Complete the migration from mock LLMs to Azure OpenAI LLMs by updating Conversat
 
 ## Progress Tracking
 
-- [ ] Step 1: Update ConversationLoopManager initialization → `./steps/01-update-conversation-manager.md`
+- [x] Step 1: Update ConversationLoopManager initialization → `./steps/01-update-conversation-manager.md`
 - [ ] Step 2: Add error handling to Azure LLM calls → `./steps/02-add-error-handling.md`
 - [ ] Step 3: Update environment configuration → `./steps/03-update-environment-config.md`
 - [ ] Step 4: Update tests for Azure API calls → `./steps/04-update-tests.md`
