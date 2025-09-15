@@ -1,24 +1,16 @@
 from pixie.core.conversation.conversation_loop import ConversationLoopManager
 
 
-def _unpack_mock(mock_tuple):
-    return mock_tuple
-
-
-def test_basic_success_path(mock_llm_set):
-    relevance, sql, refinement = _unpack_mock(mock_llm_set)
-
+def test_basic_success_path():
     def search_fn(sql_query, attrs):
         return [{"id": 1, "name": "Printer A"}]
 
-    mgr = ConversationLoopManager(relevance, sql, refinement, search_fn)
+    mgr = ConversationLoopManager(search_fn)
     resp = mgr.handle_new_question("Ik zoek een nieuwe printer")
     assert resp.type == "answer"
 
 
-def test_refinement_then_answer(mock_llm_set):
-    relevance, sql, refinement = _unpack_mock(mock_llm_set)
-
+def test_refinement_then_answer():
     # first search returns empty
     calls = {"count": 0}
 
@@ -28,7 +20,7 @@ def test_refinement_then_answer(mock_llm_set):
             return []
         return [{"id": 2, "name": "Brother XC 2570"}]
 
-    mgr = ConversationLoopManager(relevance, sql, refinement, search_fn)
+    mgr = ConversationLoopManager(search_fn)
     first = mgr.handle_new_question("Ik zoek een nieuwe printer")
     assert first.type == "ask_user"
     pending_id = first.pending_id
@@ -44,28 +36,22 @@ def test_refinement_then_answer(mock_llm_set):
     assert fourth.type == "answer"
 
 
-def test_invalid_pending_id(mock_llm_set):
-    relevance, sql, refinement = _unpack_mock(mock_llm_set)
-
+def test_invalid_pending_id():
     def search_fn(sql_query, attrs):
         return []
 
-    mgr = ConversationLoopManager(relevance, sql, refinement, search_fn)
+    mgr = ConversationLoopManager(search_fn)
     resp = mgr.handle_reply("non-existent", "anything")
     assert resp.type == "error"
 
 
-def test_max_iterations_reached(mock_llm_set):
-    relevance, sql, refinement = _unpack_mock(mock_llm_set)
-
+def test_max_iterations_reached():
     # search always returns empty -> manager should eventually return
     # no_results after max iterations
     def search_fn(sql_query, attrs):
         return []
 
-    mgr = ConversationLoopManager(
-        relevance, sql, refinement, search_fn, max_iterations=2
-    )
+    mgr = ConversationLoopManager(search_fn, max_iterations=2)
     first = mgr.handle_new_question("Ik zoek een nieuwe printer")
     assert first.type == "ask_user"
     assert first.pending_id is not None
@@ -85,15 +71,13 @@ def test_max_iterations_reached(mock_llm_set):
     assert fourth.type in ("no_results",)
 
 
-def test_choose_result_view_large_results(mock_llm_set):
-    relevance, sql, refinement = _unpack_mock(mock_llm_set)
-
+def test_choose_result_view_large_results():
     # Use RealSearchEngine so initial search (attributes None) returns many results
     from pixie.core.search.search_engine import RealSearchEngine
 
     engine = RealSearchEngine()
     # make the sql model generate SQL that will return empty until refinements are provided
-    mgr = ConversationLoopManager(relevance, sql, refinement, engine.search)
+    mgr = ConversationLoopManager(engine.search)
 
     # initial new question -> first search returns many results (attributes None) -> answer
     first = mgr.handle_new_question("Ik zoek een nieuwe printer")
@@ -112,9 +96,7 @@ def test_choose_result_view_large_results(mock_llm_set):
             return []
         return engine.search(sql_query, attrs)
 
-    mgr2 = ConversationLoopManager(
-        relevance, sql, refinement, search_fn, max_iterations=5
-    )
+    mgr2 = ConversationLoopManager(search_fn, max_iterations=5)
     first = mgr2.handle_new_question("Ik zoek een nieuwe printer")
     assert first.type == "ask_user"
     pending_id = first.pending_id
@@ -134,8 +116,7 @@ def test_choose_result_view_large_results(mock_llm_set):
     assert fifth.type == "answer"
 
 
-def test_ttl_integration(mock_llm_set):
-    relevance, sql, refinement = _unpack_mock(mock_llm_set)
+def test_ttl_integration():
     from pixie.core.storage.pending_store import InMemoryPendingStore
 
     store = InMemoryPendingStore()
@@ -144,9 +125,7 @@ def test_ttl_integration(mock_llm_set):
     def search_fn(sql_query, attrs):
         return []
 
-    mgr = ConversationLoopManager(
-        relevance, sql, refinement, search_fn, pending_store=store
-    )
+    mgr = ConversationLoopManager(search_fn, pending_store=store)
     first = mgr.handle_new_question("Ik zoek een nieuwe printer")
     assert first.type == "ask_user"
     assert first.pending_id is not None
@@ -166,21 +145,19 @@ def test_ttl_integration(mock_llm_set):
     assert resp.type == "error"
 
 
-def test_conversation_with_real_search_initial_answer(mock_llm_set):
+def test_conversation_with_real_search_initial_answer():
     # integration: ConversationLoopManager with RealSearchEngine
-    relevance, sql, refinement = _unpack_mock(mock_llm_set)
     from pixie.core.search.search_engine import RealSearchEngine
 
     engine = RealSearchEngine()
-    mgr = ConversationLoopManager(relevance, sql, refinement, engine.search)
+    mgr = ConversationLoopManager(engine.search)
 
     resp = mgr.handle_new_question("Ik zoek een nieuwe printer")
     # RealSearchEngine returns many items for attributes None -> immediate answer
     assert resp.type == "answer"
 
 
-def test_conversation_refinement_then_answer_with_real_search(mock_llm_set):
-    relevance, sql, refinement = _unpack_mock(mock_llm_set)
+def test_conversation_refinement_then_answer_with_real_search():
     from pixie.core.search.search_engine import RealSearchEngine
 
     engine = RealSearchEngine()
@@ -193,7 +170,7 @@ def test_conversation_refinement_then_answer_with_real_search(mock_llm_set):
             return []
         return engine.search(sql_query, attrs)
 
-    mgr = ConversationLoopManager(relevance, sql, refinement, search_fn)
+    mgr = ConversationLoopManager(search_fn)
     first = mgr.handle_new_question("Ik zoek een nieuwe printer")
     assert first.type == "ask_user"
     pending_id = first.pending_id

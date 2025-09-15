@@ -1,4 +1,8 @@
+import os
+
 import pytest
+
+from pixie.core.llms import azure_llm_set
 
 
 class MockRelevance:
@@ -24,4 +28,13 @@ class MockRefinement:
 
 @pytest.fixture
 def mock_llm_set():
-    return MockRelevance(), MockSQL(), MockRefinement()
+    # Use Azure LLMs if environment variables are set, otherwise fall back to mocks
+    if (
+        os.getenv("AZURE_OPENAI_ENDPOINT") != "https://example.openai.azure.com/"
+        and os.getenv("AZURE_OPENAI_KEY") != "dummy-key-for-development"
+        and os.getenv("AZURE_OPENAI_API_VERSION")
+        and os.getenv("AZURE_OPENAI_MODEL")
+    ):
+        return azure_llm_set.create_azure_llm_set()
+    else:
+        return MockRelevance(), MockSQL(), MockRefinement()
