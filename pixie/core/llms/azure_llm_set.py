@@ -1,40 +1,37 @@
 from __future__ import annotations
 
-import os
 from typing import Tuple
 
+from ..utils.config import get_config
 from .azure_refinement_llm import AzureRefinementLLM
 from .azure_relevance_llm import AzureRelevanceLLM
 from .azure_sql_llm import AzureSQLLLM
 
 
 def create_azure_llm_set() -> Tuple[AzureRelevanceLLM, AzureSQLLLM, AzureRefinementLLM]:
-    """Create Azure LLM instances reading configuration from environment variables.
+    """Create Azure LLM instances using centralized configuration.
 
-    Required environment variables:
-    - AZURE_OPENAI_API_VERSION
-    - AZURE_OPENAI_ENDPOINT
-    - AZURE_OPENAI_KEY
-    - AZURE_OPENAI_MODEL (deployment name)
+    Configuration is loaded from environment variables at startup.
     """
-    api_version = os.getenv("AZURE_OPENAI_API_VERSION")
-    if not api_version:
-        raise EnvironmentError("Missing AZURE_OPENAI_API_VERSION")
+    azure_config = get_config().azure
 
-    api_endpoint = os.getenv("AZURE_OPENAI_ENDPOINT")
-    if not api_endpoint:
-        raise EnvironmentError("Missing AZURE_OPENAI_ENDPOINT")
-
-    api_key = os.getenv("AZURE_OPENAI_KEY")
-    if not api_key:
-        raise EnvironmentError("Missing AZURE_OPENAI_KEY")
-
-    model_version = os.getenv("AZURE_OPENAI_MODEL")
-    if not model_version:
-        raise EnvironmentError("Missing AZURE_OPENAI_MODEL")
-
-    relevance = AzureRelevanceLLM(api_version, api_endpoint, api_key, model_version)
-    sql = AzureSQLLLM(api_version, api_endpoint, api_key, model_version)
-    refinement = AzureRefinementLLM(api_version, api_endpoint, api_key, model_version)
+    relevance = AzureRelevanceLLM(
+        azure_config.api_version,
+        azure_config.api_endpoint,
+        azure_config.api_key,
+        azure_config.model_version,
+    )
+    sql = AzureSQLLLM(
+        azure_config.api_version,
+        azure_config.api_endpoint,
+        azure_config.api_key,
+        azure_config.model_version,
+    )
+    refinement = AzureRefinementLLM(
+        azure_config.api_version,
+        azure_config.api_endpoint,
+        azure_config.api_key,
+        azure_config.model_version,
+    )
 
     return relevance, sql, refinement

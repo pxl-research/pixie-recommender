@@ -1,8 +1,9 @@
 from __future__ import annotations
 
 import json
-import os
 from typing import Any, Dict, List, Optional
+
+from ..utils.config import get_config
 
 
 class RealSearchEngine:
@@ -14,13 +15,11 @@ class RealSearchEngine:
 
     def __init__(self, data_file_path: Optional[str] = None):
         if data_file_path is None:
-            data_file_path = os.getenv(
-                "PIXIE_PRINTER_DATA", "pixie/core/data/printers.json"
-            )
+            data_file_path = get_config().search.data_file_path
         self.data_file_path = data_file_path
         self._data = self._load_data(self.data_file_path)
         # default page size for vague queries (no attributes)
-        self._default_page_size = int(os.getenv("PIXIE_DEFAULT_PAGE_SIZE", "10"))
+        self._default_page_size = get_config().search.default_page_size
 
     def _load_data(self, path: str) -> List[Dict[str, Any]]:
         try:
