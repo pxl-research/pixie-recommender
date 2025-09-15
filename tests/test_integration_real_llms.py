@@ -191,12 +191,12 @@ class TestV05RealLLMCompliance:
     def test_v05_azure_dependencies_available(self):
         """Verify that all Azure LLM dependencies are properly installed."""
         import importlib.util
-        
+
         try:
             # Check langchain_openai
             if importlib.util.find_spec("langchain_openai") is None:
                 raise ImportError("langchain_openai not available")
-            
+
             # Check Azure LLM modules
             if importlib.util.find_spec("pixie.core.llms.azure_refinement_llm") is None:
                 raise ImportError("AzureRefinementLLM module not available")
