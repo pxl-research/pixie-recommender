@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import logging
 
+from ..search.search_engine import RealSearchEngine
 from ..storage.pending_store import InMemoryPendingStore
 from ..utils.contracts import AskResponse
 from .conversation_loop import ConversationLoopManager
@@ -26,9 +27,7 @@ class Pixie:
             self._conversation_manager = conversation_manager
         else:
             # Provide a default search function that will be used by the
-            # ConversationLoopManager. Import lazily to avoid cycles.
-            from ..search.search_engine import RealSearchEngine
-
+            # ConversationLoopManager.
             engine = RealSearchEngine()
             self._conversation_manager = ConversationLoopManager(
                 engine.search,
