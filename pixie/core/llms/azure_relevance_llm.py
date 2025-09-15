@@ -34,9 +34,10 @@ class AzureRelevanceLLM(AzureOpenAILLM):
         try:
             if hasattr(self.model, "generate") and self.model is not None:
                 prompt = (
-                    "Determine if the following question is related to printers. "
-                    "Answer with exactly 'yes' if it is related to printers, or 'no' if not.\n\n"
-                    f"Question: {text}"
+                    "Is de volgende vraag gerelateerd aan printers? "
+                    "Beantwoord met precies 'ja' als het gerelateerd is aan printers, "
+                    "of 'nee' als niet.\n\n"
+                    f"Vraag: {text}"
                 )
                 resp = self.model.generate([{"role": "user", "content": prompt}])
 
@@ -59,6 +60,8 @@ class AzureRelevanceLLM(AzureOpenAILLM):
                         or "si" in a
                         or a.startswith("y")
                         or a.startswith("j")
+                        or a == "ja"
+                        or a == "yes"
                     )
         except Exception as e:
             logging.getLogger(__name__).error(
