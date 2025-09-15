@@ -34,7 +34,8 @@ class AzureRelevanceLLM(AzureOpenAILLM):
         try:
             if hasattr(self.model, "generate") and self.model is not None:
                 prompt = (
-                    "Is the following question related to printers? Answer 'yes' or 'no'.\n\n"
+                    "Determine if the following question is related to printers. "
+                    "Answer with exactly 'yes' if it is related to printers, or 'no' if not.\n\n"
                     f"Question: {text}"
                 )
                 resp = self.model.generate([{"role": "user", "content": prompt}])
@@ -49,8 +50,16 @@ class AzureRelevanceLLM(AzureOpenAILLM):
                     ans = resp.text
 
                 if ans:
-                    a = ans.lower()
-                    return "yes" in a or "true" in a
+                    a = ans.lower().strip()
+                    return (
+                        "yes" in a
+                        or "true" in a
+                        or "ja" in a
+                        or "oui" in a
+                        or "si" in a
+                        or a.startswith("y")
+                        or a.startswith("j")
+                    )
         except Exception as e:
             logging.getLogger(__name__).error(
                 "AzureRelevanceLLM failed to classify relevance for question=%r: %s",
