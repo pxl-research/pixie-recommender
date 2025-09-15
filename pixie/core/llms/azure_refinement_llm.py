@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-import logging
 from typing import Optional
 
 from .azure_openai_llm import AzureOpenAILLM
@@ -30,27 +29,22 @@ class AzureRefinementLLM(AzureOpenAILLM):
         self, context: Optional[dict] = None
     ) -> Optional[str]:
         ctx = context or {}
-        try:
-            if hasattr(self.model, "generate") and self.model is not None:
-                prompt = (
-                    "Given the conversation context as JSON, return a single short"
-                    " follow-up question aimed at clarifying the user's needs about"
-                    " printers, or return an empty string if no clarification is"
-                    " required. Do not add any explanation.\n\n"
-                    f"Context: {ctx}"
-                )
-                resp = self.model.generate([{"role": "user", "content": prompt}])
-                if hasattr(resp, "generations"):
-                    gens = resp.generations
-                    if gens and len(gens) > 0 and len(gens[0]) > 0:
-                        return getattr(gens[0][0], "text", None) or str(gens[0][0])
-                if hasattr(resp, "text"):
-                    return resp.text
-        except Exception as e:
-            logging.getLogger(__name__).warning(
-                "AzureRefinementLLM failed to generate refinement question for context=%r: %s",
-                ctx,
-                e,
-            )
-            # For development, return None instead of raising
-            return None
+        
+        if not self.model:
+            raise ValueError("Azure model is not available")
+
+        prompt = (
+            "Given the conversation context as JSON, return a single short "
+            "follow-up question aimed at clarifying the user's needs about "
+            "printers, or return an empty string if no clarification is "
+            "required. Do not add any explanation.\n\n"
+            f"Context: {ctx}"
+        )
+        
+        response = self.model.invoke(prompt)
+        
+        if hasattr(response, 'content'):
+            answer = response.content.strip()
+            return answer if answer else None
+        
+        raise ValueError("Invalid response format from Azure model")

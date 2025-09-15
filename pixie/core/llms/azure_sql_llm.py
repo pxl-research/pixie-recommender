@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-import logging
 from typing import Optional
 
 from .azure_openai_llm import AzureOpenAILLM
@@ -31,27 +30,20 @@ class AzureSQLLLM(AzureOpenAILLM):
     ) -> str:
         q = (question or "").strip()
         attrs = attributes or {}
-        try:
-            if hasattr(self.model, "generate") and self.model is not None:
-                prompt = (
-                    "Generate a single concise SQL query (no explanation) that"
-                    " answers the user's request. Use the table `printers` and"
-                    " available attributes.\n\n"
-                    f"Question: {q}\nAttributes: {attrs}"
-                )
-                resp = self.model.generate([{"role": "user", "content": prompt}])
-                if hasattr(resp, "generations"):
-                    gens = resp.generations
-                    if gens and len(gens) > 0 and len(gens[0]) > 0:
-                        return getattr(gens[0][0], "text", None) or str(gens[0][0])
-                if hasattr(resp, "text"):
-                    return resp.text
-        except Exception as e:
-            logging.getLogger(__name__).warning(
-                "AzureSQLLLM failed to generate SQL for question=%r attrs=%r: %s",
-                q,
-                attrs,
-                e,
-            )
-            # For development, fall back to default SQL instead of raising
-            return "SELECT * FROM printers;"
+        
+        if not self.model:
+            raise ValueError("Azure model is not available")
+
+        prompt = (
+            "Generate a single concise SQL query (no explanation) that "
+            "answers the user's request. Use the table `printers` and "
+            "available attributes.\n\n"
+            f"Question: {q}\nAttributes: {attrs}"
+        )
+        
+        response = self.model.invoke(prompt)
+        
+        if hasattr(response, 'content'):
+            return response.content.strip()
+        
+        raise ValueError("Invalid response format from Azure model")
