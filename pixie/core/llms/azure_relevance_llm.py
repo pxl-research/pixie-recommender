@@ -40,7 +40,6 @@ class AzureRelevanceLLM(AzureOpenAILLM):
                     f"Vraag: {text}"
                 )
                 resp = self.model.generate([{"role": "user", "content": prompt}])
-
                 # Best-effort extraction of text from different langchain return shapes.
                 ans = None
                 if hasattr(resp, "content"):
