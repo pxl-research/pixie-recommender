@@ -43,18 +43,11 @@ class ConversationLoopManager:
         if not relevant:
             return AskResponse(type="not_relevant", text="Not relevant")
 
-        try:
-            sql = self.sql_model.generate_sql(question, None)
-        except Exception as e:
-            logging.getLogger(__name__).warning(
-                "sql_model.generate_sql failed for question=%r: %s", question, e
-            )
-            return AskResponse(type="error", reason="sql_generation_failed")
-        results = self.search_fn(sql, None)
-        if results:
-            return AskResponse(type="answer", text=str(results))
-
-        # create pending and ask refinement question sequence
+        # For new relevant questions, prefer to ask refinement questions first
+        # instead of immediately generating SQL and returning potentially large
+        # result sets. This keeps the UX conversational and avoids dumping the
+        # full dataset for vague queries. If the refinement model cannot
+        # produce a prompt, fall back to generating SQL and searching.
         pending_id = f"pending-{uuid4().hex[:8]}"
         context: dict[str, Any] = {
             "flow": "product",
@@ -74,6 +67,22 @@ class ConversationLoopManager:
                 e,
             )
             prompt = None
+
+        # If refinement model could not provide a prompt, fall back to SQL/search
+        if prompt is None:
+            try:
+                sql = self.sql_model.generate_sql(question, None)
+            except Exception as e:
+                logging.getLogger(__name__).warning(
+                    "sql_model.generate_sql failed for question=%r: %s", question, e
+                )
+                return AskResponse(type="error", reason="sql_generation_failed")
+            results = self.search_fn(sql, None)
+            if results:
+                # resolve pending entry since we have an immediate answer
+                self.pending_store.resolve_pending(pending_id)
+                return AskResponse(type="answer", text=str(results))
+
         return AskResponse(type="ask_user", prompt=prompt, pending_id=pending_id)
 
     def handle_reply(self, pending_id: str, reply: str) -> AskResponse:

@@ -19,6 +19,13 @@ class RealSearchEngine:
             )
         self.data_file_path = data_file_path
         self._data = self._load_data(self.data_file_path)
+        # default page size for vague queries (no attributes)
+        try:
+            self._default_page_size = int(
+                os.getenv("PIXIE_DEFAULT_PAGE_SIZE", "10")
+            )
+        except Exception:
+            self._default_page_size = 10
 
     def _load_data(self, path: str) -> List[Dict[str, Any]]:
         try:
@@ -32,11 +39,13 @@ class RealSearchEngine:
     def search(
         self, sql: str, attributes: Optional[Dict[str, Any]]
     ) -> List[Dict[str, Any]]:
-        # If attributes is None or empty, return many items (mimic previous behaviour)
+        # If attributes is None or empty, return only a small page of items
+        # to avoid returning the entire dataset for vague queries.
         if attributes is None or (
             isinstance(attributes, dict) and len(attributes) == 0
         ):
-            return [self._map_item(i) for i in self._data]
+            limit = max(1, self._default_page_size)
+            return [self._map_item(i) for i in self._data[:limit]]
 
         items = list(self._data)
 
