@@ -17,7 +17,7 @@ class MockSQL:
 
 class MockRefinement:
     def generate_refinement_question(self, context: dict) -> "str | None":
-        if not context:
+        if "budget" not in context:
             return "Wat is je budget?"
         if "budget" in context and "brand" not in context:
             return "Heb je een voorkeur voor een merk?"

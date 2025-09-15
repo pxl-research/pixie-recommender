@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import logging
-from typing import Any, Callable
+from typing import Any, Callable, Tuple
 from uuid import uuid4
 
 from ..llms import azure_llm_set
@@ -21,12 +21,15 @@ class ConversationLoopManager:
         search_fn: Callable[[str, dict | None], list[dict]],
         pending_store: InMemoryPendingStore | None = None,
         max_iterations: int = 3,
+        llm_set: Tuple[Any, Any, Any] | None = None,
     ):
+        if llm_set is None:
+            llm_set = azure_llm_set.create_azure_llm_set()
         (
             self.relevance_model,
             self.sql_model,
             self.refinement_model,
-        ) = azure_llm_set.create_azure_llm_set()
+        ) = llm_set
         self.search_fn = search_fn
         self.pending_store = pending_store or InMemoryPendingStore()
         self.max_iterations = max_iterations
