@@ -119,34 +119,36 @@ class MockRefinement:
 @pytest.fixture
 def mock_llm_set():
     """LLM fixture that uses real Azure LLMs when available, falls back to mocks.
-    
+
     This allows v0.5 real LLM testing while maintaining fast/reliable mock fallback.
     Set PIXIE_FORCE_MOCKS=1 to always use mocks even when Azure is configured.
     """
     # Check if we should force mock usage
     force_mocks = os.getenv("PIXIE_FORCE_MOCKS", "0") == "1"
-    
+
     if not force_mocks:
         # Try to use real Azure LLMs if properly configured
         azure_endpoint = os.getenv("AZURE_OPENAI_ENDPOINT", "")
         azure_key = os.getenv("AZURE_OPENAI_KEY", "")
-        
+
         # Check if Azure is properly configured (not default dev values)
         if (
-            azure_endpoint 
+            azure_endpoint
             and azure_endpoint != "https://example.openai.azure.com/"
-            and azure_key 
+            and azure_key
             and azure_key != "dummy-key-for-development"
         ):
             try:
                 # Attempt to create real Azure LLMs
                 real_llms = azure_llm_set.create_azure_llm_set()
-                print(f"✅ Using REAL Azure LLMs for testing (endpoint: {azure_endpoint})")
+                print(
+                    f"✅ Using REAL Azure LLMs for testing (endpoint: {azure_endpoint})"
+                )
                 return real_llms
             except Exception as e:
                 # If Azure LLMs fail, fall back to mocks with warning
                 print(f"⚠️  Azure LLMs failed ({e}), falling back to mocks")
-    
+
     # Default: Use mock LLMs for fast, predictable tests
     print("🔧 Using MOCK LLMs for testing")
     return MockRelevance(), MockSQL(), MockRefinement()
