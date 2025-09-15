@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from typing import Optional
 
+from ..utils.attributes import get_attribute_manager
 from .azure_openai_llm import AzureOpenAILLM
 
 
@@ -33,25 +34,32 @@ class AzureRefinementLLM(AzureOpenAILLM):
         if not self.model:
             raise ValueError("Azure model is not available")
 
+        # Use attribute manager to get the next missing attribute
+        attr_manager = get_attribute_manager()
+        next_attr = attr_manager.get_next_missing_attribute("printer", ctx)
+
+        if not next_attr:
+            # All attributes collected
+            return None
+
+        # Get the predefined question for this attribute
+        predefined_question = attr_manager.get_attribute_question(next_attr)
+
+        # Ask the LLM to generate a natural question for this specific attribute
         prompt = (
-            "Given the conversation context, determine which attribute to ask about next. "
-            "Follow this exact sequence: 1) budget, 2) brand/merk, 3) technology (inkjet/laser). "
-            "Return ONLY the appropriate question in Dutch, "
-            "or empty string if all attributes are collected.\n\n"
-            "Rules:\n"
-            "- If 'budget' is missing: ask 'Wat is je budget?'\n"
-            "- If 'budget' exists but 'brand' is missing: "
-            "ask 'Heb je een voorkeur voor een merk?'\n"
-            "- If 'budget' and 'brand' exist but 'technology' is missing: "
-            "ask 'Welke technologie heeft je voorkeur (inkjet/laser)?'\n"
-            "- If all three exist: return empty string\n\n"
-            f"Context: {ctx}"
+            f"Generate a natural, conversational question in Dutch to ask about "
+            f"the '{next_attr['name']}' attribute for printers. "
+            f"The predefined question is: '{predefined_question}'. "
+            f"You can use this as-is or rephrase it naturally. "
+            f"Context: {ctx}\n\n"
+            f"Return only the question, no explanation."
         )
 
         response = self.model.invoke(prompt)
 
         if hasattr(response, "content"):
             answer = response.content.strip()
-            return answer if answer else None
+            return answer if answer else predefined_question
 
-        raise ValueError("Invalid response format from Azure model")
+        # Fallback to predefined question
+        return predefined_question

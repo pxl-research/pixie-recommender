@@ -43,30 +43,99 @@ class RealSearchEngine:
 
         items = list(self._data)
 
-        # budget handling: accept strings like 'minder dan 50€' or numeric budgets
+        # budget handling: accept strings like 'maximaal 200 euro' or numeric budgets
         budget = None
         if isinstance(attributes, dict):
             budget = attributes.get("budget") or attributes.get("Budget")
 
+        max_budget_value = None
         if isinstance(budget, (int, float)):
-            max_cents = int(float(budget) * 100)
-            items = [it for it in items if int(it.get("price_cents", 0)) <= max_cents]
+            max_budget_value = float(budget)
+        elif isinstance(budget, str):
+            # Check if it's a vague response that should be ignored
+            budget_str = budget.lower().strip()
+            vague_budget_responses = [
+                "weet ik niet",
+                "geen idee",
+                "maakt niet uit",
+                "doet er niet toe",
+                "geen voorkeur",
+                "weet niet",
+                "onbekend",
+                "nvt",
+                "n.v.t.",
+            ]
+
+            if budget_str not in vague_budget_responses:
+                # Parse budget strings like "maximaal 200 euro", "200", "100-200 euro"
+                import re
+
+                # Extract numeric values from the budget string
+                numbers = re.findall(r"\d+", budget_str)
+                if numbers:
+                    if "-" in budget_str and len(numbers) >= 2:
+                        # Range format: use the maximum value
+                        max_budget_value = float(numbers[-1])
+                    else:
+                        # Single number: use as maximum
+                        max_budget_value = float(numbers[-1])
+
+        # Apply budget filtering if we found a budget value
+        if max_budget_value is not None:
+            # Filter by price (euro) not price_cents
+            items = [
+                it for it in items if float(it.get("price", 0)) <= max_budget_value
+            ]
 
         # brand filter
         brand = None
         if isinstance(attributes, dict):
             brand = attributes.get("brand") or attributes.get("Brand")
         if isinstance(brand, str):
-            items = [it for it in items if it.get("brand", "").lower() == brand.lower()]
+            # Check if it's a vague response that should be ignored
+            brand_str = brand.lower().strip()
+            vague_brand_responses = [
+                "weet ik niet",
+                "geen idee",
+                "maakt niet uit",
+                "doet er niet toe",
+                "geen voorkeur",
+                "weet niet",
+                "onbekend",
+                "nvt",
+                "n.v.t.",
+            ]
+
+            if brand_str not in vague_brand_responses:
+                items = [
+                    it for it in items if it.get("brand", "").lower() == brand.lower()
+                ]
 
         # technology filter
         tech = None
         if isinstance(attributes, dict):
             tech = attributes.get("technology") or attributes.get("Technology")
         if isinstance(tech, str):
-            items = [
-                it for it in items if it.get("technology", "").lower() == tech.lower()
+            # Check if it's a vague response that should be ignored
+            tech_str = tech.lower().strip()
+            vague_tech_responses = [
+                "weet ik niet",
+                "geen idee",
+                "maakt niet uit",
+                "doet er niet toe",
+                "geen voorkeur",
+                "weet niet",
+                "onbekend",
+                "nvt",
+                "n.v.t.",
             ]
+
+            if tech_str not in vague_tech_responses:
+                items = [
+                    it
+                    for it in items
+                    if it.get("technology", "").lower() == tech.lower()
+                ]
 
         # return mapped items (keep structure similar to mock: id, name, price)
         return [self._map_item(it) for it in items]
