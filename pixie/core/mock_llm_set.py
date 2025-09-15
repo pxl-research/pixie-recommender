@@ -17,12 +17,16 @@ def create_mock_llm_set() -> Tuple[Any, Any, Any]:
     api_key = os.getenv("AZURE_OPENAI_KEY")
     model = os.getenv("AZURE_OPENAI_MODEL")
 
-    missing = [n for n, v in {
-        "AZURE_OPENAI_API_VERSION": api_version,
-        "AZURE_OPENAI_ENDPOINT": api_endpoint,
-        "AZURE_OPENAI_KEY": api_key,
-        "AZURE_OPENAI_MODEL": model,
-    }.items() if not v]
+    missing = [
+        n
+        for n, v in {
+            "AZURE_OPENAI_API_VERSION": api_version,
+            "AZURE_OPENAI_ENDPOINT": api_endpoint,
+            "AZURE_OPENAI_KEY": api_key,
+            "AZURE_OPENAI_MODEL": model,
+        }.items()
+        if not v
+    ]
     if missing:
         raise EnvironmentError(
             "Azure OpenAI environment variables missing: "

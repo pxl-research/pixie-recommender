@@ -26,7 +26,9 @@ class AzureSQLLLM(AzureOpenAILLM):
         super().__init__(api_version, api_endpoint, api_key, model_version, temperature)
         self.model_name = model_name
 
-    def generate_sql(self, question: Optional[str], attributes: Optional[dict] = None) -> str:
+    def generate_sql(
+        self, question: Optional[str], attributes: Optional[dict] = None
+    ) -> str:
         q = (question or "").strip()
         attrs = attributes or {}
         try:

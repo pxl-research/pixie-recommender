@@ -26,7 +26,9 @@ class AzureRefinementLLM(AzureOpenAILLM):
         super().__init__(api_version, api_endpoint, api_key, model_version, temperature)
         self.model_name = model_name
 
-    def generate_refinement_question(self, context: Optional[dict] = None) -> Optional[str]:
+    def generate_refinement_question(
+        self, context: Optional[dict] = None
+    ) -> Optional[str]:
         ctx = context or {}
         try:
             if hasattr(self.model, "generate") and self.model is not None:

@@ -1,4 +1,3 @@
-
 try:
     # langchain_openai is an external dependency; guard import so repo can be
     # imported during tests that don't have the package installed.

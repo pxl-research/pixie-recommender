@@ -21,9 +21,7 @@ class RealSearchEngine:
         self._data = self._load_data(self.data_file_path)
         # default page size for vague queries (no attributes)
         try:
-            self._default_page_size = int(
-                os.getenv("PIXIE_DEFAULT_PAGE_SIZE", "10")
-            )
+            self._default_page_size = int(os.getenv("PIXIE_DEFAULT_PAGE_SIZE", "10"))
         except Exception:
             self._default_page_size = 10
 

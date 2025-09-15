@@ -42,7 +42,11 @@ class Pixie:
 
                 engine = RealSearchEngine()
                 self._conversation_manager = ConversationLoopManager(
-                    relevance, sql, refinement, engine.search, pending_store=self._pending_store
+                    relevance,
+                    sql,
+                    refinement,
+                    engine.search,
+                    pending_store=self._pending_store,
                 )
             except Exception as e:
                 # If Azure isn't configured (e.g., in local test runs), leave
