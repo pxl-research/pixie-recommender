@@ -60,13 +60,13 @@ def test_invalid_pending_id():
     assert resp.type == "error"
 
 
-def test_max_iterations_reached():
+def test_max_iterations_reached(mock_llm_set):
     # search always returns empty -> manager should eventually return
     # no_results after max iterations
     def search_fn(sql_query, attrs):
         return []
 
-    mgr = ConversationLoopManager(search_fn, max_iterations=2)
+    mgr = ConversationLoopManager(search_fn, max_iterations=2, llm_set=mock_llm_set)
     first = mgr.handle_new_question("Ik zoek een nieuwe printer")
     assert first.type == "ask_user"
     assert first.pending_id is not None
@@ -131,7 +131,7 @@ def test_choose_result_view_large_results(mock_llm_set):
     assert fifth.type == "answer"
 
 
-def test_ttl_integration():
+def test_ttl_integration(mock_llm_set):
     from pixie.core.storage.pending_store import InMemoryPendingStore
 
     store = InMemoryPendingStore()
@@ -140,7 +140,7 @@ def test_ttl_integration():
     def search_fn(sql_query, attrs):
         return []
 
-    mgr = ConversationLoopManager(search_fn, pending_store=store)
+    mgr = ConversationLoopManager(search_fn, pending_store=store, llm_set=mock_llm_set)
     first = mgr.handle_new_question("Ik zoek een nieuwe printer")
     assert first.type == "ask_user"
     assert first.pending_id is not None

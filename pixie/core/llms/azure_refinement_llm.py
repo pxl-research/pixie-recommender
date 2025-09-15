@@ -47,17 +47,9 @@ class AzureRefinementLLM(AzureOpenAILLM):
                 if hasattr(resp, "text"):
                     return resp.text
         except Exception as e:
-            logging.getLogger(__name__).warning(
+            logging.getLogger(__name__).error(
                 "AzureRefinementLLM failed to generate refinement question for context=%r: %s",
                 ctx,
                 e,
             )
-
-        # Fallback deterministic sequence matching the mock behaviour
-        if "budget" not in ctx:
-            return "Wat is je budget?"
-        if "brand" not in ctx:
-            return "Heb je een voorkeur voor een merk?"
-        if "technology" not in ctx:
-            return "Welke technologie heeft je voorkeur (inkjet/laser)?"
-        return None
+            raise  # Re-raise the exception instead of falling back to static questions

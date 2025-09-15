@@ -52,12 +52,9 @@ class AzureRelevanceLLM(AzureOpenAILLM):
                     a = ans.lower()
                     return "yes" in a or "true" in a
         except Exception as e:
-            logging.getLogger(__name__).warning(
+            logging.getLogger(__name__).error(
                 "AzureRelevanceLLM failed to classify relevance for question=%r: %s",
                 text,
                 e,
             )
-            # fall through to heuristic fallback
-
-        # Fallback heuristic identical to the original mock implementation.
-        return "printer" in text.lower() or "printers" in text.lower()
+            raise  # Re-raise the exception instead of falling back to heuristic

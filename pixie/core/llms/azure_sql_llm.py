@@ -47,12 +47,10 @@ class AzureSQLLLM(AzureOpenAILLM):
                 if hasattr(resp, "text"):
                     return resp.text
         except Exception as e:
-            logging.getLogger(__name__).warning(
+            logging.getLogger(__name__).error(
                 "AzureSQLLLM failed to generate SQL for question=%r attrs=%r: %s",
                 q,
                 attrs,
                 e,
             )
-
-        # Fallback to the previous mock default
-        return "SELECT * FROM printers;"
+            raise  # Re-raise the exception instead of falling back to default SQL
