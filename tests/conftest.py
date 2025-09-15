@@ -1,9 +1,4 @@
-import os
-
 import pytest
-
-from pixie.core.llms import azure_llm_set
-from pixie.core.utils.attributes import get_attribute_manager
 
 
 class MockRelevance:
@@ -104,26 +99,21 @@ class MockSQL:
 
 
 class MockRefinement:
-    def __init__(self):
-        self.attr_manager = get_attribute_manager()
-
     def generate_refinement_question(self, context: dict) -> "str | None":
-        # Use the structured attribute system for consistent behavior
-        next_attr = self.attr_manager.get_next_missing_attribute("printer", context)
-        if next_attr:
-            return self.attr_manager.get_attribute_question(next_attr)
+        stage = context.get("stage", "")
+        # Check if this is the first question (ask_budget stage or no user attributes)
+        system_keys = ["flow", "stage", "iterations", "question"]
+        user_attrs = [k for k in context.keys() if k not in system_keys]
+        if stage == "ask_budget" or not context or len(user_attrs) == 0:
+            return "Wat is je budget?"
+        if "budget" in context and "brand" not in context:
+            return "Heb je een voorkeur voor een merk?"
+        if "budget" in context and "brand" in context and "technology" not in context:
+            return "Welke technologie heeft je voorkeur (inkjet/laser)?"
         return None
 
 
 @pytest.fixture
 def mock_llm_set():
-    # Use Azure LLMs if environment variables are set, otherwise fall back to mocks
-    if (
-        os.getenv("AZURE_OPENAI_ENDPOINT") != "https://example.openai.azure.com/"
-        and os.getenv("AZURE_OPENAI_KEY") != "dummy-key-for-development"
-        and os.getenv("AZURE_OPENAI_API_VERSION")
-        and os.getenv("AZURE_OPENAI_MODEL")
-    ):
-        return azure_llm_set.create_azure_llm_set()
-    else:
-        return MockRelevance(), MockSQL(), MockRefinement()
+    # Always use mock LLMs for testing for predictable, fast tests
+    return MockRelevance(), MockSQL(), MockRefinement()

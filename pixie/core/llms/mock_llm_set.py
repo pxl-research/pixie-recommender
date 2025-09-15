@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from typing import Any, Tuple
+
 
 class MockRelevance:
     def is_relevant(self, text: str) -> bool:
@@ -20,3 +22,8 @@ class MockRefinement:
         if "budget" in context and "brand" in context and "technology" not in context:
             return "Welke technologie heeft je voorkeur (inkjet/laser)?"
         return None
+
+
+def create_mock_llm_set() -> Tuple[Any, Any, Any]:
+    """Create mock LLM instances for testing."""
+    return MockRelevance(), MockSQL(), MockRefinement()
