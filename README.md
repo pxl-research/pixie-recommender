@@ -76,6 +76,37 @@ Quick command (recommended):
 Or use the Makefile target `make dev-test` which delegates to the canonical
 helper script `./scripts/dev_test.sh`.
 
+## Configuration
+
+### Environment Variables
+
+Pixie Core uses simple environment variable configuration with sensible defaults for development.
+
+### Azure OpenAI Configuration
+
+- `AZURE_OPENAI_API_VERSION`: API version for Azure OpenAI (default: "2024-02-01")
+- `AZURE_OPENAI_ENDPOINT`: Azure OpenAI endpoint URL (default: `https://example.openai.azure.com/`)
+- `AZURE_OPENAI_KEY`: Azure OpenAI API key (default: "dummy-key-for-development")
+- `AZURE_OPENAI_MODEL`: Azure OpenAI model deployment name (default: "gpt-4")
+
+### Search Configuration
+
+- `PIXIE_PRINTER_DATA`: Path to printer data JSON file (default: "pixie/core/data/printers.json")
+- `PIXIE_DEFAULT_PAGE_SIZE`: Default page size for search results (default: 10)
+
+### Configuration Examples
+
+```bash
+# Development (default - uses dummy values)
+export AZURE_OPENAI_ENDPOINT=https://your-dev-endpoint.openai.azure.com/
+export AZURE_OPENAI_KEY=your-dev-key
+
+# Production
+export AZURE_OPENAI_ENDPOINT=https://your-prod-endpoint.openai.azure.com/
+export AZURE_OPENAI_KEY=your-production-key
+export PIXIE_DEFAULT_PAGE_SIZE=20
+```
+
 ## Azure OpenAI configuration
 
 To run the application with real Azure OpenAI LLMs, set the following
