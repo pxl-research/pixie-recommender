@@ -1,4 +1,4 @@
-from pixie.core.conversation_loop import ConversationLoopManager
+from pixie.core.conversation.conversation_loop import ConversationLoopManager
 
 
 def _unpack_mock(mock_tuple):
@@ -89,7 +89,7 @@ def test_choose_result_view_large_results(mock_llm_set):
     relevance, sql, refinement = _unpack_mock(mock_llm_set)
 
     # Use RealSearchEngine so initial search (attributes None) returns many results
-    from pixie.core.search_engine import RealSearchEngine
+    from pixie.core.search.search_engine import RealSearchEngine
 
     engine = RealSearchEngine()
     # make the sql model generate SQL that will return empty until refinements are provided
@@ -136,7 +136,7 @@ def test_choose_result_view_large_results(mock_llm_set):
 
 def test_ttl_integration(mock_llm_set):
     relevance, sql, refinement = _unpack_mock(mock_llm_set)
-    from pixie.core.pending_store import InMemoryPendingStore
+    from pixie.core.storage.pending_store import InMemoryPendingStore
 
     store = InMemoryPendingStore()
 
@@ -169,7 +169,7 @@ def test_ttl_integration(mock_llm_set):
 def test_conversation_with_real_search_initial_answer(mock_llm_set):
     # integration: ConversationLoopManager with RealSearchEngine
     relevance, sql, refinement = _unpack_mock(mock_llm_set)
-    from pixie.core.search_engine import RealSearchEngine
+    from pixie.core.search.search_engine import RealSearchEngine
 
     engine = RealSearchEngine()
     mgr = ConversationLoopManager(relevance, sql, refinement, engine.search)
@@ -181,7 +181,7 @@ def test_conversation_with_real_search_initial_answer(mock_llm_set):
 
 def test_conversation_refinement_then_answer_with_real_search(mock_llm_set):
     relevance, sql, refinement = _unpack_mock(mock_llm_set)
-    from pixie.core.search_engine import RealSearchEngine
+    from pixie.core.search.search_engine import RealSearchEngine
 
     engine = RealSearchEngine()
 

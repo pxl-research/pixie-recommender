@@ -1,7 +1,7 @@
 import time
 from datetime import datetime
 
-from pixie.core.pending_store import InMemoryPendingStore
+from pixie.core.storage.pending_store import InMemoryPendingStore
 
 
 def test_save_and_get_pending():

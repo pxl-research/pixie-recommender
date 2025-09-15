@@ -2,10 +2,10 @@ from __future__ import annotations
 
 import logging
 
-from pixie.core.contracts import AskResponse
-from pixie.core.conversation_loop import ConversationLoopManager
-from pixie.core import azure_llm_set
-from pixie.core.pending_store import InMemoryPendingStore
+from ..llms import azure_llm_set
+from ..storage.pending_store import InMemoryPendingStore
+from ..utils.contracts import AskResponse
+from .conversation_loop import ConversationLoopManager
 
 
 class Pixie:
@@ -29,7 +29,7 @@ class Pixie:
             relevance, sql, refinement = azure_llm_set.create_azure_llm_set()
             # Provide a default search function that will be used by the
             # ConversationLoopManager. Import lazily to avoid cycles.
-            from pixie.core.search_engine import RealSearchEngine
+            from ..search.search_engine import RealSearchEngine
 
             engine = RealSearchEngine()
             self._conversation_manager = ConversationLoopManager(

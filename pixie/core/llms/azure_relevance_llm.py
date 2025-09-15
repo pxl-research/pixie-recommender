@@ -1,9 +1,9 @@
 from __future__ import annotations
 
-from typing import Optional
 import logging
+from typing import Optional
 
-from pixie.core.azure_openai_llm import AzureOpenAILLM
+from .azure_openai_llm import AzureOpenAILLM
 
 
 class AzureRelevanceLLM(AzureOpenAILLM):

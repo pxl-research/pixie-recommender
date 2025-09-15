@@ -1,6 +1,6 @@
-from pixie.core.azure_refinement_llm import AzureRefinementLLM
-from pixie.core.azure_relevance_llm import AzureRelevanceLLM
-from pixie.core.azure_sql_llm import AzureSQLLLM
+from pixie.core.llms.azure_refinement_llm import AzureRefinementLLM
+from pixie.core.llms.azure_relevance_llm import AzureRelevanceLLM
+from pixie.core.llms.azure_sql_llm import AzureSQLLLM
 
 
 class _Gen:
@@ -130,7 +130,7 @@ def test_create_azure_llm_set_reads_env(monkeypatch):
     monkeypatch.setenv("AZURE_OPENAI_KEY", "k")
     monkeypatch.setenv("AZURE_OPENAI_MODEL", "m")
 
-    from pixie.core.azure_llm_set import create_azure_llm_set
+    from pixie.core.llms.azure_llm_set import create_azure_llm_set
 
     relevance, sql, refinement = create_azure_llm_set()
     assert isinstance(relevance, AzureRelevanceLLM)

@@ -3,8 +3,8 @@ from __future__ import annotations
 from typing import Any, Callable
 from uuid import uuid4
 
-from pixie.core.contracts import AskResponse
-from pixie.core.pending_store import InMemoryPendingStore
+from ..storage.pending_store import InMemoryPendingStore
+from ..utils.contracts import AskResponse
 
 
 class ConversationLoopManager:

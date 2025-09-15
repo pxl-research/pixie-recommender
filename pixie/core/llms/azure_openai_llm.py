@@ -5,7 +5,7 @@ try:
 except Exception:  # pragma: no cover - environment-specific
     AzureChatOpenAI = None  # type: ignore
 
-from pixie.core.abstractclasses.llm import LLM
+from .abstractclasses.llm import LLM
 
 
 class AzureOpenAILLM(LLM):

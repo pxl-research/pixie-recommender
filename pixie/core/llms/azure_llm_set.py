@@ -3,9 +3,9 @@ from __future__ import annotations
 import os
 from typing import Tuple
 
-from pixie.core.azure_relevance_llm import AzureRelevanceLLM
-from pixie.core.azure_sql_llm import AzureSQLLLM
-from pixie.core.azure_refinement_llm import AzureRefinementLLM
+from .azure_refinement_llm import AzureRefinementLLM
+from .azure_relevance_llm import AzureRelevanceLLM
+from .azure_sql_llm import AzureSQLLLM
 
 
 def create_azure_llm_set() -> Tuple[AzureRelevanceLLM, AzureSQLLLM, AzureRefinementLLM]:

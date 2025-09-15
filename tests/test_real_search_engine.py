@@ -1,4 +1,4 @@
-from pixie.core.search_engine import RealSearchEngine
+from pixie.core.search.search_engine import RealSearchEngine
 
 
 def test_real_search_loads_data_and_returns_many():

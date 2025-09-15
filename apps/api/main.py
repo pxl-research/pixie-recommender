@@ -4,10 +4,10 @@ from uuid import uuid4
 
 from fastapi import Body, FastAPI
 
-from pixie.core import logging as pixie_logging
-from pixie.core.contracts import AskResponse
-from pixie.core.logging import trace_id_ctx
-from pixie.core.pixie import Pixie
+from pixie.core.conversation.pixie import Pixie
+from pixie.core.utils import logging as pixie_logging
+from pixie.core.utils.contracts import AskResponse
+from pixie.core.utils.logging import trace_id_ctx
 
 # Also configure logging at import time so test runners that create a
 # TestClient during module import (common in test files) have the LogRecord
