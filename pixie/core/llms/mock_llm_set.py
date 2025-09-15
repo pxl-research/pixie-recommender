@@ -7,9 +7,25 @@ class MockRelevance:
     def is_relevant(self, text: str) -> bool:
         # Check for product-related keywords
         product_keywords = [
-            "printer", "laptop", "computer", "phone", "tablet", "monitor",
-            "keyboard", "mouse", "headphones", "speaker", "camera", "tv",
-            "koop", "prijs", "budget", "merk", "brand", "laser", "inkjet"
+            "printer",
+            "laptop",
+            "computer",
+            "phone",
+            "tablet",
+            "monitor",
+            "keyboard",
+            "mouse",
+            "headphones",
+            "speaker",
+            "camera",
+            "tv",
+            "koop",
+            "prijs",
+            "budget",
+            "merk",
+            "brand",
+            "laser",
+            "inkjet",
         ]
         text_lower = text.lower()
 

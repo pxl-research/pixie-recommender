@@ -19,6 +19,7 @@ def force_mocks():
     else:
         os.environ.pop("PIXIE_FORCE_MOCKS", None)
 
+
 client = TestClient(app)
 
 

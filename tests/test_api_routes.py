@@ -32,8 +32,7 @@ def mock_client():
     # Create conversation manager with mock LLMs
     search_engine = RealSearchEngine()
     conversation_manager = ConversationLoopManager(
-        search_fn=search_engine.search,
-        llm_set=mock_llms
+        search_fn=search_engine.search, llm_set=mock_llms
     )
 
     # Create Pixie instance with mock conversation manager
@@ -69,7 +68,8 @@ def mock_client():
                 message = req.get("message")
                 if not message or not isinstance(message, str):
                     return AskResponse(
-                        type="error", reason="'message' is required and must be a string"
+                        type="error",
+                        reason="'message' is required and must be a string",
                     ).dict()
 
                 resp = pixie_instance.reply(pending_id.strip(), message.strip())
@@ -86,7 +86,9 @@ def mock_client():
 
         except Exception:
             logger.exception("Unexpected error in /ask endpoint")
-            return AskResponse(type="error", reason="Internal server error occurred").dict()
+            return AskResponse(
+                type="error", reason="Internal server error occurred"
+            ).dict()
 
     # Configure logging for tests
     pixie_logging.configure_logging()
@@ -123,7 +125,9 @@ def test_product_found_flow(mock_client):
     assert pending and pending.startswith("pending-")
 
     # Reply budget -> ask brand (look for brand-related keywords)
-    r2 = mock_client.post("/ask", json={"pending_id": pending, "message": "Maximaal 200€"})
+    r2 = mock_client.post(
+        "/ask", json={"pending_id": pending, "message": "Maximaal 200€"}
+    )
     assert r2.status_code == 200
     d2 = r2.json()
     assert d2["type"] == "ask_user"
@@ -173,7 +177,9 @@ def test_no_results_flow(mock_client):
     pending = d1.get("pending_id")
 
     # Too small budget -> might ask more questions or give no results
-    r2 = mock_client.post("/ask", json={"pending_id": pending, "message": "Minder dan 50€"})
+    r2 = mock_client.post(
+        "/ask", json={"pending_id": pending, "message": "Minder dan 50€"}
+    )
     assert r2.status_code == 200
     d2 = r2.json()
     # System might either continue asking or give no results
@@ -191,7 +197,9 @@ def test_too_many_results_flow(mock_client):
 
     # Answer 'Weet ik niet' three times - system might finish or ask for view choice
     for i in range(3):
-        r = mock_client.post("/ask", json={"pending_id": pending, "message": "Weet ik niet"})
+        r = mock_client.post(
+            "/ask", json={"pending_id": pending, "message": "Weet ik niet"}
+        )
         assert r.status_code == 200
         d = r.json()
         pending = d.get("pending_id")
