@@ -3,29 +3,29 @@ from __future__ import annotations
 from typing import Any, Callable
 from uuid import uuid4
 
+from ..llms import azure_llm_set
 from ..storage.pending_store import InMemoryPendingStore
 from ..utils.contracts import AskResponse
 
 
 class ConversationLoopManager:
-    """Minimal conversation-loop manager that orchestrates the three mock LLMs.
+    """Minimal conversation-loop manager that orchestrates the three Azure LLMs.
 
-    The manager expects simple, literal behaviors from the supplied models and a
+    The manager automatically creates Azure LLM instances and expects a
     `search_fn` callable that returns a list of dict results for a SQL query.
     """
 
     def __init__(
         self,
-        relevance_model: Any,
-        sql_model: Any,
-        refinement_model: Any,
         search_fn: Callable[[str, dict | None], list[dict]],
         pending_store: InMemoryPendingStore | None = None,
         max_iterations: int = 3,
     ):
-        self.relevance_model = relevance_model
-        self.sql_model = sql_model
-        self.refinement_model = refinement_model
+        (
+            self.relevance_model,
+            self.sql_model,
+            self.refinement_model,
+        ) = azure_llm_set.create_azure_llm_set()
         self.search_fn = search_fn
         self.pending_store = pending_store or InMemoryPendingStore()
         self.max_iterations = max_iterations

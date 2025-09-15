@@ -2,7 +2,6 @@ from __future__ import annotations
 
 import logging
 
-from ..llms import azure_llm_set
 from ..storage.pending_store import InMemoryPendingStore
 from ..utils.contracts import AskResponse
 from .conversation_loop import ConversationLoopManager
@@ -26,16 +25,12 @@ class Pixie:
         if conversation_manager is not None:
             self._conversation_manager = conversation_manager
         else:
-            relevance, sql, refinement = azure_llm_set.create_azure_llm_set()
             # Provide a default search function that will be used by the
             # ConversationLoopManager. Import lazily to avoid cycles.
             from ..search.search_engine import RealSearchEngine
 
             engine = RealSearchEngine()
             self._conversation_manager = ConversationLoopManager(
-                relevance,
-                sql,
-                refinement,
                 engine.search,
                 pending_store=self._pending_store,
             )
