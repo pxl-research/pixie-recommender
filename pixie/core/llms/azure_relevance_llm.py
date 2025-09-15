@@ -43,7 +43,9 @@ class AzureRelevanceLLM(AzureOpenAILLM):
 
                 # Best-effort extraction of text from different langchain return shapes.
                 ans = None
-                if hasattr(resp, "generations"):
+                if hasattr(resp, "content"):
+                    ans = resp.content
+                elif hasattr(resp, "generations"):
                     gens = resp.generations
                     if gens and len(gens) > 0 and len(gens[0]) > 0:
                         ans = getattr(gens[0][0], "text", None) or str(gens[0][0])
