@@ -35,12 +35,14 @@ def create_azure_llm_set() -> Tuple[Any, Any, Any]:
 
     Falls back to mock LLMs if Azure environment variables are not properly configured.
     """
-    # Check if Azure environment variables are set (not dummy defaults)
+    # Check if Azure environment variables are set (allowing defaults)
+    endpoint = os.getenv("AZURE_OPENAI_ENDPOINT", "https://example.openai.azure.com/")
+    api_key = os.getenv("AZURE_OPENAI_KEY", "dummy-key-for-development")
+    
+    # Use Azure if endpoint and key are not defaults
     if (
-        os.getenv("AZURE_OPENAI_ENDPOINT") != "https://example.openai.azure.com/"
-        and os.getenv("AZURE_OPENAI_KEY") != "dummy-key-for-development"
-        and os.getenv("AZURE_OPENAI_API_VERSION")
-        and os.getenv("AZURE_OPENAI_MODEL")
+        endpoint != "https://example.openai.azure.com/"
+        and api_key != "dummy-key-for-development"
     ):
         azure_config = get_config().azure
 
