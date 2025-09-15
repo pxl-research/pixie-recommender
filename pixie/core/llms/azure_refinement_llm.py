@@ -29,7 +29,7 @@ class AzureRefinementLLM(AzureOpenAILLM):
         self, context: Optional[dict] = None
     ) -> Optional[str]:
         ctx = context or {}
-        
+
         if not self.model:
             raise ValueError("Azure model is not available")
 
@@ -40,11 +40,11 @@ class AzureRefinementLLM(AzureOpenAILLM):
             "required. Do not add any explanation.\n\n"
             f"Context: {ctx}"
         )
-        
+
         response = self.model.invoke(prompt)
-        
-        if hasattr(response, 'content'):
+
+        if hasattr(response, "content"):
             answer = response.content.strip()
             return answer if answer else None
-        
+
         raise ValueError("Invalid response format from Azure model")

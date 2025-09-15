@@ -30,7 +30,7 @@ class AzureSQLLLM(AzureOpenAILLM):
     ) -> str:
         q = (question or "").strip()
         attrs = attributes or {}
-        
+
         if not self.model:
             raise ValueError("Azure model is not available")
 
@@ -40,10 +40,10 @@ class AzureSQLLLM(AzureOpenAILLM):
             "available attributes.\n\n"
             f"Question: {q}\nAttributes: {attrs}"
         )
-        
+
         response = self.model.invoke(prompt)
-        
-        if hasattr(response, 'content'):
+
+        if hasattr(response, "content"):
             return response.content.strip()
-        
+
         raise ValueError("Invalid response format from Azure model")

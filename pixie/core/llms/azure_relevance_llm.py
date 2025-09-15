@@ -31,11 +31,11 @@ class AzureRelevanceLLM(AzureOpenAILLM):
             "Answer with exactly 'yes' or 'no'.\n\n"
             f"Question: {text}"
         )
-        
+
         response = self.model.invoke(prompt)
-        
-        if hasattr(response, 'content'):
+
+        if hasattr(response, "content"):
             answer = response.content.lower().strip()
-            return answer == 'yes' or answer.startswith('yes')
-        
+            return answer == "yes" or answer.startswith("yes")
+
         raise ValueError("Invalid response format from Azure model")
