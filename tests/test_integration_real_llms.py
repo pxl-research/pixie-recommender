@@ -15,6 +15,7 @@ To skip these tests: set PIXIE_FORCE_MOCKS=1
 """
 
 import os
+
 import pytest
 
 from pixie.core.llms import azure_llm_set
@@ -189,15 +190,20 @@ class TestV05RealLLMCompliance:
 
     def test_v05_azure_dependencies_available(self):
         """Verify that all Azure LLM dependencies are properly installed."""
+        import importlib.util
+        
         try:
-            import langchain_openai  # noqa: F401
-            from pixie.core.llms.azure_relevance_llm import (
-                AzureRelevanceLLM,
-            )  # noqa: F401
-            from pixie.core.llms.azure_sql_llm import AzureSQLLLM  # noqa: F401
-            from pixie.core.llms.azure_refinement_llm import (
-                AzureRefinementLLM,
-            )  # noqa: F401
+            # Check langchain_openai
+            if importlib.util.find_spec("langchain_openai") is None:
+                raise ImportError("langchain_openai not available")
+            
+            # Check Azure LLM modules
+            if importlib.util.find_spec("pixie.core.llms.azure_refinement_llm") is None:
+                raise ImportError("AzureRefinementLLM module not available")
+            if importlib.util.find_spec("pixie.core.llms.azure_relevance_llm") is None:
+                raise ImportError("AzureRelevanceLLM module not available")
+            if importlib.util.find_spec("pixie.core.llms.azure_sql_llm") is None:
+                raise ImportError("AzureSQLLLM module not available")
         except ImportError as e:
             pytest.fail(f"Missing Azure LLM dependencies for v0.5: {e}")
 

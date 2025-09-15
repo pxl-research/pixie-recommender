@@ -9,8 +9,8 @@ def test_fixture_configuration():
     # Test 1: Force mocks
     os.environ["PIXIE_FORCE_MOCKS"] = "1"
 
-    from tests.conftest import MockRelevance, MockSQL, MockRefinement
     from pixie.core.llms import azure_llm_set
+    from tests.conftest import MockRefinement, MockRelevance, MockSQL
 
     # Mock the fixture logic manually
     force_mocks = os.getenv("PIXIE_FORCE_MOCKS", "0") == "1"
