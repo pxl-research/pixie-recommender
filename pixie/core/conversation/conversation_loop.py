@@ -1,9 +1,8 @@
 from __future__ import annotations
 
+import logging
 from typing import Any, Callable
 from uuid import uuid4
-
-import logging
 
 from ..llms import azure_llm_set
 from ..storage.pending_store import InMemoryPendingStore
@@ -98,7 +97,9 @@ class ConversationLoopManager:
             try:
                 prompt = self.refinement_model.generate_refinement_question(ctx)
             except Exception as e:
-                logger.error("Failed to generate refinement question for ask_brand", exc_info=e)
+                logger.error(
+                    "Failed to generate refinement question for ask_brand", exc_info=e
+                )
                 return AskResponse(type="error", reason="llm_failure")
             return AskResponse(type="ask_user", prompt=prompt, pending_id=pending_id)
 
@@ -112,7 +113,9 @@ class ConversationLoopManager:
             try:
                 prompt = self.refinement_model.generate_refinement_question(ctx)
             except Exception as e:
-                logger.error("Failed to generate refinement question for ask_tech", exc_info=e)
+                logger.error(
+                    "Failed to generate refinement question for ask_tech", exc_info=e
+                )
                 return AskResponse(type="error", reason="llm_failure")
             return AskResponse(type="ask_user", prompt=prompt, pending_id=pending_id)
 
@@ -150,7 +153,9 @@ class ConversationLoopManager:
             try:
                 sql = self.sql_model.generate_sql(pending_entry.question, ctx)
             except Exception as e:
-                logger.error("Failed to generate SQL for choose_result_view", exc_info=e)
+                logger.error(
+                    "Failed to generate SQL for choose_result_view", exc_info=e
+                )
                 return AskResponse(type="error", reason="llm_failure")
             results = self.search_fn(sql, ctx)
             if results:
