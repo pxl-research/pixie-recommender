@@ -34,10 +34,17 @@ class AzureRefinementLLM(AzureOpenAILLM):
             raise ValueError("Azure model is not available")
 
         prompt = (
-            "Given the conversation context as JSON, return a single short "
-            "follow-up question aimed at clarifying the user's needs about "
-            "printers, or return an empty string if no clarification is "
-            "required. Do not add any explanation.\n\n"
+            "Given the conversation context, determine which attribute to ask about next. "
+            "Follow this exact sequence: 1) budget, 2) brand/merk, 3) technology (inkjet/laser). "
+            "Return ONLY the appropriate question in Dutch, "
+            "or empty string if all attributes are collected.\n\n"
+            "Rules:\n"
+            "- If 'budget' is missing: ask 'Wat is je budget?'\n"
+            "- If 'budget' exists but 'brand' is missing: "
+            "ask 'Heb je een voorkeur voor een merk?'\n"
+            "- If 'budget' and 'brand' exist but 'technology' is missing: "
+            "ask 'Welke technologie heeft je voorkeur (inkjet/laser)?'\n"
+            "- If all three exist: return empty string\n\n"
             f"Context: {ctx}"
         )
 
