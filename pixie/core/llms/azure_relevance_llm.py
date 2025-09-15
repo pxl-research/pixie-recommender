@@ -70,5 +70,5 @@ class AzureRelevanceLLM(AzureOpenAILLM):
                 text,
                 e,
             )
-            # For development, fall back to False instead of raising
-            return False
+            # Fall back to keyword heuristic
+            return "printer" in text.lower() or "printers" in text.lower()
