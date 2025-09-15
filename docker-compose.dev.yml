@@ -7,14 +7,6 @@ services:
     ports:
       - "${PORT_API:-8012}:8000"
     env_file: .env.dev
-    environment:
-      - ENV=dev
-      - AZURE_OPENAI_API_VERSION
-      - AZURE_OPENAI_ENDPOINT
-      - AZURE_OPENAI_KEY
-      - AZURE_OPENAI_MODEL
-      - PIXIE_PRINTER_DATA
-      - PIXIE_DEFAULT_PAGE_SIZE
     volumes:
       - .:/app   # hot reload
     healthcheck:
