@@ -7,7 +7,24 @@ def test_basic_success_path():
 
     mgr = ConversationLoopManager(search_fn)
     resp = mgr.handle_new_question("Ik zoek een nieuwe printer")
-    assert resp.type == "answer"
+    assert resp.type == "ask_user"
+    assert resp.prompt == "Wat is je budget?"
+    pending_id = resp.pending_id
+    assert pending_id is not None
+
+    # Reply with budget
+    resp2 = mgr.handle_reply(pending_id, "minder dan 150€")
+    assert resp2.type == "ask_user"
+    assert resp2.prompt == "Heb je een voorkeur voor een merk?"
+
+    # Reply with brand
+    resp3 = mgr.handle_reply(pending_id, "Brother")
+    assert resp3.type == "ask_user"
+    assert resp3.prompt == "Welke technologie heeft je voorkeur (inkjet/laser)?"
+
+    # Reply with tech
+    resp4 = mgr.handle_reply(pending_id, "laser")
+    assert resp4.type == "answer"
 
 
 def test_refinement_then_answer():
@@ -16,9 +33,7 @@ def test_refinement_then_answer():
 
     def search_fn(sql_query, attrs):
         calls["count"] += 1
-        if calls["count"] == 1:
-            return []
-        return [{"id": 2, "name": "Brother XC 2570"}]
+        return [{"id": 2, "name": "Brother Printer XC 2570"}]
 
     mgr = ConversationLoopManager(search_fn)
     first = mgr.handle_new_question("Ik zoek een nieuwe printer")
@@ -79,9 +94,9 @@ def test_choose_result_view_large_results():
     # make the sql model generate SQL that will return empty until refinements are provided
     mgr = ConversationLoopManager(engine.search)
 
-    # initial new question -> first search returns many results (attributes None) -> answer
+    # initial new question -> first search returns many results (attributes None) -> ask_user
     first = mgr.handle_new_question("Ik zoek een nieuwe printer")
-    assert first.type == "answer"
+    assert first.type == "ask_user"
 
     # But to test the choose_result_view flow, simulate a flow where initial search is empty.
     # We'll create a search_fn that returns [] initially and then returns many when view chosen.
@@ -90,9 +105,9 @@ def test_choose_result_view_large_results():
     def search_fn(sql_query, attrs):
         # first call (initial) empty, subsequent calls return many
         calls["count"] += 1
-        # return empty for the first two calls (initial and after ask_tech)
+        # return empty for the first call (after ask_tech)
         # this makes the manager reach the choose_result_view stage
-        if calls["count"] <= 2:
+        if calls["count"] <= 1:
             return []
         return engine.search(sql_query, attrs)
 
@@ -153,8 +168,8 @@ def test_conversation_with_real_search_initial_answer():
     mgr = ConversationLoopManager(engine.search)
 
     resp = mgr.handle_new_question("Ik zoek een nieuwe printer")
-    # RealSearchEngine returns many items for attributes None -> immediate answer
-    assert resp.type == "answer"
+    # RealSearchEngine returns many items for attributes None -> ask_user
+    assert resp.type == "ask_user"
 
 
 def test_conversation_refinement_then_answer_with_real_search():
@@ -166,8 +181,6 @@ def test_conversation_refinement_then_answer_with_real_search():
 
     def search_fn(sql_query, attrs):
         calls["count"] += 1
-        if calls["count"] == 1:
-            return []
         return engine.search(sql_query, attrs)
 
     mgr = ConversationLoopManager(search_fn)

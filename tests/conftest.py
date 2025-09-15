@@ -7,7 +7,7 @@ from pixie.core.llms import azure_llm_set
 
 class MockRelevance:
     def is_relevant(self, text: str) -> bool:
-        return "printer" in (text or "").lower()
+        return True
 
 
 class MockSQL:

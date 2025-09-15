@@ -6,27 +6,7 @@ from ..utils.config import get_config
 from .azure_refinement_llm import AzureRefinementLLM
 from .azure_relevance_llm import AzureRelevanceLLM
 from .azure_sql_llm import AzureSQLLLM
-
-
-class MockRelevance:
-    def is_relevant(self, text: str) -> bool:
-        return "printer" in (text or "").lower()
-
-
-class MockSQL:
-    def generate_sql(self, question: str, attributes: dict | None = None) -> str:
-        return "SELECT * FROM printers;"
-
-
-class MockRefinement:
-    def generate_refinement_question(self, context: dict) -> "str | None":
-        if not context:
-            return "Wat is je budget?"
-        if "budget" in context and "brand" not in context:
-            return "Heb je een voorkeur voor een merk?"
-        if "budget" in context and "brand" in context and "technology" not in context:
-            return "Welke technologie heeft je voorkeur (inkjet/laser)?"
-        return None
+from .mock_llm_set import MockRefinement, MockRelevance, MockSQL
 
 
 def create_azure_llm_set() -> Tuple[Any, Any, Any]:
