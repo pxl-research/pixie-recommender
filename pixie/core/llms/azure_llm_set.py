@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-import os
 from typing import Any, Tuple
 
 from ..utils.config import get_config
@@ -35,17 +34,13 @@ def create_azure_llm_set() -> Tuple[Any, Any, Any]:
 
     Falls back to mock LLMs if Azure environment variables are not properly configured.
     """
-    # Check if Azure environment variables are set (allowing defaults)
-    endpoint = os.getenv("AZURE_OPENAI_ENDPOINT", "https://example.openai.azure.com/")
-    api_key = os.getenv("AZURE_OPENAI_KEY", "dummy-key-for-development")
-    
+    azure_config = get_config().azure
+
     # Use Azure if endpoint and key are not defaults
     if (
-        endpoint != "https://example.openai.azure.com/"
-        and api_key != "dummy-key-for-development"
+        azure_config.api_endpoint != "https://example.openai.azure.com/"
+        and azure_config.api_key != "dummy-key-for-development"
     ):
-        azure_config = get_config().azure
-
         relevance = AzureRelevanceLLM(
             azure_config.api_version,
             azure_config.api_endpoint,
