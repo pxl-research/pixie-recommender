@@ -18,22 +18,20 @@ def create_azure_llm_set() -> Tuple[AzureRelevanceLLM, AzureSQLLLM, AzureRefinem
     - AZURE_OPENAI_MODEL (deployment name)
     """
     api_version = os.getenv("AZURE_OPENAI_API_VERSION")
-    api_endpoint = os.getenv("AZURE_OPENAI_ENDPOINT")
-    api_key = os.getenv("AZURE_OPENAI_KEY")
-    model_version = os.getenv("AZURE_OPENAI_MODEL")
+    if not api_version:
+        raise EnvironmentError("Missing AZURE_OPENAI_API_VERSION")
 
-    missing = [
-        n
-        for n, v in {
-            "AZURE_OPENAI_API_VERSION": api_version,
-            "AZURE_OPENAI_ENDPOINT": api_endpoint,
-            "AZURE_OPENAI_KEY": api_key,
-            "AZURE_OPENAI_MODEL": model_version,
-        }.items()
-        if not v
-    ]
-    if missing:
-        raise EnvironmentError(f"Missing required Azure OpenAI env vars: {missing}")
+    api_endpoint = os.getenv("AZURE_OPENAI_ENDPOINT")
+    if not api_endpoint:
+        raise EnvironmentError("Missing AZURE_OPENAI_ENDPOINT")
+
+    api_key = os.getenv("AZURE_OPENAI_KEY")
+    if not api_key:
+        raise EnvironmentError("Missing AZURE_OPENAI_KEY")
+
+    model_version = os.getenv("AZURE_OPENAI_MODEL")
+    if not model_version:
+        raise EnvironmentError("Missing AZURE_OPENAI_MODEL")
 
     relevance = AzureRelevanceLLM(api_version, api_endpoint, api_key, model_version)
     sql = AzureSQLLLM(api_version, api_endpoint, api_key, model_version)

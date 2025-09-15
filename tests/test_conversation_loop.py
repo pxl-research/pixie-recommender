@@ -1,9 +1,12 @@
 from pixie.core.conversation_loop import ConversationLoopManager
-from pixie.core.azure_llm_set import create_azure_llm_set as create_mock_llm_set
 
 
-def test_basic_success_path():
-    relevance, sql, refinement = create_mock_llm_set()
+def _unpack_mock(mock_tuple):
+    return mock_tuple
+
+
+def test_basic_success_path(mock_llm_set):
+    relevance, sql, refinement = _unpack_mock(mock_llm_set)
 
     def search_fn(sql_query, attrs):
         return [{"id": 1, "name": "Printer A"}]
@@ -13,8 +16,8 @@ def test_basic_success_path():
     assert resp.type == "answer"
 
 
-def test_refinement_then_answer():
-    relevance, sql, refinement = create_mock_llm_set()
+def test_refinement_then_answer(mock_llm_set):
+    relevance, sql, refinement = _unpack_mock(mock_llm_set)
 
     # first search returns empty
     calls = {"count": 0}
@@ -41,8 +44,8 @@ def test_refinement_then_answer():
     assert fourth.type == "answer"
 
 
-def test_invalid_pending_id():
-    relevance, sql, refinement = create_mock_llm_set()
+def test_invalid_pending_id(mock_llm_set):
+    relevance, sql, refinement = _unpack_mock(mock_llm_set)
 
     def search_fn(sql_query, attrs):
         return []
@@ -52,8 +55,8 @@ def test_invalid_pending_id():
     assert resp.type == "error"
 
 
-def test_max_iterations_reached():
-    relevance, sql, refinement = create_mock_llm_set()
+def test_max_iterations_reached(mock_llm_set):
+    relevance, sql, refinement = _unpack_mock(mock_llm_set)
 
     # search always returns empty -> manager should eventually return
     # no_results after max iterations
@@ -82,8 +85,8 @@ def test_max_iterations_reached():
     assert fourth.type in ("no_results",)
 
 
-def test_choose_result_view_large_results():
-    relevance, sql, refinement = create_mock_llm_set()
+def test_choose_result_view_large_results(mock_llm_set):
+    relevance, sql, refinement = _unpack_mock(mock_llm_set)
 
     # Use RealSearchEngine so initial search (attributes None) returns many results
     from pixie.core.search_engine import RealSearchEngine
@@ -131,8 +134,8 @@ def test_choose_result_view_large_results():
     assert fifth.type == "answer"
 
 
-def test_ttl_integration():
-    relevance, sql, refinement = create_mock_llm_set()
+def test_ttl_integration(mock_llm_set):
+    relevance, sql, refinement = _unpack_mock(mock_llm_set)
     from pixie.core.pending_store import InMemoryPendingStore
 
     store = InMemoryPendingStore()
@@ -163,9 +166,9 @@ def test_ttl_integration():
     assert resp.type == "error"
 
 
-def test_conversation_with_real_search_initial_answer():
+def test_conversation_with_real_search_initial_answer(mock_llm_set):
     # integration: ConversationLoopManager with RealSearchEngine
-    relevance, sql, refinement = create_mock_llm_set()
+    relevance, sql, refinement = _unpack_mock(mock_llm_set)
     from pixie.core.search_engine import RealSearchEngine
 
     engine = RealSearchEngine()
@@ -176,8 +179,8 @@ def test_conversation_with_real_search_initial_answer():
     assert resp.type == "answer"
 
 
-def test_conversation_refinement_then_answer_with_real_search():
-    relevance, sql, refinement = create_mock_llm_set()
+def test_conversation_refinement_then_answer_with_real_search(mock_llm_set):
+    relevance, sql, refinement = _unpack_mock(mock_llm_set)
     from pixie.core.search_engine import RealSearchEngine
 
     engine = RealSearchEngine()

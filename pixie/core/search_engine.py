@@ -20,10 +20,7 @@ class RealSearchEngine:
         self.data_file_path = data_file_path
         self._data = self._load_data(self.data_file_path)
         # default page size for vague queries (no attributes)
-        try:
-            self._default_page_size = int(os.getenv("PIXIE_DEFAULT_PAGE_SIZE", "10"))
-        except Exception:
-            self._default_page_size = 10
+        self._default_page_size = int(os.getenv("PIXIE_DEFAULT_PAGE_SIZE", "10"))
 
     def _load_data(self, path: str) -> List[Dict[str, Any]]:
         try:
@@ -51,10 +48,6 @@ class RealSearchEngine:
         budget = None
         if isinstance(attributes, dict):
             budget = attributes.get("budget") or attributes.get("Budget")
-
-        if isinstance(budget, str) and "minder dan 50" in budget.lower():
-            # special case from mock: return empty list for this phrase
-            return []
 
         if isinstance(budget, (int, float)):
             max_cents = int(float(budget) * 100)
