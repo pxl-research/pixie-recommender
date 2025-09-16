@@ -25,11 +25,24 @@ class SearchConfig:
 
 
 @dataclass
+class DatabaseConfig:
+    """Database configuration."""
+
+    url: str
+    pool_size: int
+    max_overflow: int
+    pool_timeout: int
+    pool_recycle: int
+    echo: bool
+
+
+@dataclass
 class Config:
     """Main configuration."""
 
     azure: AzureConfig
     search: SearchConfig
+    database: DatabaseConfig
 
     @classmethod
     def from_env(cls) -> Config:
@@ -50,7 +63,23 @@ class Config:
             default_page_size=int(os.getenv("PIXIE_DEFAULT_PAGE_SIZE", "10")),
         )
 
-        return cls(azure=azure_config, search=search_config)
+        database_config = DatabaseConfig(
+            url=os.getenv(
+                "DATABASE_URL",
+                "postgresql://pixie_user:pixie_password@localhost:5432/pixie_db"
+            ),
+            pool_size=int(os.getenv("DATABASE_POOL_SIZE", "10")),
+            max_overflow=int(os.getenv("DATABASE_MAX_OVERFLOW", "20")),
+            pool_timeout=int(os.getenv("DATABASE_POOL_TIMEOUT", "30")),
+            pool_recycle=int(os.getenv("DATABASE_POOL_RECYCLE", "3600")),
+            echo=os.getenv("DATABASE_ECHO", "false").lower() == "true",
+        )
+
+        return cls(
+            azure=azure_config,
+            search=search_config,
+            database=database_config
+        )
 
 
 # Global config instance
