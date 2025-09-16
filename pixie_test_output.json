@@ -1,0 +1,54 @@
+{
+  "health": {
+    "status_code": 200,
+    "body": {
+      "status": "ok"
+    }
+  },
+  "flow": [
+    {
+      "step": 1,
+      "status": 200,
+      "resp": {
+        "type": "ask_user",
+        "text": null,
+        "prompt": "Wat is je budget?",
+        "pending_id": "pending-47daa4bb",
+        "reason": null
+      }
+    },
+    {
+      "step": 2,
+      "status": 200,
+      "resp": {
+        "type": "ask_user",
+        "text": null,
+        "prompt": "Heb je een voorkeur voor een merk?",
+        "pending_id": "pending-47daa4bb",
+        "reason": null
+      }
+    },
+    {
+      "step": 3,
+      "status": 200,
+      "resp": {
+        "type": "ask_user",
+        "text": null,
+        "prompt": "Welke technologie heeft je voorkeur (inkjet/laser)?",
+        "pending_id": "pending-47daa4bb",
+        "reason": null
+      }
+    },
+    {
+      "step": 4,
+      "status": 200,
+      "resp": {
+        "type": "answer",
+        "text": "[{'id': 1, 'name': 'Brother HL-L2350DW', 'price': 129.99}, {'id': 10, 'name': 'Brother DCP-L2550DW', 'price': 159.99}, {'id': 17, 'name': 'Brother HL-L2305W', 'price': 109.99}]",
+        "prompt": null,
+        "pending_id": null,
+        "reason": null
+      }
+    }
+  ]
+}
