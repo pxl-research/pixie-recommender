@@ -1,0 +1,37 @@
+{
+  "printer": {
+    "attributes": [
+      {
+        "name": "budget",
+        "type": "range",
+        "question": "Wat is je budget voor een printer?",
+        "description": "Price range the user is willing to spend"
+      },
+      {
+        "name": "brand",
+        "type": "choice",
+        "question": "Heb je een voorkeur voor een bepaald merk?",
+        "description": "Preferred printer brand"
+      },
+      {
+        "name": "technology",
+        "type": "choice",
+        "question": "Welke printtechnologie heeft je voorkeur?",
+        "description": "Inkjet vs laser printing technology",
+        "options": ["inkjet", "laser"]
+      },
+      {
+        "name": "has_color",
+        "type": "boolean",
+        "question": "Heb je kleurenprinting nodig?",
+        "description": "Whether color printing is required"
+      },
+      {
+        "name": "is_multifunction",
+        "type": "boolean", 
+        "question": "Moet de printer ook kunnen scannen en kopiëren?",
+        "description": "Whether multifunction capabilities are needed"
+      }
+    ]
+  }
+}

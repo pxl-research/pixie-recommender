@@ -23,17 +23,13 @@ jobs:
 
       - name: Wait for API health
         run: |
-          container=$(docker compose -f docker-compose.dev.yml ps -q api)
-          echo "waiting for container: $container"
-          for i in $(seq 1 30); do
-            status=$(docker exec "$container" python /app/scripts/wait_for_health_container.py || true)
-            echo "health: $status"
-            if echo "$status" | grep -q "200"; then
-              echo ok
-              break
-            fi
-            sleep 2
-          done
+          echo "Waiting for container to be healthy (using Docker health check)"
+          container_name=$(docker compose -f docker-compose.dev.yml ps -q api)
+          timeout 120 bash -c 'until docker inspect '"$container_name"' --format="{{.State.Health.Status}}" | grep -q "healthy"; do 
+            echo "Container not healthy yet, waiting..."; 
+            sleep 5; 
+          done'
+          echo "✅ Container is healthy"
 
       - name: Run container smoke tests
         run: |

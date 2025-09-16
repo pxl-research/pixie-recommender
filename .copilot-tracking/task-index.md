@@ -1,20 +1,21 @@
-# Task: Migrate Mock LLMs to Azure OpenAI
+# Task: Complete Azure LLM Migration
 
 ## Goal
-Replace all mock LLM implementations (MockRelevanceLLM, MockSQLLLM, MockRefinementLLM) with real Azure OpenAI LLM implementations using gpt-5-chat model. Update ConversationLoopManager to automatically use Azure LLMs and update all tests to work with real Azure API calls.
+
+Complete the migration from mock LLMs to Azure OpenAI LLMs by updating ConversationLoopManager initialization, adding error handling, updating configuration, and testing the complete flow.
 
 ## Progress Tracking
-- [ ] Step 1: Create Azure LLM wrapper classes → `./steps/01-create-azure-llm-wrappers.md`
-- [ ] Step 2: Update LLM factory/creation logic → `./steps/02-update-llm-factory.md`
-- [ ] Step 3: Update ConversationLoopManager initialization → `./steps/03-update-conversation-manager.md`
-- [ ] Step 4: Implement error handling → `./steps/04-implement-error-handling.md`
-- [ ] Step 5: Update environment configuration → `./steps/05-update-environment-config.md`
-- [ ] Step 6: Update tests → `./steps/06-update-tests.md`
-- [ ] Step 7: Remove old mock LLM files → `./steps/07-cleanup-mock-files.md`
-- [ ] Step 8: Test complete flow → `./steps/08-test-complete-flow.md`
+
+- [x] Step 1: Update ConversationLoopManager initialization → `./steps/01-update-conversation-manager.md`
+- [x] Step 2: Add error handling to Azure LLM calls → `./steps/02-add-error-handling.md`
+- [x] Step 3: Update environment configuration → `./steps/03-update-environment-config.md`
+- [x] Step 4: Update tests for Azure API calls → `./steps/04-update-tests.md`
+- [x] Step 5: Test complete flow end-to-end → `./steps/05-test-complete-flow.md`
 
 ## Current Status
-**Next Step**: `./steps/01-create-azure-llm-wrappers.md`
+
+**Next Step**: `./steps/01-update-conversation-manager.md`
 
 ## Completion
+
 When all steps are checked off and their files deleted, delete this index file.

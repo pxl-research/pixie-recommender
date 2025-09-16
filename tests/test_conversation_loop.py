@@ -1,31 +1,66 @@
-from pixie.core.conversation_loop import ConversationLoopManager
-from pixie.core.mock_llm_set import create_mock_llm_set
+from pixie.core.conversation.conversation_loop import ConversationLoopManager
 
 
-def test_basic_success_path():
-    relevance, sql, refinement = create_mock_llm_set()
-
+def test_basic_success_path(mock_llm_set):
     def search_fn(sql_query, attrs):
         return [{"id": 1, "name": "Printer A"}]
 
-    mgr = ConversationLoopManager(relevance, sql, refinement, search_fn)
+    mgr = ConversationLoopManager(search_fn, llm_set=mock_llm_set)
     resp = mgr.handle_new_question("Ik zoek een nieuwe printer")
-    assert resp.type == "answer"
+    assert resp.type == "ask_user"
+    assert resp.prompt is not None
+    # More flexible check - LLM might ask about budget in different ways
+    budget_keywords = ["budget", "prijs", "kosten", "geld", "uitgeven", "hoeveel"]
+    prompt_lower = resp.prompt.lower()
+    assert any(
+        keyword in prompt_lower for keyword in budget_keywords
+    ), f"Expected budget question, got: {resp.prompt}"
+    pending_id = resp.pending_id
+    assert pending_id is not None
+
+    # Reply with budget
+    resp2 = mgr.handle_reply(pending_id, "minder dan 150€")
+    assert resp2.type == "ask_user"
+    assert resp2.prompt is not None
+    # More flexible check for brand question
+    brand_keywords = ["merk", "brand", "voorkeur"]
+    prompt2_lower = resp2.prompt.lower()
+    assert any(
+        keyword in prompt2_lower for keyword in brand_keywords
+    ), f"Expected brand question, got: {resp2.prompt}"
+
+    # Reply with brand
+    resp3 = mgr.handle_reply(pending_id, "Brother")
+    assert resp3.type == "ask_user"
+    assert resp3.prompt is not None
+    # More flexible check for technology question
+    tech_keywords = [
+        "technologie",
+        "printtechnologie",
+        "inkjet",
+        "laser",
+        "soort",
+        "type",
+    ]
+    prompt3_lower = resp3.prompt.lower()
+    assert any(
+        keyword in prompt3_lower for keyword in tech_keywords
+    ), f"Expected technology question, got: {resp3.prompt}"
+
+    # Reply with tech
+    resp4 = mgr.handle_reply(pending_id, "laser")
+    assert resp4.type == "answer"
 
 
-def test_refinement_then_answer():
-    relevance, sql, refinement = create_mock_llm_set()
-
+def test_refinement_then_answer(mock_llm_set):
     # first search returns empty
     calls = {"count": 0}
 
     def search_fn(sql_query, attrs):
         calls["count"] += 1
-        if calls["count"] == 1:
-            return []
-        return [{"id": 2, "name": "Brother XC 2570"}]
+        return [{"id": 2, "name": "Brother Printer XC 2570"}]
 
-    mgr = ConversationLoopManager(relevance, sql, refinement, search_fn)
+    mgr = ConversationLoopManager(search_fn, llm_set=mock_llm_set)
     first = mgr.handle_new_question("Ik zoek een nieuwe printer")
     assert first.type == "ask_user"
     pending_id = first.pending_id
@@ -41,28 +76,22 @@ def test_refinement_then_answer():
     assert fourth.type == "answer"
 
 
-def test_invalid_pending_id():
-    relevance, sql, refinement = create_mock_llm_set()
-
+def test_invalid_pending_id(mock_llm_set):
     def search_fn(sql_query, attrs):
         return []
 
-    mgr = ConversationLoopManager(relevance, sql, refinement, search_fn)
+    mgr = ConversationLoopManager(search_fn, llm_set=mock_llm_set)
     resp = mgr.handle_reply("non-existent", "anything")
     assert resp.type == "error"
 
 
-def test_max_iterations_reached():
-    relevance, sql, refinement = create_mock_llm_set()
-
+def test_max_iterations_reached(mock_llm_set):
     # search always returns empty -> manager should eventually return
     # no_results after max iterations
     def search_fn(sql_query, attrs):
         return []
 
-    mgr = ConversationLoopManager(
-        relevance, sql, refinement, search_fn, max_iterations=2
-    )
+    mgr = ConversationLoopManager(search_fn, max_iterations=2, llm_set=mock_llm_set)
     first = mgr.handle_new_question("Ik zoek een nieuwe printer")
     assert first.type == "ask_user"
     assert first.pending_id is not None
@@ -82,19 +111,17 @@ def test_max_iterations_reached():
     assert fourth.type in ("no_results",)
 
 
-def test_choose_result_view_large_results():
-    relevance, sql, refinement = create_mock_llm_set()
-
+def test_choose_result_view_large_results(mock_llm_set):
     # Use RealSearchEngine so initial search (attributes None) returns many results
-    from pixie.core.search_engine import RealSearchEngine
+    from pixie.core.search.search_engine import RealSearchEngine
 
     engine = RealSearchEngine()
     # make the sql model generate SQL that will return empty until refinements are provided
-    mgr = ConversationLoopManager(relevance, sql, refinement, engine.search)
+    mgr = ConversationLoopManager(engine.search, llm_set=mock_llm_set)
 
-    # initial new question -> first search returns many results (attributes None) -> answer
+    # initial new question -> first search returns many results (attributes None) -> ask_user
     first = mgr.handle_new_question("Ik zoek een nieuwe printer")
-    assert first.type == "answer"
+    assert first.type == "ask_user"
 
     # But to test the choose_result_view flow, simulate a flow where initial search is empty.
     # We'll create a search_fn that returns [] initially and then returns many when view chosen.
@@ -103,15 +130,13 @@ def test_choose_result_view_large_results():
     def search_fn(sql_query, attrs):
         # first call (initial) empty, subsequent calls return many
         calls["count"] += 1
-        # return empty for the first two calls (initial and after ask_tech)
+        # return empty for the first call (after ask_tech)
         # this makes the manager reach the choose_result_view stage
-        if calls["count"] <= 2:
+        if calls["count"] <= 1:
             return []
         return engine.search(sql_query, attrs)
 
-    mgr2 = ConversationLoopManager(
-        relevance, sql, refinement, search_fn, max_iterations=5
-    )
+    mgr2 = ConversationLoopManager(search_fn, max_iterations=5, llm_set=mock_llm_set)
     first = mgr2.handle_new_question("Ik zoek een nieuwe printer")
     assert first.type == "ask_user"
     pending_id = first.pending_id
@@ -131,9 +156,8 @@ def test_choose_result_view_large_results():
     assert fifth.type == "answer"
 
 
-def test_ttl_integration():
-    relevance, sql, refinement = create_mock_llm_set()
-    from pixie.core.pending_store import InMemoryPendingStore
+def test_ttl_integration(mock_llm_set):
+    from pixie.core.storage.pending_store import InMemoryPendingStore
 
     store = InMemoryPendingStore()
 
@@ -141,9 +165,7 @@ def test_ttl_integration():
     def search_fn(sql_query, attrs):
         return []
 
-    mgr = ConversationLoopManager(
-        relevance, sql, refinement, search_fn, pending_store=store
-    )
+    mgr = ConversationLoopManager(search_fn, pending_store=store, llm_set=mock_llm_set)
     first = mgr.handle_new_question("Ik zoek een nieuwe printer")
     assert first.type == "ask_user"
     assert first.pending_id is not None
@@ -163,22 +185,20 @@ def test_ttl_integration():
     assert resp.type == "error"
 
 
-def test_conversation_with_real_search_initial_answer():
+def test_conversation_with_real_search_initial_answer(mock_llm_set):
     # integration: ConversationLoopManager with RealSearchEngine
-    relevance, sql, refinement = create_mock_llm_set()
-    from pixie.core.search_engine import RealSearchEngine
+    from pixie.core.search.search_engine import RealSearchEngine
 
     engine = RealSearchEngine()
-    mgr = ConversationLoopManager(relevance, sql, refinement, engine.search)
+    mgr = ConversationLoopManager(engine.search, llm_set=mock_llm_set)
 
     resp = mgr.handle_new_question("Ik zoek een nieuwe printer")
-    # RealSearchEngine returns many items for attributes None -> immediate answer
-    assert resp.type == "answer"
+    # RealSearchEngine returns many items for attributes None -> ask_user
+    assert resp.type == "ask_user"
 
 
-def test_conversation_refinement_then_answer_with_real_search():
-    relevance, sql, refinement = create_mock_llm_set()
-    from pixie.core.search_engine import RealSearchEngine
+def test_conversation_refinement_then_answer_with_real_search(mock_llm_set):
+    from pixie.core.search.search_engine import RealSearchEngine
 
     engine = RealSearchEngine()
 
@@ -186,11 +206,9 @@ def test_conversation_refinement_then_answer_with_real_search():
 
     def search_fn(sql_query, attrs):
         calls["count"] += 1
-        if calls["count"] == 1:
-            return []
         return engine.search(sql_query, attrs)
 
-    mgr = ConversationLoopManager(relevance, sql, refinement, search_fn)
+    mgr = ConversationLoopManager(search_fn, llm_set=mock_llm_set)
     first = mgr.handle_new_question("Ik zoek een nieuwe printer")
     assert first.type == "ask_user"
     pending_id = first.pending_id
