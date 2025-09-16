@@ -60,18 +60,18 @@ def health_check() -> dict:
                 return {
                     "status": "healthy",
                     "message": "Database connection successful",
-                    "tables": get_table_names()
+                    "tables": get_table_names(),
                 }
             else:
                 return {
                     "status": "unhealthy",
-                    "message": "Database health check failed"
+                    "message": "Database health check failed",
                 }
     except Exception as e:
         logger.error(f"Database health check failed: {e}")
         return {
             "status": "unhealthy",
-            "message": f"Database connection failed: {str(e)}"
+            "message": f"Database connection failed: {str(e)}",
         }
 
 

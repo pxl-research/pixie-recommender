@@ -273,10 +273,10 @@ class DataMigration:
                 logger.info(f"  {category}: {count}")
 
             total_products = (
-                self.stats["printers"] +
-                self.stats["laptops"] +
-                self.stats["computers"] +
-                self.stats["smartphones"]
+                self.stats["printers"]
+                + self.stats["laptops"]
+                + self.stats["computers"]
+                + self.stats["smartphones"]
             )
             logger.info(f"Total products migrated: {total_products}")
 

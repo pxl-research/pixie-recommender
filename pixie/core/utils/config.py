@@ -66,7 +66,7 @@ class Config:
         database_config = DatabaseConfig(
             url=os.getenv(
                 "DATABASE_URL",
-                "postgresql://pixie_user:pixie_password@localhost:5432/pixie_db"
+                "postgresql://pixie_user:pixie_password@localhost:5432/pixie_db",
             ),
             pool_size=int(os.getenv("DATABASE_POOL_SIZE", "10")),
             max_overflow=int(os.getenv("DATABASE_MAX_OVERFLOW", "20")),
@@ -75,11 +75,7 @@ class Config:
             echo=os.getenv("DATABASE_ECHO", "false").lower() == "true",
         )
 
-        return cls(
-            azure=azure_config,
-            search=search_config,
-            database=database_config
-        )
+        return cls(azure=azure_config, search=search_config, database=database_config)
 
 
 # Global config instance

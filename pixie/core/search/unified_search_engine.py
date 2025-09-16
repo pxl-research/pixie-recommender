@@ -91,7 +91,9 @@ class SearchEngine:
                 logger.error(f"Error getting default results for {category}: {e}")
                 return []
 
-    def _search_printers(self, session, attributes: Dict[str, Any]) -> List[Dict[str, Any]]:
+    def _search_printers(
+        self, session, attributes: Dict[str, Any]
+    ) -> List[Dict[str, Any]]:
         """Search printers with database queries."""
         repo = PrinterRepository(session)
 
@@ -104,7 +106,9 @@ class SearchEngine:
         # Convert to dict format
         return [self._map_printer(p) for p in filtered_items]
 
-    def _search_laptops(self, session, attributes: Dict[str, Any]) -> List[Dict[str, Any]]:
+    def _search_laptops(
+        self, session, attributes: Dict[str, Any]
+    ) -> List[Dict[str, Any]]:
         """Search laptops with database queries."""
         repo = LaptopRepository(session)
 
@@ -117,7 +121,9 @@ class SearchEngine:
         # Convert to dict format
         return [self._map_laptop(L) for L in filtered_items]
 
-    def _search_computers(self, session, attributes: Dict[str, Any]) -> List[Dict[str, Any]]:
+    def _search_computers(
+        self, session, attributes: Dict[str, Any]
+    ) -> List[Dict[str, Any]]:
         """Search computers with database queries."""
         repo = ComputerRepository(session)
 
@@ -130,7 +136,9 @@ class SearchEngine:
         # Convert to dict format
         return [self._map_computer(c) for c in filtered_items]
 
-    def _search_smartphones(self, session, attributes: Dict[str, Any]) -> List[Dict[str, Any]]:
+    def _search_smartphones(
+        self, session, attributes: Dict[str, Any]
+    ) -> List[Dict[str, Any]]:
         """Search smartphones with database queries."""
         repo = SmartphoneRepository(session)
 
@@ -154,7 +162,11 @@ class SearchEngine:
 
         if max_budget_value is not None:
             # Filter by price (not price_cents)
-            items = [item for item in items if float(getattr(item, 'price', 0)) <= max_budget_value]
+            items = [
+                item
+                for item in items
+                if float(getattr(item, "price", 0)) <= max_budget_value
+            ]
 
         # Brand filtering
         brand = attributes.get("brand") or attributes.get("Brand")
@@ -171,8 +183,9 @@ class SearchEngine:
         if isinstance(tech, str) and not self._is_vague_response(tech):
             # Filter items by technology
             items = [
-                item for item in items
-                if getattr(item, 'technology', '').lower() == tech.lower()
+                item
+                for item in items
+                if getattr(item, "technology", "").lower() == tech.lower()
             ]
 
         return items
@@ -183,16 +196,19 @@ class SearchEngine:
         screen_size = attributes.get("screen_size")
         if isinstance(screen_size, str) and not self._is_vague_response(screen_size):
             items = [
-                item for item in items
-                if screen_size.lower() in getattr(item, 'screen_size_inches', '').lower()
+                item
+                for item in items
+                if screen_size.lower()
+                in getattr(item, "screen_size_inches", "").lower()
             ]
 
         # Processor filter
         processor = attributes.get("processor")
         if isinstance(processor, str) and not self._is_vague_response(processor):
             items = [
-                item for item in items
-                if processor.lower() in getattr(item, 'processor', '').lower()
+                item
+                for item in items
+                if processor.lower() in getattr(item, "processor", "").lower()
             ]
 
         return items
@@ -203,8 +219,9 @@ class SearchEngine:
         processor = attributes.get("processor")
         if isinstance(processor, str) and not self._is_vague_response(processor):
             items = [
-                item for item in items
-                if processor.lower() in getattr(item, 'processor', '').lower()
+                item
+                for item in items
+                if processor.lower() in getattr(item, "processor", "").lower()
             ]
 
         return items
@@ -215,16 +232,22 @@ class SearchEngine:
         screen_size = attributes.get("screen_size")
         if isinstance(screen_size, str) and not self._is_vague_response(screen_size):
             items = [
-                item for item in items
-                if screen_size.lower() in getattr(item, 'screen_size_inches', '').lower()
+                item
+                for item in items
+                if screen_size.lower()
+                in getattr(item, "screen_size_inches", "").lower()
             ]
 
         # Operating system filter
         operating_system = attributes.get("operating_system")
-        if isinstance(operating_system, str) and not self._is_vague_response(operating_system):
+        if isinstance(operating_system, str) and not self._is_vague_response(
+            operating_system
+        ):
             items = [
-                item for item in items
-                if operating_system.lower() == getattr(item, 'operating_system', '').lower()
+                item
+                for item in items
+                if operating_system.lower()
+                == getattr(item, "operating_system", "").lower()
             ]
 
         return items
@@ -239,6 +262,7 @@ class SearchEngine:
 
             # Parse budget strings like "maximaal 200 euro", "200", "100-200 euro"
             import re
+
             numbers = re.findall(r"\d+", budget)
             if numbers:
                 if "-" in budget and len(numbers) >= 2:
@@ -252,8 +276,15 @@ class SearchEngine:
     def _is_vague_response(self, response: str) -> bool:
         """Check if response is vague and should be ignored."""
         vague_responses = [
-            "weet ik niet", "geen idee", "maakt niet uit", "doet er niet toe",
-            "geen voorkeur", "weet niet", "onbekend", "nvt", "n.v.t."
+            "weet ik niet",
+            "geen idee",
+            "maakt niet uit",
+            "doet er niet toe",
+            "geen voorkeur",
+            "weet niet",
+            "onbekend",
+            "nvt",
+            "n.v.t.",
         ]
         return response.lower().strip() in vague_responses
 

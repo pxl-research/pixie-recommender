@@ -8,23 +8,35 @@ from .laptop import Laptop
 from .printer import Printer
 from .schemas import (
     Attribute as AttributeSchema,
+)
+from .schemas import (
     AttributeBase,
     AttributeCreate,
-    Category as CategorySchema,
     CategoryBase,
     CategoryCreate,
-    Computer as ComputerSchema,
     ComputerBase,
     ComputerCreate,
-    Laptop as LaptopSchema,
     LaptopBase,
     LaptopCreate,
-    Printer as PrinterSchema,
     PrinterBase,
     PrinterCreate,
-    Smartphone as SmartphoneSchema,
     SmartphoneBase,
     SmartphoneCreate,
+)
+from .schemas import (
+    Category as CategorySchema,
+)
+from .schemas import (
+    Computer as ComputerSchema,
+)
+from .schemas import (
+    Laptop as LaptopSchema,
+)
+from .schemas import (
+    Printer as PrinterSchema,
+)
+from .schemas import (
+    Smartphone as SmartphoneSchema,
 )
 from .smartphone import Smartphone
 

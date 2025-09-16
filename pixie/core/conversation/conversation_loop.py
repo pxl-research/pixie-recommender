@@ -68,13 +68,13 @@ class ConversationLoopManager:
         # Get category metadata from search engine
         category_metadata = None
         if category and hasattr(self.search_engine, "_categories_metadata"):
-            categories_meta = getattr(self.search_engine, '_categories_metadata', {})
+            categories_meta = getattr(self.search_engine, "_categories_metadata", {})
             category_metadata = categories_meta.get(category)
         elif category:
             # For database backend, try to get metadata through the public API
             try:
                 get_metadata_func = getattr(
-                    self.search_engine, 'get_category_metadata', lambda c: None
+                    self.search_engine, "get_category_metadata", lambda c: None
                 )
                 category_metadata = get_metadata_func(category)
             except Exception:

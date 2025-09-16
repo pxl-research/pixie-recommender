@@ -15,16 +15,21 @@ class AttributeRepository(BaseRepository[Attribute]):
 
     def get_by_category(self, category_id: int) -> List[Attribute]:
         """Get all attributes for a specific category."""
-        return self.session.query(Attribute).filter(
-            Attribute.category_id == category_id
-        ).all()
+        return (
+            self.session.query(Attribute)
+            .filter(Attribute.category_id == category_id)
+            .all()
+        )
 
-    def get_by_category_and_name(self, category_id: int, name: str) -> Optional[Attribute]:
+    def get_by_category_and_name(
+        self, category_id: int, name: str
+    ) -> Optional[Attribute]:
         """Get attribute by category and name."""
-        return self.session.query(Attribute).filter(
-            Attribute.category_id == category_id,
-            Attribute.name == name
-        ).first()
+        return (
+            self.session.query(Attribute)
+            .filter(Attribute.category_id == category_id, Attribute.name == name)
+            .first()
+        )
 
     def get_by_type(self, attr_type: str) -> List[Attribute]:
         """Get all attributes of a specific type."""
@@ -37,17 +42,19 @@ class AttributeRepository(BaseRepository[Attribute]):
         attr_type: str,
         question: str,
         description: Optional[str] = None,
-        options: Optional[list] = None
+        options: Optional[list] = None,
     ) -> Attribute:
         """Create a new attribute."""
-        return self.create({
-            "category_id": category_id,
-            "name": name,
-            "type": attr_type,
-            "question": question,
-            "description": description,
-            "options": options
-        })
+        return self.create(
+            {
+                "category_id": category_id,
+                "name": name,
+                "type": attr_type,
+                "question": question,
+                "description": description,
+                "options": options,
+            }
+        )
 
     def update_attribute(
         self,
@@ -56,7 +63,7 @@ class AttributeRepository(BaseRepository[Attribute]):
         attr_type: Optional[str] = None,
         question: Optional[str] = None,
         description: Optional[str] = None,
-        options: Optional[list] = None
+        options: Optional[list] = None,
     ) -> Optional[Attribute]:
         """Update attribute information."""
         update_data = {}

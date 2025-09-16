@@ -66,11 +66,7 @@ def get_session_factory() -> sessionmaker:
     global _SessionLocal
     if _SessionLocal is None:
         engine = get_engine()
-        _SessionLocal = sessionmaker(
-            autocommit=False,
-            autoflush=False,
-            bind=engine
-        )
+        _SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
     return _SessionLocal
 
 

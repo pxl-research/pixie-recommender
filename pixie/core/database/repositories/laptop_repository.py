@@ -15,7 +15,9 @@ class LaptopRepository(BaseRepository[Laptop]):
     def model_class(self):
         return Laptop
 
-    def get_by_brand(self, brand: str, skip: int = 0, limit: Optional[int] = None) -> List[Laptop]:
+    def get_by_brand(
+        self, brand: str, skip: int = 0, limit: Optional[int] = None
+    ) -> List[Laptop]:
         """Get laptops by brand."""
         return self.filter_by({"brand": brand}, skip=skip, limit=limit)
 
@@ -24,12 +26,14 @@ class LaptopRepository(BaseRepository[Laptop]):
         min_price: float,
         max_price: float,
         skip: int = 0,
-        limit: Optional[int] = None
+        limit: Optional[int] = None,
     ) -> List[Laptop]:
         """Get laptops within price range."""
-        query = self.session.query(Laptop).filter(
-            between(Laptop.price, min_price, max_price)
-        ).offset(skip)
+        query = (
+            self.session.query(Laptop)
+            .filter(between(Laptop.price, min_price, max_price))
+            .offset(skip)
+        )
 
         if limit:
             query = query.limit(limit)
@@ -41,12 +45,14 @@ class LaptopRepository(BaseRepository[Laptop]):
         min_size: float,
         max_size: float,
         skip: int = 0,
-        limit: Optional[int] = None
+        limit: Optional[int] = None,
     ) -> List[Laptop]:
         """Get laptops by screen size range."""
-        query = self.session.query(Laptop).filter(
-            between(Laptop.screen_size_inches, min_size, max_size)
-        ).offset(skip)
+        query = (
+            self.session.query(Laptop)
+            .filter(between(Laptop.screen_size_inches, min_size, max_size))
+            .offset(skip)
+        )
 
         if limit:
             query = query.limit(limit)
@@ -54,22 +60,20 @@ class LaptopRepository(BaseRepository[Laptop]):
         return query.all()
 
     def search_laptops(
-        self,
-        search_term: str,
-        skip: int = 0,
-        limit: Optional[int] = None
+        self, search_term: str, skip: int = 0, limit: Optional[int] = None
     ) -> List[Laptop]:
         """Search laptops by name, brand, or processor."""
         return self.search(
-            search_term,
-            ["name", "brand", "processor"],
-            skip=skip,
-            limit=limit
+            search_term, ["name", "brand", "processor"], skip=skip, limit=limit
         )
 
-    def get_available_laptops(self, skip: int = 0, limit: Optional[int] = None) -> List[Laptop]:
+    def get_available_laptops(
+        self, skip: int = 0, limit: Optional[int] = None
+    ) -> List[Laptop]:
         """Get laptops that are in stock."""
-        return self.filter_by({"availability_status": "in_stock"}, skip=skip, limit=limit)
+        return self.filter_by(
+            {"availability_status": "in_stock"}, skip=skip, limit=limit
+        )
 
     def create_laptop(self, **kwargs) -> Laptop:
         """Create a new laptop."""

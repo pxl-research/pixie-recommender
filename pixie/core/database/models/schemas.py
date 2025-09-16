@@ -24,6 +24,7 @@ class CategoryBase(BaseSchema):
 
 class CategoryCreate(CategoryBase):
     """Schema for creating categories."""
+
     pass
 
 
@@ -49,6 +50,7 @@ class AttributeBase(BaseSchema):
 
 class AttributeCreate(AttributeBase):
     """Schema for creating attributes."""
+
     pass
 
 
@@ -90,6 +92,7 @@ class PrinterBase(ProductBase):
 
 class PrinterCreate(PrinterBase):
     """Schema for creating printers."""
+
     pass
 
 
@@ -123,6 +126,7 @@ class LaptopBase(ProductBase):
 
 class LaptopCreate(LaptopBase):
     """Schema for creating laptops."""
+
     pass
 
 
@@ -157,6 +161,7 @@ class ComputerBase(ProductBase):
 
 class ComputerCreate(ComputerBase):
     """Schema for creating computers."""
+
     pass
 
 
@@ -191,6 +196,7 @@ class SmartphoneBase(ProductBase):
 
 class SmartphoneCreate(SmartphoneBase):
     """Schema for creating smartphones."""
+
     pass
 
 

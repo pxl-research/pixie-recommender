@@ -22,24 +22,19 @@ class CategoryRepository(BaseRepository[Category]):
         return self.get_all()
 
     def create_category(
-        self,
-        name: str,
-        display_name: str,
-        description: Optional[str] = None
+        self, name: str, display_name: str, description: Optional[str] = None
     ) -> Category:
         """Create a new category."""
-        return self.create({
-            "name": name,
-            "display_name": display_name,
-            "description": description
-        })
+        return self.create(
+            {"name": name, "display_name": display_name, "description": description}
+        )
 
     def update_category(
         self,
         id: int,
         name: Optional[str] = None,
         display_name: Optional[str] = None,
-        description: Optional[str] = None
+        description: Optional[str] = None,
     ) -> Optional[Category]:
         """Update category information."""
         update_data = {}

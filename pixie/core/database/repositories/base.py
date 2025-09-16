@@ -86,7 +86,7 @@ class BaseRepository(ABC, Generic[ModelType]):
         filters: Dict[str, Any],
         skip: int = 0,
         limit: Optional[int] = None,
-        order_by: Optional[str] = None
+        order_by: Optional[str] = None,
     ) -> List[ModelType]:
         """Filter records by multiple criteria."""
         query = select(self.model_class)
@@ -121,7 +121,7 @@ class BaseRepository(ABC, Generic[ModelType]):
         search_term: str,
         search_fields: List[str],
         skip: int = 0,
-        limit: Optional[int] = None
+        limit: Optional[int] = None,
     ) -> List[ModelType]:
         """Search records using full-text search on specified fields."""
         query = select(self.model_class)

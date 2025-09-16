@@ -16,10 +16,7 @@ class SmartphoneRepository(BaseRepository[Smartphone]):
         return Smartphone
 
     def get_by_brand(
-        self,
-        brand: str,
-        skip: int = 0,
-        limit: Optional[int] = None
+        self, brand: str, skip: int = 0, limit: Optional[int] = None
     ) -> List[Smartphone]:
         """Get smartphones by brand."""
         return self.filter_by({"brand": brand}, skip=skip, limit=limit)
@@ -29,12 +26,14 @@ class SmartphoneRepository(BaseRepository[Smartphone]):
         min_price: float,
         max_price: float,
         skip: int = 0,
-        limit: Optional[int] = None
+        limit: Optional[int] = None,
     ) -> List[Smartphone]:
         """Get smartphones within price range."""
-        query = self.session.query(Smartphone).filter(
-            between(Smartphone.price, min_price, max_price)
-        ).offset(skip)
+        query = (
+            self.session.query(Smartphone)
+            .filter(between(Smartphone.price, min_price, max_price))
+            .offset(skip)
+        )
 
         if limit:
             query = query.limit(limit)
@@ -46,12 +45,14 @@ class SmartphoneRepository(BaseRepository[Smartphone]):
         min_size: float,
         max_size: float,
         skip: int = 0,
-        limit: Optional[int] = None
+        limit: Optional[int] = None,
     ) -> List[Smartphone]:
         """Get smartphones by screen size range."""
-        query = self.session.query(Smartphone).filter(
-            between(Smartphone.screen_size_inches, min_size, max_size)
-        ).offset(skip)
+        query = (
+            self.session.query(Smartphone)
+            .filter(between(Smartphone.screen_size_inches, min_size, max_size))
+            .offset(skip)
+        )
 
         if limit:
             query = query.limit(limit)
@@ -59,26 +60,20 @@ class SmartphoneRepository(BaseRepository[Smartphone]):
         return query.all()
 
     def search_smartphones(
-        self,
-        search_term: str,
-        skip: int = 0,
-        limit: Optional[int] = None
+        self, search_term: str, skip: int = 0, limit: Optional[int] = None
     ) -> List[Smartphone]:
         """Search smartphones by name, brand, or processor."""
         return self.search(
-            search_term,
-            ["name", "brand", "processor"],
-            skip=skip,
-            limit=limit
+            search_term, ["name", "brand", "processor"], skip=skip, limit=limit
         )
 
     def get_available_smartphones(
-        self,
-        skip: int = 0,
-        limit: Optional[int] = None
+        self, skip: int = 0, limit: Optional[int] = None
     ) -> List[Smartphone]:
         """Get smartphones that are in stock."""
-        return self.filter_by({"availability_status": "in_stock"}, skip=skip, limit=limit)
+        return self.filter_by(
+            {"availability_status": "in_stock"}, skip=skip, limit=limit
+        )
 
     def create_smartphone(self, **kwargs) -> Smartphone:
         """Create a new smartphone."""
