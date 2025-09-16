@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import logging
 
-from ..search import UnifiedSearchEngine
+from ..search import SearchEngine
 from ..storage.pending_store import InMemoryPendingStore
 from ..utils.contracts import AskResponse
 from .conversation_loop import ConversationLoopManager
@@ -28,7 +28,7 @@ class Pixie:
         else:
             # Provide a default search function that will be used by the
             # ConversationLoopManager.
-            engine = UnifiedSearchEngine()
+            engine = SearchEngine()
 
             # Create a wrapper function that extracts category from context
             def search_with_category(

@@ -5,7 +5,7 @@ from typing import Any, Callable, Tuple
 from uuid import uuid4
 
 from ..llms import azure_llm_set
-from ..search import UnifiedSearchEngine, create_unified_search_engine
+from ..search import SearchEngine, create_search_engine
 from ..storage.pending_store import InMemoryPendingStore
 from ..utils.attributes import get_attribute_manager
 from ..utils.contracts import AskResponse
@@ -24,7 +24,7 @@ class ConversationLoopManager:
         pending_store: InMemoryPendingStore | None = None,
         max_iterations: int = 3,
         llm_set: Tuple[Any, Any, Any] | None = None,
-        search_engine: UnifiedSearchEngine | None = None,
+        search_engine: SearchEngine | None = None,
     ):
         if llm_set is None:
             llm_set = azure_llm_set.create_azure_llm_set()
@@ -36,7 +36,7 @@ class ConversationLoopManager:
         self.search_fn = search_fn
         self.pending_store = pending_store or InMemoryPendingStore()
         self.max_iterations = max_iterations
-        self.search_engine = search_engine or create_unified_search_engine()
+        self.search_engine = search_engine or create_search_engine()
 
     def handle_new_question(self, question: str) -> AskResponse:
         logger = logging.getLogger(__name__)

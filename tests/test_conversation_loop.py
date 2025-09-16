@@ -112,10 +112,10 @@ def test_max_iterations_reached(mock_llm_set):
 
 
 def test_choose_result_view_large_results(mock_llm_set):
-    # Use RealSearchEngine so initial search (attributes None) returns many results
-    from pixie.core.search.search_engine import RealSearchEngine
+    # Use SearchEngine so initial search (attributes None) returns many results
+    from pixie.core.search import SearchEngine
 
-    engine = RealSearchEngine()
+    engine = SearchEngine()
     # make the sql model generate SQL that will return empty until refinements are provided
     mgr = ConversationLoopManager(engine.search, llm_set=mock_llm_set)
 
@@ -186,21 +186,21 @@ def test_ttl_integration(mock_llm_set):
 
 
 def test_conversation_with_real_search_initial_answer(mock_llm_set):
-    # integration: ConversationLoopManager with RealSearchEngine
-    from pixie.core.search.search_engine import RealSearchEngine
+    # integration: ConversationLoopManager with SearchEngine
+    from pixie.core.search import SearchEngine
 
-    engine = RealSearchEngine()
+    engine = SearchEngine()
     mgr = ConversationLoopManager(engine.search, llm_set=mock_llm_set)
 
     resp = mgr.handle_new_question("Ik zoek een nieuwe printer")
-    # RealSearchEngine returns many items for attributes None -> ask_user
+    # SearchEngine returns many items for attributes None -> ask_user
     assert resp.type == "ask_user"
 
 
 def test_conversation_refinement_then_answer_with_real_search(mock_llm_set):
-    from pixie.core.search.search_engine import RealSearchEngine
+    from pixie.core.search import SearchEngine
 
-    engine = RealSearchEngine()
+    engine = SearchEngine()
 
     calls = {"count": 0}
 

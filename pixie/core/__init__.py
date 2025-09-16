@@ -5,7 +5,7 @@ from .llms.azure_llm_set import create_azure_llm_set
 from .llms.azure_refinement_llm import AzureRefinementLLM
 from .llms.azure_relevance_llm import AzureRelevanceLLM
 from .llms.azure_sql_llm import AzureSQLLLM
-from .search import UnifiedSearchEngine
+from .search import SearchEngine
 from .storage.pending_store import InMemoryPendingStore
 from .utils.config import AzureConfig, Config, SearchConfig, get_config
 from .utils.contracts import AskResponse
@@ -26,5 +26,5 @@ __all__ = [
     "Pixie",
     "SearchConfig",
     "trace_id_ctx",
-    "UnifiedSearchEngine",
+    "SearchEngine",
 ]

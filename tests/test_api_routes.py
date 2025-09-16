@@ -10,7 +10,7 @@ from fastapi.testclient import TestClient
 from pixie.core.conversation.conversation_loop import ConversationLoopManager
 from pixie.core.conversation.pixie import Pixie
 from pixie.core.llms.mock_llm_set import create_mock_llm_set
-from pixie.core.search.search_engine import RealSearchEngine
+from pixie.core.search import SearchEngine
 from pixie.core.utils import logging as pixie_logging
 from pixie.core.utils.contracts import AskResponse
 from pixie.core.utils.logging import trace_id_ctx
@@ -30,7 +30,7 @@ def mock_client():
     mock_llms = create_mock_llm_set()
 
     # Create conversation manager with mock LLMs
-    search_engine = RealSearchEngine()
+    search_engine = SearchEngine()
     conversation_manager = ConversationLoopManager(
         search_fn=search_engine.search, llm_set=mock_llms
     )

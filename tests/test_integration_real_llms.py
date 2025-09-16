@@ -194,10 +194,10 @@ class TestRealLLMEndToEndFlow:
     def test_conversation_flow_with_real_llms(self, real_azure_llms):
         """Test a complete conversation flow using real Azure LLMs."""
         from pixie.core.conversation.conversation_loop import ConversationLoopManager
-        from pixie.core.search.search_engine import RealSearchEngine
+        from pixie.core.search import SearchEngine
 
         # Create conversation manager with real LLMs
-        search_engine = RealSearchEngine()
+        search_engine = SearchEngine()
         manager = ConversationLoopManager(
             search_fn=search_engine.search, llm_set=real_azure_llms
         )
