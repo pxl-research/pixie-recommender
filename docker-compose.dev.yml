@@ -10,7 +10,7 @@ services:
     volumes:
       - .:/app   # hot reload
     healthcheck:
-      test: ["CMD", "wget", "-qO-", "http://localhost:8000/health"]
+      test: ["CMD", "python", "/app/scripts/wait_for_health_container.py"]
       interval: 10s
       timeout: 3s
       retries: 5
