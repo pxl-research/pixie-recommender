@@ -26,6 +26,17 @@ class MockRelevance:
             "brand",
             "laser",
             "inkjet",
+            # Dutch keywords
+            "telefoon",
+            "drukker",
+            "afdrukken",
+            "beeldscherm",
+            "toetsenbord",
+            "muis",
+            "koptelefoon",
+            "luidspreker",
+            "fotocamera",
+            "televisie",
         ]
         text_lower = text.lower()
 

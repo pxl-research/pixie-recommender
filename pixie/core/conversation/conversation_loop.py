@@ -5,6 +5,7 @@ from typing import Any, Callable, Tuple
 from uuid import uuid4
 
 from ..llms import azure_llm_set
+from ..search.search_engine import create_real_search_engine, RealSearchEngine
 from ..storage.pending_store import InMemoryPendingStore
 from ..utils.contracts import AskResponse
 
@@ -22,6 +23,7 @@ class ConversationLoopManager:
         pending_store: InMemoryPendingStore | None = None,
         max_iterations: int = 3,
         llm_set: Tuple[Any, Any, Any] | None = None,
+        search_engine: RealSearchEngine | None = None,
     ):
         if llm_set is None:
             llm_set = azure_llm_set.create_azure_llm_set()
@@ -33,6 +35,7 @@ class ConversationLoopManager:
         self.search_fn = search_fn
         self.pending_store = pending_store or InMemoryPendingStore()
         self.max_iterations = max_iterations
+        self.search_engine = search_engine or create_real_search_engine()
 
     def handle_new_question(self, question: str) -> AskResponse:
         logger = logging.getLogger(__name__)
@@ -51,12 +54,42 @@ class ConversationLoopManager:
         # full dataset for vague queries. If the refinement model cannot
         # produce a prompt, fall back to generating SQL and searching.
         pending_id = f"pending-{uuid4().hex[:8]}"
+        
+        # Detect category from the question
+        category = None
+        try:
+            category = self.relevance_model.detect_category(question)
+        except Exception as e:
+            logger.warning("Failed to detect category, falling back to default", exc_info=e)
+        
+        # Get category metadata from search engine
+        category_metadata = None
+        if category and hasattr(self.search_engine, '_categories_metadata'):
+            category_metadata = self.search_engine._categories_metadata.get(category)
+        
+        # Initialize context with category information
         context: dict[str, Any] = {
             "flow": "product",
-            "stage": "ask_budget",
+            "category": category or "printers",  # Default to printers for backward compatibility
             "iterations": 0,
             "question": question,
         }
+        
+        # Add category metadata if available
+        if category_metadata:
+            context["attribute_priority"] = category_metadata.get("attribute_priority", [])
+            context["attribute_descriptions"] = category_metadata.get("attribute_descriptions", {})
+        
+        # Determine first stage based on category priorities or fallback to budget
+        if category_metadata and "attribute_priority" in category_metadata:
+            # Use first priority attribute for initial stage
+            first_attr = category_metadata["attribute_priority"][0]
+            context["stage"] = f"ask_{first_attr}"
+            context["collected_attributes"] = []
+        else:
+            # Fallback to old behavior for backward compatibility
+            context["stage"] = "ask_budget"
+            context["collected_attributes"] = []
         self.pending_store.save_pending(
             pending_id, question, ttl_seconds=300, conversation_context=context
         )
@@ -81,6 +114,34 @@ class ConversationLoopManager:
 
         return AskResponse(type="ask_user", prompt=prompt, pending_id=pending_id)
 
+    def _get_next_stage(self, context: dict[str, Any]) -> str | None:
+        """Determine the next stage based on category attribute priorities."""
+        category = context.get("category", "printers")
+        collected_attributes = context.get("collected_attributes", [])
+        
+        # Get category metadata
+        category_metadata = None
+        if hasattr(self.search_engine, '_categories_metadata'):
+            category_metadata = self.search_engine._categories_metadata.get(category)
+        
+        if not category_metadata or "attribute_priority" not in category_metadata:
+            # Fallback to old hardcoded logic for backward compatibility
+            current_stage = context.get("stage")
+            if current_stage == "ask_budget":
+                return "ask_brand"
+            elif current_stage == "ask_brand":
+                return "ask_tech"
+            else:
+                return None
+        
+        # Find next uncollected attribute
+        attribute_priority = category_metadata["attribute_priority"]
+        for attr in attribute_priority:
+            if attr not in collected_attributes:
+                return f"ask_{attr}"
+        
+        return None  # All attributes collected
+
     def handle_reply(self, pending_id: str, reply: str) -> AskResponse:
         logger = logging.getLogger(__name__)
         pending_entry = self.pending_store.get_pending(pending_id)
@@ -89,70 +150,66 @@ class ConversationLoopManager:
 
         ctx = pending_entry.conversation_context or {}
         stage = ctx.get("stage")
-        # very literal attribute extraction
-        if stage == "ask_budget":
-            ctx["budget"] = reply
-            ctx["stage"] = "ask_brand"
+        
+        # Initialize collected_attributes if not exists
+        if "collected_attributes" not in ctx:
+            ctx["collected_attributes"] = []
+        
+        # Extract attribute name from stage (e.g., "ask_budget" -> "budget")
+        if stage and stage.startswith("ask_"):
+            attribute_name = stage[4:]  # Remove "ask_" prefix
+            ctx[attribute_name] = reply
+            ctx["collected_attributes"].append(attribute_name)
             ctx["iterations"] = ctx.get("iterations", 0) + 1
-            self.pending_store.save_pending(
-                pending_id, pending_entry.question, conversation_context=ctx
-            )
-            try:
-                prompt = self.refinement_model.generate_refinement_question(ctx)
-            except Exception as e:
-                logger.error(
-                    "Failed to generate refinement question for ask_brand", exc_info=e
-                )
-                return AskResponse(type="error", reason="llm_failure")
-            return AskResponse(type="ask_user", prompt=prompt, pending_id=pending_id)
-
-        if stage == "ask_brand":
-            ctx["brand"] = reply
-            ctx["stage"] = "ask_tech"
-            ctx["iterations"] = ctx.get("iterations", 0) + 1
-            self.pending_store.save_pending(
-                pending_id, pending_entry.question, conversation_context=ctx
-            )
-            try:
-                prompt = self.refinement_model.generate_refinement_question(ctx)
-            except Exception as e:
-                logger.error(
-                    "Failed to generate refinement question for ask_tech", exc_info=e
-                )
-                return AskResponse(type="error", reason="llm_failure")
-            return AskResponse(type="ask_user", prompt=prompt, pending_id=pending_id)
-
-        if stage == "ask_tech":
-            ctx["technology"] = reply
-            ctx["iterations"] = ctx.get("iterations", 0) + 1
-            try:
-                sql = self.sql_model.generate_sql(pending_entry.question, ctx)
-            except Exception as e:
-                logger.error("Failed to generate SQL for ask_tech", exc_info=e)
-                return AskResponse(type="error", reason="llm_failure")
-            results = self.search_fn(sql, ctx)
-            if results:
-                self.pending_store.resolve_pending(pending_id)
-                return AskResponse(type="answer", text=str(results))
-            # no results -> either ask next or finish
-            if ctx["iterations"] < self.max_iterations:
-                ctx["stage"] = "choose_result_view"
+            
+            # Determine next stage
+            next_stage = self._get_next_stage(ctx)
+            if next_stage:
+                ctx["stage"] = next_stage
                 self.pending_store.save_pending(
                     pending_id, pending_entry.question, conversation_context=ctx
                 )
-                return AskResponse(
-                    type="ask_user",
-                    prompt="No results, choose view?",
-                    pending_id=pending_id,
-                )
-            self.pending_store.resolve_pending(pending_id)
-            return AskResponse(type="no_results", text="No results found")
+                try:
+                    prompt = self.refinement_model.generate_refinement_question(ctx)
+                except Exception as e:
+                    logger.error(
+                        f"Failed to generate refinement question for {next_stage}", exc_info=e
+                    )
+                    return AskResponse(type="error", reason="llm_failure")
+                return AskResponse(type="ask_user", prompt=prompt, pending_id=pending_id)
+            else:
+                # All attributes collected, generate SQL and search
+                try:
+                    sql = self.sql_model.generate_sql(pending_entry.question, ctx)
+                except Exception as e:
+                    logger.error(
+                        "Failed to generate SQL after collecting all attributes", exc_info=e
+                    )
+                    return AskResponse(type="error", reason="llm_failure")
+                results = self.search_fn(sql, ctx)
+                if results:
+                    self.pending_store.resolve_pending(pending_id)
+                    return AskResponse(type="answer", text=str(results))
+                # No results -> ask for result view if iterations allow
+                if ctx["iterations"] < self.max_iterations:
+                    ctx["stage"] = "choose_result_view"
+                    self.pending_store.save_pending(
+                        pending_id, pending_entry.question, conversation_context=ctx
+                    )
+                    return AskResponse(
+                        type="ask_user",
+                        prompt="No results found. Would you like to try a different view "
+                               "or adjust your criteria?",
+                        pending_id=pending_id,
+                    )
+                self.pending_store.resolve_pending(pending_id)
+                return AskResponse(type="no_results", text="No results found")
 
         if stage == "choose_result_view":
-            # user selects a view (e.g., 'gesorteerd op prijs' or 'willekeurig')
+            # User selects a view (e.g., 'gesorteerd op prijs' or 'willekeurig')
             ctx["view"] = reply
             ctx["iterations"] = ctx.get("iterations", 0) + 1
-            # regenerate SQL with chosen view and perform search
+            # Regenerate SQL with chosen view and perform search
             try:
                 sql = self.sql_model.generate_sql(pending_entry.question, ctx)
             except Exception as e:
@@ -164,7 +221,7 @@ class ConversationLoopManager:
             if results:
                 self.pending_store.resolve_pending(pending_id)
                 return AskResponse(type="answer", text=str(results))
-            # nothing found after choosing view -> finish with no_results
+            # Nothing found after choosing view -> finish with no_results
             self.pending_store.resolve_pending(pending_id)
             return AskResponse(type="no_results", text="No results found")
 

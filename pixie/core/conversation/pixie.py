@@ -32,6 +32,7 @@ class Pixie:
             self._conversation_manager = ConversationLoopManager(
                 engine.search,
                 pending_store=self._pending_store,
+                search_engine=engine,
             )
 
     def answer(self, question: str) -> AskResponse:
