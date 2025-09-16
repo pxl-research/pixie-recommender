@@ -5,7 +5,7 @@ from typing import Any, Callable, Tuple
 from uuid import uuid4
 
 from ..llms import azure_llm_set
-from ..search.search_engine import RealSearchEngine, create_real_search_engine
+from ..search import UnifiedSearchEngine, create_unified_search_engine
 from ..storage.pending_store import InMemoryPendingStore
 from ..utils.attributes import get_attribute_manager
 from ..utils.contracts import AskResponse
@@ -24,7 +24,7 @@ class ConversationLoopManager:
         pending_store: InMemoryPendingStore | None = None,
         max_iterations: int = 3,
         llm_set: Tuple[Any, Any, Any] | None = None,
-        search_engine: RealSearchEngine | None = None,
+        search_engine: UnifiedSearchEngine | None = None,
     ):
         if llm_set is None:
             llm_set = azure_llm_set.create_azure_llm_set()
@@ -36,7 +36,7 @@ class ConversationLoopManager:
         self.search_fn = search_fn
         self.pending_store = pending_store or InMemoryPendingStore()
         self.max_iterations = max_iterations
-        self.search_engine = search_engine or create_real_search_engine()
+        self.search_engine = search_engine or create_unified_search_engine()
 
     def handle_new_question(self, question: str) -> AskResponse:
         logger = logging.getLogger(__name__)
@@ -68,7 +68,17 @@ class ConversationLoopManager:
         # Get category metadata from search engine
         category_metadata = None
         if category and hasattr(self.search_engine, "_categories_metadata"):
-            category_metadata = self.search_engine._categories_metadata.get(category)
+            categories_meta = getattr(self.search_engine, '_categories_metadata', {})
+            category_metadata = categories_meta.get(category)
+        elif category:
+            # For database backend, try to get metadata through the public API
+            try:
+                get_metadata_func = getattr(
+                    self.search_engine, 'get_category_metadata', lambda c: None
+                )
+                category_metadata = get_metadata_func(category)
+            except Exception:
+                category_metadata = None
 
         # Initialize context with category information
         context: dict[str, Any] = {
