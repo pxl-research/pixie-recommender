@@ -76,11 +76,11 @@ def test_refinement_then_answer(mock_llm_set):
     assert fourth.type == "answer"
 
 
-def test_invalid_pending_id():
+def test_invalid_pending_id(mock_llm_set):
     def search_fn(sql_query, attrs):
         return []
 
-    mgr = ConversationLoopManager(search_fn)
+    mgr = ConversationLoopManager(search_fn, llm_set=mock_llm_set)
     resp = mgr.handle_reply("non-existent", "anything")
     assert resp.type == "error"
 
