@@ -1,6 +1,6 @@
 """Computer model for desktop computer products."""
 
-from sqlalchemy import Boolean, Column, DECIMAL, Integer, String, Text
+from sqlalchemy import DECIMAL, Boolean, Column, Integer, String, Text
 
 from .base import BaseModel
 

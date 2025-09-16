@@ -1,6 +1,6 @@
 """Smartphone model for smartphone products."""
 
-from sqlalchemy import Boolean, Column, DECIMAL, Integer, String
+from sqlalchemy import DECIMAL, Boolean, Column, Integer, String
 
 from .base import BaseModel
 

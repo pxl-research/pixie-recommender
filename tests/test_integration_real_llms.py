@@ -28,14 +28,21 @@ def is_azure_configured() -> bool:
     api_version = os.getenv("AZURE_OPENAI_API_VERSION", "")
     model = os.getenv("AZURE_OPENAI_MODEL", "")
 
+    # Ensure all required values are present and not dummy values
+    has_valid_endpoint = bool(
+        endpoint and endpoint != "https://example.openai.azure.com/"
+    )
+    has_valid_key = bool(key and key != "dummy-key-for-development")
+    has_api_version = bool(api_version)
+    has_model = bool(model)
+    not_forced_mock = os.getenv("PIXIE_FORCE_MOCKS", "0") != "1"
+
     return (
-        endpoint
-        and endpoint != "https://example.openai.azure.com/"
-        and key
-        and key != "dummy-key-for-development"
-        and api_version
-        and model
-        and os.getenv("PIXIE_FORCE_MOCKS", "0") != "1"
+        has_valid_endpoint
+        and has_valid_key
+        and has_api_version
+        and has_model
+        and not_forced_mock
     )
 
 
