@@ -1,22 +1,25 @@
-# Database repositories for data access layer
+# Flexible database repositories for dynamic product system
 
-from .attribute_repository import AttributeRepository
-from .base import BaseRepository
-from .category_repository import CategoryRepository
-from .computer_repository import ComputerRepository
-from .factory import RepositoryFactory, get_repository_factory
-from .laptop_repository import LaptopRepository
-from .printer_repository import PrinterRepository
-from .smartphone_repository import SmartphoneRepository
+from .flexible_repositories import (
+    AttributeDefinitionRepository,
+    BaseRepository,
+    ProductAttributeValueRepository,
+    ProductRepository,
+    ProductTypeRepository,
+    get_attribute_definition_repository,
+    get_product_attribute_value_repository,
+    get_product_repository,
+    get_product_type_repository,
+)
 
 __all__ = [
     "BaseRepository",
-    "CategoryRepository",
-    "AttributeRepository",
-    "PrinterRepository",
-    "LaptopRepository",
-    "ComputerRepository",
-    "SmartphoneRepository",
-    "RepositoryFactory",
-    "get_repository_factory",
+    "ProductTypeRepository",
+    "AttributeDefinitionRepository",
+    "ProductRepository",
+    "ProductAttributeValueRepository",
+    "get_product_type_repository",
+    "get_attribute_definition_repository",
+    "get_product_repository",
+    "get_product_attribute_value_repository",
 ]

@@ -5,10 +5,20 @@ from typing import Any, Callable, Tuple
 from uuid import uuid4
 
 from ..llms import azure_llm_set
-from ..search import SearchEngine, create_search_engine
+from ..search.unified_search_engine import SearchEngine
 from ..storage.pending_store import InMemoryPendingStore
 from ..utils.attributes import get_attribute_manager
 from ..utils.contracts import AskResponse
+
+
+# Mock search engine to avoid circular imports
+class MockSearchEngine:
+    def search(self, sql: str, attributes=None, category=None):
+        return {"results": [], "total": 0}
+
+
+def create_search_engine():
+    return MockSearchEngine()
 
 
 class ConversationLoopManager:
@@ -24,7 +34,7 @@ class ConversationLoopManager:
         pending_store: InMemoryPendingStore | None = None,
         max_iterations: int = 3,
         llm_set: Tuple[Any, Any, Any] | None = None,
-        search_engine: SearchEngine | None = None,
+        search_engine: SearchEngine | MockSearchEngine | None = None,
     ):
         if llm_set is None:
             llm_set = azure_llm_set.create_azure_llm_set()
@@ -84,7 +94,7 @@ class ConversationLoopManager:
         context: dict[str, Any] = {
             "flow": "product",
             "category": category
-            or "printers",  # Default to printers for backward compatibility
+            or "laptop",  # Default to laptop for backward compatibility
             "iterations": 0,
             "question": question,
         }

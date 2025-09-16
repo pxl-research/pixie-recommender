@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import logging
 
-from ..search import SearchEngine
+from ..search.unified_search_engine import SearchEngine
 from ..storage.pending_store import InMemoryPendingStore
 from ..utils.contracts import AskResponse
 from .conversation_loop import ConversationLoopManager
@@ -37,7 +37,8 @@ class Pixie:
                 category = None
                 if context and isinstance(context, dict):
                     category = context.get("category")
-                return engine.search(sql, context, category)
+                result = engine.search(sql, context, category)
+                return result.get("results", [])
 
             self._conversation_manager = ConversationLoopManager(
                 search_with_category,

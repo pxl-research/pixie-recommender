@@ -1,14 +1,13 @@
 """Database-driven search engine for Pixie Core."""
 
 import logging
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, Optional
+from uuid import UUID
 
 from ..database.connection import get_db_session
-from ..database.repositories import (
-    ComputerRepository,
-    LaptopRepository,
-    PrinterRepository,
-    SmartphoneRepository,
+from ..database.repositories.flexible_repositories import (
+    get_product_repository,
+    get_product_type_repository,
 )
 
 logger = logging.getLogger(__name__)
@@ -22,315 +21,214 @@ class SearchEngine:
 
     Methods:
       search(sql: str, attributes: Optional[Dict[str, Any]],
-             category: Optional[str] = None) -> List[Dict]
+             category: Optional[str] = None) -> Dict[str, Any]
     """
 
     def __init__(self):
-        self._default_category = "printers"
         self._default_page_size = 10
-        logger.info("Initialized database-driven search engine")
+        logger.info("Initialized flexible database-driven search engine")
 
     def search(
         self,
         sql: str,
         attributes: Optional[Dict[str, Any]],
         category: Optional[str] = None,
-    ) -> List[Dict[str, Any]]:
+    ) -> Dict[str, Any]:
         """Search products using database queries."""
-        # Determine which category to search in
-        if category is None:
-            category = self._default_category
+        logger.info(
+            f"Search called with sql='{sql}', "
+            f"attributes={attributes}, category='{category}'"
+        )
 
-        # If attributes is None or empty, return only a small page of items
+        # If attributes is None or empty, return default results
         if attributes is None or (
             isinstance(attributes, dict) and len(attributes) == 0
         ):
             return self._get_default_results(category)
 
-        with get_db_session() as session:
-            try:
-                # Route to appropriate repository based on category
-                if category == "printers":
-                    return self._search_printers(session, attributes)
-                elif category == "laptops":
-                    return self._search_laptops(session, attributes)
-                elif category == "computers":
-                    return self._search_computers(session, attributes)
-                elif category == "smartphones":
-                    return self._search_smartphones(session, attributes)
-                else:
-                    logger.warning(f"Unknown category: {category}")
-                    return []
-            except Exception as e:
-                logger.error(f"Search error for category {category}: {e}")
-                return []
+        # Use attributes to filter results
+        return self._filter_results_by_attributes(attributes, category)
 
-    def _get_default_results(self, category: str) -> List[Dict[str, Any]]:
+    def _get_default_results(self, category: Optional[str]) -> Dict[str, Any]:
         """Get default results when no attributes are provided."""
+        logger.info(f"Getting default results for category: {category}")
+
         with get_db_session() as session:
             try:
-                if category == "printers":
-                    repo = PrinterRepository(session)
-                    printers = repo.get_all(limit=self._default_page_size)
-                    return [self._map_printer(p) for p in printers]
-                elif category == "laptops":
-                    repo = LaptopRepository(session)
-                    laptops = repo.get_all(limit=self._default_page_size)
-                    return [self._map_laptop(L) for L in laptops]
-                elif category == "computers":
-                    repo = ComputerRepository(session)
-                    computers = repo.get_all(limit=self._default_page_size)
-                    return [self._map_computer(c) for c in computers]
-                elif category == "smartphones":
-                    repo = SmartphoneRepository(session)
-                    smartphones = repo.get_all(limit=self._default_page_size)
-                    return [self._map_smartphone(s) for s in smartphones]
+                product_repo = get_product_repository(session)
+                type_repo = get_product_type_repository(session)
+
+                # Find product type by name
+                if category:
+                    product_type = type_repo.get_by_name(category)
+                    if product_type:
+                        # Convert to UUID if needed
+                        type_id = UUID(str(product_type.id))
+                        products = product_repo.get_by_product_type(type_id)
+                        results = [self._map_product(p) for p in products]
+                        logger.info(
+                            f"Found {len(results)} products for category '{category}'"
+                        )
+                        return {"results": results, "total": len(results)}
+                    else:
+                        logger.warning(f"Product type '{category}' not found")
                 else:
-                    return []
+                    # Get all products if no category specified
+                    products = product_repo.get_all()
+                    results = [self._map_product(p) for p in products]
+                    logger.info(f"Found {len(results)} products total")
+                    return {"results": results, "total": len(results)}
+
+                return {"results": [], "total": 0}
+
             except Exception as e:
-                logger.error(f"Error getting default results for {category}: {e}")
-                return []
+                logger.error(f"Error getting default results: {e}")
+                return {"results": [], "total": 0}
 
-    def _search_printers(
-        self, session, attributes: Dict[str, Any]
-    ) -> List[Dict[str, Any]]:
-        """Search printers with database queries."""
-        repo = PrinterRepository(session)
+    def _filter_results_by_attributes(
+        self, attributes: Dict[str, Any], category: Optional[str]
+    ) -> Dict[str, Any]:
+        """Filter products based on collected attributes."""
+        logger.info(
+            f"Filtering results by attributes: {attributes}, category: {category}"
+        )
 
-        # Apply common filters
-        filtered_items = self._apply_common_filters(repo, attributes)
+        # Extract only the relevant attributes for filtering
+        filter_attributes = self._extract_filter_attributes(attributes)
 
-        # Apply printer-specific filters
-        filtered_items = self._apply_printer_filters(filtered_items, attributes)
+        with get_db_session() as session:
+            try:
+                product_repo = get_product_repository(session)
+                type_repo = get_product_type_repository(session)
 
-        # Convert to dict format
-        return [self._map_printer(p) for p in filtered_items]
-
-    def _search_laptops(
-        self, session, attributes: Dict[str, Any]
-    ) -> List[Dict[str, Any]]:
-        """Search laptops with database queries."""
-        repo = LaptopRepository(session)
-
-        # Apply common filters
-        filtered_items = self._apply_common_filters(repo, attributes)
-
-        # Apply laptop-specific filters
-        filtered_items = self._apply_laptop_filters(filtered_items, attributes)
-
-        # Convert to dict format
-        return [self._map_laptop(L) for L in filtered_items]
-
-    def _search_computers(
-        self, session, attributes: Dict[str, Any]
-    ) -> List[Dict[str, Any]]:
-        """Search computers with database queries."""
-        repo = ComputerRepository(session)
-
-        # Apply common filters
-        filtered_items = self._apply_common_filters(repo, attributes)
-
-        # Apply computer-specific filters
-        filtered_items = self._apply_computer_filters(filtered_items, attributes)
-
-        # Convert to dict format
-        return [self._map_computer(c) for c in filtered_items]
-
-    def _search_smartphones(
-        self, session, attributes: Dict[str, Any]
-    ) -> List[Dict[str, Any]]:
-        """Search smartphones with database queries."""
-        repo = SmartphoneRepository(session)
-
-        # Apply common filters
-        filtered_items = self._apply_common_filters(repo, attributes)
-
-        # Apply smartphone-specific filters
-        filtered_items = self._apply_smartphone_filters(filtered_items, attributes)
-
-        # Convert to dict format
-        return [self._map_smartphone(s) for s in filtered_items]
-
-    def _apply_common_filters(self, repo, attributes: Dict[str, Any]):
-        """Apply filters that are common across all categories (budget, brand)."""
-        # Start with all items
-        items = repo.get_all()
-
-        # Budget filtering
-        budget = attributes.get("budget") or attributes.get("Budget")
-        max_budget_value = self._parse_budget(budget)
-
-        if max_budget_value is not None:
-            # Filter by price (not price_cents)
-            items = [
-                item
-                for item in items
-                if float(getattr(item, "price", 0)) <= max_budget_value
-            ]
-
-        # Brand filtering
-        brand = attributes.get("brand") or attributes.get("Brand")
-        if isinstance(brand, str) and not self._is_vague_response(brand):
-            # Use repository's brand filtering
-            items = repo.get_by_brand(brand)
-
-        return items
-
-    def _apply_printer_filters(self, items, attributes: Dict[str, Any]):
-        """Apply printer-specific filters."""
-        # Technology filter
-        tech = attributes.get("technology") or attributes.get("Technology")
-        if isinstance(tech, str) and not self._is_vague_response(tech):
-            # Filter items by technology
-            items = [
-                item
-                for item in items
-                if getattr(item, "technology", "").lower() == tech.lower()
-            ]
-
-        return items
-
-    def _apply_laptop_filters(self, items, attributes: Dict[str, Any]):
-        """Apply laptop-specific filters."""
-        # Screen size filter
-        screen_size = attributes.get("screen_size")
-        if isinstance(screen_size, str) and not self._is_vague_response(screen_size):
-            items = [
-                item
-                for item in items
-                if screen_size.lower()
-                in getattr(item, "screen_size_inches", "").lower()
-            ]
-
-        # Processor filter
-        processor = attributes.get("processor")
-        if isinstance(processor, str) and not self._is_vague_response(processor):
-            items = [
-                item
-                for item in items
-                if processor.lower() in getattr(item, "processor", "").lower()
-            ]
-
-        return items
-
-    def _apply_computer_filters(self, items, attributes: Dict[str, Any]):
-        """Apply computer-specific filters."""
-        # Processor filter
-        processor = attributes.get("processor")
-        if isinstance(processor, str) and not self._is_vague_response(processor):
-            items = [
-                item
-                for item in items
-                if processor.lower() in getattr(item, "processor", "").lower()
-            ]
-
-        return items
-
-    def _apply_smartphone_filters(self, items, attributes: Dict[str, Any]):
-        """Apply smartphone-specific filters."""
-        # Screen size filter
-        screen_size = attributes.get("screen_size")
-        if isinstance(screen_size, str) and not self._is_vague_response(screen_size):
-            items = [
-                item
-                for item in items
-                if screen_size.lower()
-                in getattr(item, "screen_size_inches", "").lower()
-            ]
-
-        # Operating system filter
-        operating_system = attributes.get("operating_system")
-        if isinstance(operating_system, str) and not self._is_vague_response(
-            operating_system
-        ):
-            items = [
-                item
-                for item in items
-                if operating_system.lower()
-                == getattr(item, "operating_system", "").lower()
-            ]
-
-        return items
-
-    def _parse_budget(self, budget) -> Optional[float]:
-        """Parse budget value from various formats."""
-        if isinstance(budget, (int, float)):
-            return float(budget)
-        elif isinstance(budget, str):
-            if self._is_vague_response(budget):
-                return None
-
-            # Parse budget strings like "maximaal 200 euro", "200", "100-200 euro"
-            import re
-
-            numbers = re.findall(r"\d+", budget)
-            if numbers:
-                if "-" in budget and len(numbers) >= 2:
-                    # Range format: use the maximum value
-                    return float(numbers[-1])
+                # Start with all products in the category
+                if category:
+                    product_type = type_repo.get_by_name(category)
+                    if product_type:
+                        type_id = UUID(str(product_type.id))
+                        products = product_repo.get_by_product_type(type_id)
+                    else:
+                        logger.warning(f"Product type '{category}' not found")
+                        return {"results": [], "total": 0}
                 else:
-                    # Single number: use as maximum
-                    return float(numbers[-1])
-        return None
+                    products = product_repo.get_all()
 
-    def _is_vague_response(self, response: str) -> bool:
-        """Check if response is vague and should be ignored."""
-        vague_responses = [
-            "weet ik niet",
-            "geen idee",
-            "maakt niet uit",
-            "doet er niet toe",
-            "geen voorkeur",
-            "weet niet",
-            "onbekend",
-            "nvt",
-            "n.v.t.",
-        ]
-        return response.lower().strip() in vague_responses
+                # Apply attribute filters
+                filtered_products = self._apply_attribute_filters(
+                    products, filter_attributes
+                )
 
-    def _map_printer(self, printer) -> Dict[str, Any]:
-        """Map printer model to dict format."""
-        return {
-            "id": printer.id,
-            "name": printer.name,
-            "price": float(printer.price),
+                # Convert to dictionary format
+                results = [self._map_product(p) for p in filtered_products]
+                logger.info(
+                    f"Filtered to {len(results)} products from {len(products)} total"
+                )
+
+                return {"results": results, "total": len(results)}
+
+            except Exception as e:
+                logger.error(f"Error filtering results by attributes: {e}")
+                return {"results": [], "total": 0}
+
+    def _extract_filter_attributes(self, context: Dict[str, Any]) -> Dict[str, Any]:
+        """Extract only the relevant attributes for filtering from context."""
+        # Define which context keys are actual product attributes
+        attribute_keys = {
+            "budget",
+            "brand",
+            "screen_size",
+            "processor",
+            "ram",
+            "storage",
+            "camera",
+            "wireless",
+            "noise_cancelling",
+            "resolution",
+            "refresh_rate",
+            "cellular",
+            "price",
+            "merk",
+            "schermgrootte",
+            "processor_type",
+            "geheugen",
         }
 
-    def _map_laptop(self, laptop) -> Dict[str, Any]:
-        """Map laptop model to dict format."""
+        filter_attributes = {}
+        for key, value in context.items():
+            if key in attribute_keys and value is not None:
+                filter_attributes[key] = value
+
+        logger.info(f"Extracted filter attributes: {filter_attributes}")
+        return filter_attributes
+
+    def _apply_attribute_filters(self, products, attributes: Dict[str, Any]):
+        """Apply attribute-based filtering to products."""
+        filtered_products = []
+
+        for product in products:
+            if self._matches_attributes(product, attributes):
+                filtered_products.append(product)
+
+        return filtered_products
+
+    def _matches_attributes(self, product, attributes: Dict[str, Any]) -> bool:
+        """Check if a product matches the given attributes."""
+        # For now, implement basic filtering based on product fields
+        # TODO: Implement more sophisticated filtering using product_attribute_values
+
+        for attr_name, attr_value in attributes.items():
+            if attr_name == "budget":
+                # Parse budget value (remove euro signs, etc.)
+                budget_str = (
+                    str(attr_value).lower().replace("euro", "").replace("€", "").strip()
+                )
+                try:
+                    budget_cents = int(float(budget_str) * 100)
+                    if product.price_cents > budget_cents:
+                        return False
+                except (ValueError, TypeError):
+                    logger.warning(f"Could not parse budget value: {attr_value}")
+
+            elif attr_name == "brand":
+                brand_value = str(attr_value).lower().strip()
+                product_brand = str(product.brand or "").lower().strip()
+                if brand_value and product_brand and brand_value not in product_brand:
+                    return False
+
+            elif attr_name == "screen_size":
+                # Basic screen size matching
+                size_value = str(attr_value).lower().strip()
+                product_name = str(product.name or "").lower()
+                product_desc = str(product.description or "").lower()
+                if (
+                    size_value
+                    and size_value not in product_name
+                    and size_value not in product_desc
+                ):
+                    # Try to extract screen size from product name/description
+                    pass  # For now, skip strict filtering
+
+            # Add more attribute filters as needed
+
+        return True
+
+    def _map_product(self, product) -> Dict[str, Any]:
+        """Map a Product object to dictionary format."""
         return {
-            "id": laptop.id,
-            "name": laptop.name,
-            "price": float(laptop.price),
+            "id": str(product.id),
+            "external_id": product.external_id,
+            "name": product.name,
+            "description": product.description,
+            "brand": product.brand,
+            "model": product.model,
+            "price_cents": product.price_cents,
+            "product_type": product.product_type.name if product.product_type else None,
+            "created_at": (
+                product.created_at.isoformat() if product.created_at else None
+            ),
         }
 
-    def _map_computer(self, computer) -> Dict[str, Any]:
-        """Map computer model to dict format."""
-        return {
-            "id": computer.id,
-            "name": computer.name,
-            "price": float(computer.price),
-        }
 
-    def _map_smartphone(self, smartphone) -> Dict[str, Any]:
-        """Map smartphone model to dict format."""
-        return {
-            "id": smartphone.id,
-            "name": smartphone.name,
-            "price": float(smartphone.price),
-        }
-
-    def get_categories(self) -> List[str]:
-        """Get list of available categories."""
-        return ["printers", "laptops", "computers", "smartphones"]
-
-    def get_category_metadata(self, category: str) -> Optional[Dict[str, Any]]:
-        """Get metadata for a specific category."""
-        # This would need to be implemented based on attributes table
-        # For now, return None to maintain compatibility
-        return None
-
-
-def create_search_engine() -> SearchEngine:
-    """Factory function for database search engine."""
+def create_search_engine():
+    """Create and return a SearchEngine instance."""
     return SearchEngine()

@@ -7,7 +7,7 @@ from sqlalchemy import create_engine
 from sqlalchemy.orm import Session, sessionmaker
 from sqlalchemy.pool import StaticPool
 
-from .base import Base
+from .models.base import Base
 
 # Database configuration
 DATABASE_URL = os.getenv(

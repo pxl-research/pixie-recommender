@@ -4,6 +4,15 @@ from __future__ import annotations
 
 import os
 from dataclasses import dataclass
+from pathlib import Path
+
+# Load environment variables from .env.dev if it exists
+project_root = Path(__file__).parent.parent.parent
+env_dev_path = project_root / ".env.dev"
+if env_dev_path.exists():
+    from dotenv import load_dotenv
+
+    load_dotenv(env_dev_path)
 
 
 @dataclass
@@ -66,7 +75,7 @@ class Config:
         database_config = DatabaseConfig(
             url=os.getenv(
                 "DATABASE_URL",
-                "postgresql://pixie_user:pixie_password@localhost:5432/pixie_db",
+                "postgresql://pixie_user:pixie_password@localhost:5432/pixie_dev",
             ),
             pool_size=int(os.getenv("DATABASE_POOL_SIZE", "10")),
             max_overflow=int(os.getenv("DATABASE_MAX_OVERFLOW", "20")),
