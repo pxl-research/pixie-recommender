@@ -11,27 +11,27 @@ class RealSearchEngine:
     """Simple JSON-backed search engine compatible with MockSearchEngine API.
 
     Methods:
-      search(sql: str, attributes: Optional[Dict[str, Any]], 
+      search(sql: str, attributes: Optional[Dict[str, Any]],
              category: Optional[str] = None) -> List[Dict]
     """
 
     def __init__(self, data_file_path: Optional[str] = None):
         if data_file_path is None:
             data_file_path = get_config().search.data_file_path
-        
+
         self.data_dir = os.path.dirname(data_file_path)
         self._categories_data = self._load_all_categories()
         self._categories_metadata = {}
-        
+
         # Load metadata for each category
         for category in self._categories_data.keys():
             metadata = self._load_category_metadata(category)
             if metadata:
                 self._categories_metadata[category] = metadata
-        
+
         # For backward compatibility, default to printers
         self._default_category = "printers"
-        
+
         # default page size for vague queries (no attributes)
         self._default_page_size = get_config().search.default_page_size
 
@@ -40,11 +40,11 @@ class RealSearchEngine:
         categories = {}
         category_files = {
             "printers": "printers.json",
-            "laptops": "laptops.json", 
+            "laptops": "laptops.json",
             "computers": "computers.json",
-            "smartphones": "smartphones.json"
+            "smartphones": "smartphones.json",
         }
-        
+
         for category, filename in category_files.items():
             file_path = os.path.join(self.data_dir, filename)
             try:
@@ -56,7 +56,7 @@ class RealSearchEngine:
             except Exception:
                 # fail gracefully to empty dataset for this category
                 categories[category] = []
-        
+
         return categories
 
     def _load_category_metadata(self, category: str) -> Optional[Dict[str, Any]]:
@@ -71,17 +71,20 @@ class RealSearchEngine:
             return None
 
     def search(
-        self, sql: str, attributes: Optional[Dict[str, Any]], category: Optional[str] = None
+        self,
+        sql: str,
+        attributes: Optional[Dict[str, Any]],
+        category: Optional[str] = None,
     ) -> List[Dict[str, Any]]:
         # Determine which category to search in
         if category is None:
             category = self._default_category
-        
+
         if category not in self._categories_data:
             return []
-        
+
         data = self._categories_data[category]
-        
+
         # If attributes is None or empty, return only a small page of items
         # to avoid returning the entire dataset for vague queries.
         if attributes is None or (
@@ -104,7 +107,7 @@ class RealSearchEngine:
         """Apply category-specific filtering based on attributes."""
         # Common filters for all categories
         items = self._apply_common_filters(items, attributes)
-        
+
         # Category-specific filters
         if category == "printers":
             items = self._apply_printer_filters(items, attributes)
@@ -114,7 +117,7 @@ class RealSearchEngine:
             items = self._apply_computer_filters(items, attributes)
         elif category == "smartphones":
             items = self._apply_smartphone_filters(items, attributes)
-        
+
         return items
 
     def _apply_common_filters(
@@ -196,16 +199,24 @@ class RealSearchEngine:
         if isinstance(tech, str):
             tech_str = tech.lower().strip()
             vague_tech_responses = [
-                "weet ik niet", "geen idee", "maakt niet uit", "doet er niet toe",
-                "geen voorkeur", "weet niet", "onbekend", "nvt", "n.v.t."
+                "weet ik niet",
+                "geen idee",
+                "maakt niet uit",
+                "doet er niet toe",
+                "geen voorkeur",
+                "weet niet",
+                "onbekend",
+                "nvt",
+                "n.v.t.",
             ]
 
             if tech_str not in vague_tech_responses:
                 items = [
-                    it for it in items 
+                    it
+                    for it in items
                     if it.get("technology", "").lower() == tech.lower()
                 ]
-        
+
         return items
 
     def _apply_laptop_filters(
@@ -218,30 +229,33 @@ class RealSearchEngine:
             screen_size_str = screen_size.lower().strip()
             if screen_size_str not in ["weet ik niet", "geen idee", "maakt niet uit"]:
                 items = [
-                    it for it in items 
+                    it
+                    for it in items
                     if screen_size_str in it.get("screen_size", "").lower()
                 ]
-        
+
         # processor filter
         processor = attributes.get("processor")
         if isinstance(processor, str):
             processor_str = processor.lower().strip()
             if processor_str not in ["weet ik niet", "geen idee", "maakt niet uit"]:
                 items = [
-                    it for it in items 
+                    it
+                    for it in items
                     if processor_str in it.get("processor", "").lower()
                 ]
-        
+
         # usage_type filter
         usage_type = attributes.get("usage_type")
         if isinstance(usage_type, str):
             usage_type_str = usage_type.lower().strip()
             if usage_type_str not in ["weet ik niet", "geen idee", "maakt niet uit"]:
                 items = [
-                    it for it in items 
+                    it
+                    for it in items
                     if it.get("usage_type", "").lower() == usage_type_str
                 ]
-        
+
         return items
 
     def _apply_computer_filters(
@@ -254,30 +268,33 @@ class RealSearchEngine:
             processor_str = processor.lower().strip()
             if processor_str not in ["weet ik niet", "geen idee", "maakt niet uit"]:
                 items = [
-                    it for it in items 
+                    it
+                    for it in items
                     if processor_str in it.get("processor", "").lower()
                 ]
-        
+
         # form_factor filter
         form_factor = attributes.get("form_factor")
         if isinstance(form_factor, str):
             form_factor_str = form_factor.lower().strip()
             if form_factor_str not in ["weet ik niet", "geen idee", "maakt niet uit"]:
                 items = [
-                    it for it in items 
+                    it
+                    for it in items
                     if it.get("form_factor", "").lower() == form_factor_str
                 ]
-        
+
         # usage_type filter
         usage_type = attributes.get("usage_type")
         if isinstance(usage_type, str):
             usage_type_str = usage_type.lower().strip()
             if usage_type_str not in ["weet ik niet", "geen idee", "maakt niet uit"]:
                 items = [
-                    it for it in items 
+                    it
+                    for it in items
                     if it.get("usage_type", "").lower() == usage_type_str
                 ]
-        
+
         return items
 
     def _apply_smartphone_filters(
@@ -290,20 +307,22 @@ class RealSearchEngine:
             screen_size_str = screen_size.lower().strip()
             if screen_size_str not in ["weet ik niet", "geen idee", "maakt niet uit"]:
                 items = [
-                    it for it in items 
+                    it
+                    for it in items
                     if screen_size_str in it.get("screen_size", "").lower()
                 ]
-        
+
         # operating_system filter
         operating_system = attributes.get("operating_system")
         if isinstance(operating_system, str):
             os_str = operating_system.lower().strip()
             if os_str not in ["weet ik niet", "geen idee", "maakt niet uit"]:
                 items = [
-                    it for it in items 
+                    it
+                    for it in items
                     if it.get("operating_system", "").lower() == os_str
                 ]
-        
+
         return items
 
     def _map_item(self, item: Dict[str, Any]) -> Dict[str, Any]:

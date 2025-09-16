@@ -26,19 +26,42 @@ class AzureRelevanceLLM(AzureOpenAILLM):
         if not self.model:
             raise ValueError("Azure model is not available")
 
-        prompt = (
-            "Is the following question related to printers? "
-            "Answer with exactly 'yes' or 'no'.\n\n"
-            f"Question: {text}"
-        )
+        try:
+            prompt = (
+                "Is the following question related to buying or searching for products? "
+                "The products we support are: printers, laptops, computers, smartphones. "
+                "Answer with exactly 'yes' or 'no'.\n\n"
+                f"Question: {text}"
+            )
 
-        response = self.model.invoke(prompt)
+            response = self.model.invoke(prompt)
 
-        if hasattr(response, "content"):
-            answer = response.content.lower().strip()
-            return answer == "yes" or answer.startswith("yes")
+            if hasattr(response, "content"):
+                answer = response.content.lower().strip()
+                return answer == "yes" or answer.startswith("yes")
 
-        raise ValueError("Invalid response format from Azure model")
+            raise ValueError("Invalid response format from Azure model")
+        except Exception:
+            # If Azure call fails, fall back to simple keyword-based relevance check
+            product_keywords = [
+                "printer",
+                "laptop",
+                "computer",
+                "phone",
+                "smartphone",
+                "tablet",
+                "monitor",
+                "keyboard",
+                "mouse",
+                "headphones",
+                "speaker",
+                "camera",
+                "tv",
+                "drukker",
+                "telefoon",
+            ]
+            text_lower = text.lower()
+            return any(keyword in text_lower for keyword in product_keywords)
 
     def detect_category(self, question: Optional[str]) -> Optional[str]:
         """Detect the product category from the question.
@@ -48,24 +71,65 @@ class AzureRelevanceLLM(AzureOpenAILLM):
         text = (question or "").strip()
 
         if not self.model:
-            raise ValueError("Azure model is not available")
+            # Fall back to keyword-based detection if model is not available
+            return self._keyword_based_category_detection(text)
 
-        prompt = (
-            "Determine the product category from the following question. "
-            "Possible categories are: printers, laptops, computers, smartphones. "
-            "If the question is not related to any of these categories, return 'none'. "
-            "Answer with exactly one word: printers, laptops, computers, smartphones, or none.\n\n"
-            f"Question: {text}"
-        )
+        try:
+            prompt = (
+                "Determine the product category from the following question. "
+                "Possible categories are: printers, laptops, computers, smartphones. "
+                "If the question is not related to any of these categories, return 'none'. "
+                "Answer with exactly one word: printers, laptops, computers, "
+                "smartphones, or none.\n\n"
+                f"Question: {text}"
+            )
 
-        response = self.model.invoke(prompt)
+            response = self.model.invoke(prompt)
 
-        if hasattr(response, "content"):
-            answer = response.content.lower().strip()
-            valid_categories = {"printers", "laptops", "computers", "smartphones"}
-            if answer in valid_categories:
-                return answer
-            elif answer == "none":
-                return None
+            if hasattr(response, "content"):
+                answer = response.content.lower().strip()
+                valid_categories = {"printers", "laptops", "computers", "smartphones"}
+                if answer in valid_categories:
+                    return answer
+                elif answer == "none":
+                    return None
 
-        raise ValueError("Invalid response format from Azure model")
+            raise ValueError("Invalid response format from Azure model")
+        except Exception:
+            # If Azure call fails, fall back to keyword-based detection
+            return self._keyword_based_category_detection(text)
+
+    def _keyword_based_category_detection(self, text: str) -> Optional[str]:
+        """Fallback keyword-based category detection."""
+        text_lower = text.lower()
+
+        # Define keywords for each category
+        category_keywords = {
+            "printers": ["printer", "print", "laser", "inkjet", "drukker", "afdrukken"],
+            "laptops": ["laptop", "notebook", "ultrabook", "macbook", "chromebook"],
+            "computers": [
+                "computer",
+                "pc",
+                "desktop",
+                "tower",
+                "all-in-one",
+                "workstation",
+            ],
+            "smartphones": [
+                "smartphone",
+                "phone",
+                "telefoon",
+                "iphone",
+                "android",
+                "samsung",
+                "huawei",
+                "xiaomi",
+            ],
+        }
+
+        # Check for category-specific keywords
+        for category, keywords in category_keywords.items():
+            if any(keyword in text_lower for keyword in keywords):
+                return category
+
+        return None

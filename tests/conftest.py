@@ -10,14 +10,29 @@ class MockRelevance:
         return True
 
     def detect_category(self, question: str) -> str | None:
-        """Mock category detection - always returns printers for testing."""
-        return "printers"
+        """Mock category detection based on question content."""
+        question_lower = question.lower()
+        if "laptop" in question_lower:
+            return "laptops"
+        elif "printer" in question_lower or "print" in question_lower:
+            return "printers"
+        elif "smartphone" in question_lower or "telefoon" in question_lower:
+            return "smartphones"
+        elif "computer" in question_lower or "pc" in question_lower:
+            return "computers"
+        else:
+            return "printers"  # fallback
 
 
 class MockSQL:
-    def generate_sql(self, question: str, attributes: dict | None = None) -> str:
+    def generate_sql(
+        self,
+        question: str,
+        attributes: dict | None = None,
+        table_name: str = "printers",
+    ) -> str:
         """Generate SQL query with proper budget filtering."""
-        base_query = "SELECT * FROM printers"
+        base_query = f"SELECT * FROM {table_name}"
         conditions = []
 
         # Define vague responses that should be ignored
@@ -109,15 +124,45 @@ class MockSQL:
 class MockRefinement:
     def generate_refinement_question(self, context: dict) -> "str | None":
         stage = context.get("stage", "")
+        category = context.get("category", "printers")
+
         # Check if this is the first question (ask_budget stage or no user attributes)
-        system_keys = ["flow", "stage", "iterations", "question"]
+        system_keys = [
+            "flow",
+            "stage",
+            "iterations",
+            "question",
+            "collected_attributes",
+            "category",
+        ]
         user_attrs = [k for k in context.keys() if k not in system_keys]
-        if stage == "ask_budget" or not context or len(user_attrs) == 0:
+
+        # If stage indicates asking for budget and no user attributes yet
+        if stage == "ask_budget" or len(user_attrs) == 0:
             return "Wat is je budget?"
         if "budget" in context and "brand" not in context:
             return "Heb je een voorkeur voor een merk?"
-        if "budget" in context and "brand" in context and "technology" not in context:
+
+        # Category-specific questions based on stage
+        if stage == "ask_technology" and category == "printers":
             return "Welke technologie heeft je voorkeur (inkjet/laser)?"
+        elif stage == "ask_screen_size" and category in ["laptops", "smartphones"]:
+            return "Welke schermgrootte heeft je voorkeur?"
+        elif stage == "ask_processor" and category in ["laptops", "computers"]:
+            return "Welke processor heeft je voorkeur?"
+        elif stage == "ask_ram" and category == "laptops":
+            return "Hoeveel RAM heb je nodig?"
+        elif stage == "ask_storage" and category == "laptops":
+            return "Hoeveel opslagruimte heb je nodig?"
+        elif stage == "ask_battery_capacity" and category == "smartphones":
+            return "Wat is je gewenste batterij capaciteit?"
+        elif stage == "ask_camera" and category == "smartphones":
+            return "Welke camera kwaliteit heb je nodig?"
+        elif stage == "ask_motherboard" and category == "computers":
+            return "Welke motherboard heb je nodig?"
+        elif stage == "ask_power_supply" and category == "computers":
+            return "Welke voeding heb je nodig?"
+
         return None
 
 

@@ -29,8 +29,18 @@ class Pixie:
             # Provide a default search function that will be used by the
             # ConversationLoopManager.
             engine = RealSearchEngine()
+
+            # Create a wrapper function that extracts category from context
+            def search_with_category(
+                sql: str, context: dict | None = None
+            ) -> list[dict]:
+                category = None
+                if context and isinstance(context, dict):
+                    category = context.get("category")
+                return engine.search(sql, context, category)
+
             self._conversation_manager = ConversationLoopManager(
-                engine.search,
+                search_with_category,
                 pending_store=self._pending_store,
                 search_engine=engine,
             )

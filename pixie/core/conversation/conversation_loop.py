@@ -7,6 +7,7 @@ from uuid import uuid4
 from ..llms import azure_llm_set
 from ..search.search_engine import create_real_search_engine, RealSearchEngine
 from ..storage.pending_store import InMemoryPendingStore
+from ..utils.attributes import get_attribute_manager
 from ..utils.contracts import AskResponse
 
 
@@ -54,42 +55,62 @@ class ConversationLoopManager:
         # full dataset for vague queries. If the refinement model cannot
         # produce a prompt, fall back to generating SQL and searching.
         pending_id = f"pending-{uuid4().hex[:8]}"
-        
+
         # Detect category from the question
         category = None
         try:
             category = self.relevance_model.detect_category(question)
         except Exception as e:
-            logger.warning("Failed to detect category, falling back to default", exc_info=e)
-        
+            logger.warning(
+                "Failed to detect category, falling back to default", exc_info=e
+            )
+
         # Get category metadata from search engine
         category_metadata = None
-        if category and hasattr(self.search_engine, '_categories_metadata'):
+        if category and hasattr(self.search_engine, "_categories_metadata"):
             category_metadata = self.search_engine._categories_metadata.get(category)
-        
+
         # Initialize context with category information
         context: dict[str, Any] = {
             "flow": "product",
-            "category": category or "printers",  # Default to printers for backward compatibility
+            "category": category
+            or "printers",  # Default to printers for backward compatibility
             "iterations": 0,
             "question": question,
         }
-        
+
         # Add category metadata if available
         if category_metadata:
-            context["attribute_priority"] = category_metadata.get("attribute_priority", [])
-            context["attribute_descriptions"] = category_metadata.get("attribute_descriptions", {})
-        
-        # Determine first stage based on category priorities or fallback to budget
-        if category_metadata and "attribute_priority" in category_metadata:
-            # Use first priority attribute for initial stage
-            first_attr = category_metadata["attribute_priority"][0]
-            context["stage"] = f"ask_{first_attr}"
-            context["collected_attributes"] = []
-        else:
+            context["attribute_priority"] = category_metadata.get(
+                "attribute_priority", []
+            )
+            context["attribute_descriptions"] = category_metadata.get(
+                "attribute_descriptions", {}
+            )
+
+        # Determine first stage based on attribute manager or fallback
+        try:
+            attr_manager = get_attribute_manager()
+            first_attr = attr_manager.get_next_missing_attribute(
+                context["category"], context
+            )
+            if first_attr:
+                context["stage"] = f"ask_{first_attr['name']}"
+                context["collected_attributes"] = []
+            else:
+                # No attributes to collect, go directly to SQL generation
+                context["stage"] = "generate_sql"
+                context["collected_attributes"] = []
+        except Exception:
             # Fallback to old behavior for backward compatibility
-            context["stage"] = "ask_budget"
-            context["collected_attributes"] = []
+            if category_metadata and "attribute_priority" in category_metadata:
+                # Use first priority attribute for initial stage
+                first_attr = category_metadata["attribute_priority"][0]
+                context["stage"] = f"ask_{first_attr}"
+                context["collected_attributes"] = []
+            else:
+                context["stage"] = "ask_budget"
+                context["collected_attributes"] = []
         self.pending_store.save_pending(
             pending_id, question, ttl_seconds=300, conversation_context=context
         )
@@ -115,16 +136,17 @@ class ConversationLoopManager:
         return AskResponse(type="ask_user", prompt=prompt, pending_id=pending_id)
 
     def _get_next_stage(self, context: dict[str, Any]) -> str | None:
-        """Determine the next stage based on category attribute priorities."""
+        """Determine the next stage based on attribute manager."""
         category = context.get("category", "printers")
-        collected_attributes = context.get("collected_attributes", [])
-        
-        # Get category metadata
-        category_metadata = None
-        if hasattr(self.search_engine, '_categories_metadata'):
-            category_metadata = self.search_engine._categories_metadata.get(category)
-        
-        if not category_metadata or "attribute_priority" not in category_metadata:
+
+        try:
+            attr_manager = get_attribute_manager()
+            next_attr = attr_manager.get_next_missing_attribute(category, context)
+            if next_attr:
+                return f"ask_{next_attr['name']}"
+            else:
+                return None  # All attributes collected
+        except Exception:
             # Fallback to old hardcoded logic for backward compatibility
             current_stage = context.get("stage")
             if current_stage == "ask_budget":
@@ -133,14 +155,6 @@ class ConversationLoopManager:
                 return "ask_tech"
             else:
                 return None
-        
-        # Find next uncollected attribute
-        attribute_priority = category_metadata["attribute_priority"]
-        for attr in attribute_priority:
-            if attr not in collected_attributes:
-                return f"ask_{attr}"
-        
-        return None  # All attributes collected
 
     def handle_reply(self, pending_id: str, reply: str) -> AskResponse:
         logger = logging.getLogger(__name__)
@@ -150,18 +164,18 @@ class ConversationLoopManager:
 
         ctx = pending_entry.conversation_context or {}
         stage = ctx.get("stage")
-        
+
         # Initialize collected_attributes if not exists
         if "collected_attributes" not in ctx:
             ctx["collected_attributes"] = []
-        
+
         # Extract attribute name from stage (e.g., "ask_budget" -> "budget")
         if stage and stage.startswith("ask_"):
             attribute_name = stage[4:]  # Remove "ask_" prefix
             ctx[attribute_name] = reply
             ctx["collected_attributes"].append(attribute_name)
             ctx["iterations"] = ctx.get("iterations", 0) + 1
-            
+
             # Determine next stage
             next_stage = self._get_next_stage(ctx)
             if next_stage:
@@ -173,17 +187,26 @@ class ConversationLoopManager:
                     prompt = self.refinement_model.generate_refinement_question(ctx)
                 except Exception as e:
                     logger.error(
-                        f"Failed to generate refinement question for {next_stage}", exc_info=e
+                        f"Failed to generate refinement question for {next_stage}",
+                        exc_info=e,
                     )
                     return AskResponse(type="error", reason="llm_failure")
-                return AskResponse(type="ask_user", prompt=prompt, pending_id=pending_id)
+                return AskResponse(
+                    type="ask_user", prompt=prompt, pending_id=pending_id
+                )
             else:
                 # All attributes collected, generate SQL and search
                 try:
-                    sql = self.sql_model.generate_sql(pending_entry.question, ctx)
+                    # Use category to determine the correct table name
+                    category = ctx.get("category", "printers")
+                    table_name = category  # Table name matches category name
+                    sql = self.sql_model.generate_sql(
+                        pending_entry.question, ctx, table_name=table_name
+                    )
                 except Exception as e:
                     logger.error(
-                        "Failed to generate SQL after collecting all attributes", exc_info=e
+                        "Failed to generate SQL after collecting all attributes",
+                        exc_info=e,
                     )
                     return AskResponse(type="error", reason="llm_failure")
                 results = self.search_fn(sql, ctx)
@@ -199,7 +222,7 @@ class ConversationLoopManager:
                     return AskResponse(
                         type="ask_user",
                         prompt="No results found. Would you like to try a different view "
-                               "or adjust your criteria?",
+                        "or adjust your criteria?",
                         pending_id=pending_id,
                     )
                 self.pending_store.resolve_pending(pending_id)
@@ -211,7 +234,12 @@ class ConversationLoopManager:
             ctx["iterations"] = ctx.get("iterations", 0) + 1
             # Regenerate SQL with chosen view and perform search
             try:
-                sql = self.sql_model.generate_sql(pending_entry.question, ctx)
+                # Use category to determine the correct table name
+                category = ctx.get("category", "printers")
+                table_name = category  # Table name matches category name
+                sql = self.sql_model.generate_sql(
+                    pending_entry.question, ctx, table_name=table_name
+                )
             except Exception as e:
                 logger.error(
                     "Failed to generate SQL for choose_result_view", exc_info=e
