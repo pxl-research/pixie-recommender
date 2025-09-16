@@ -238,6 +238,45 @@ class ConversationLoopManager:
                 self.pending_store.resolve_pending(pending_id)
                 return AskResponse(type="no_results", text="No results found")
 
+        # Handle generate_sql stage - user is providing additional context
+        if stage == "generate_sql":
+            # Add the reply as additional context
+            ctx["additional_context"] = reply
+            ctx["iterations"] = ctx.get("iterations", 0) + 1
+
+            # Generate SQL and search
+            try:
+                # Use category to determine the correct table name
+                category = ctx.get("category", "printers")
+                table_name = category  # Table name matches category name
+                sql = self.sql_model.generate_sql(
+                    pending_entry.question, ctx, table_name=table_name
+                )
+            except Exception as e:
+                logger.error(
+                    "Failed to generate SQL for generate_sql stage",
+                    exc_info=e,
+                )
+                return AskResponse(type="error", reason="llm_failure")
+            results = self.search_fn(sql, ctx)
+            if results:
+                self.pending_store.resolve_pending(pending_id)
+                return AskResponse(type="answer", text=str(results))
+            # No results -> ask for result view if iterations allow
+            if ctx["iterations"] < self.max_iterations:
+                ctx["stage"] = "choose_result_view"
+                self.pending_store.save_pending(
+                    pending_id, pending_entry.question, conversation_context=ctx
+                )
+                return AskResponse(
+                    type="ask_user",
+                    prompt="No results found. Would you like to try a different view "
+                    "or adjust your criteria?",
+                    pending_id=pending_id,
+                )
+            self.pending_store.resolve_pending(pending_id)
+            return AskResponse(type="no_results", text="No results found")
+
         if stage == "choose_result_view":
             # User selects a view (e.g., 'gesorteerd op prijs' or 'willekeurig')
             ctx["view"] = reply
