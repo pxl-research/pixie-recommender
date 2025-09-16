@@ -1,3 +1,5 @@
+import os
+
 from pixie.core.llms.azure_refinement_llm import AzureRefinementLLM
 from pixie.core.llms.azure_relevance_llm import AzureRelevanceLLM
 from pixie.core.llms.azure_sql_llm import AzureSQLLLM
@@ -125,8 +127,20 @@ def test_create_azure_llm_set_reads_env(monkeypatch):
     monkeypatch.setenv("AZURE_OPENAI_MODEL", "m")
 
     from pixie.core.llms.azure_llm_set import create_azure_llm_set
+    from pixie.core.llms.mock_llm_set import MockRefinement, MockRelevance, MockSQL
 
     relevance, sql, refinement = create_azure_llm_set()
-    assert isinstance(relevance, AzureRelevanceLLM)
-    assert isinstance(sql, AzureSQLLLM)
-    assert isinstance(refinement, AzureRefinementLLM)
+
+    # Check if mocks are forced
+    force_mocks = os.getenv("PIXIE_FORCE_MOCKS", "0") == "1"
+
+    if force_mocks:
+        # Should return mock instances when PIXIE_FORCE_MOCKS=1
+        assert isinstance(relevance, MockRelevance)
+        assert isinstance(sql, MockSQL)
+        assert isinstance(refinement, MockRefinement)
+    else:
+        # Should return real Azure LLM instances when not forced
+        assert isinstance(relevance, AzureRelevanceLLM)
+        assert isinstance(sql, AzureSQLLLM)
+        assert isinstance(refinement, AzureRefinementLLM)
