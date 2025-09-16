@@ -29,10 +29,11 @@ class MockSQL:
         self,
         question: str,
         attributes: dict | None = None,
-        table_name: str = "printers",
+        table_name: str | None = None,
     ) -> str:
         """Generate SQL query with proper budget filtering."""
-        base_query = f"SELECT * FROM {table_name}"
+        table = table_name or "printers"
+        base_query = f"SELECT * FROM {table}"
         conditions = []
 
         # Define vague responses that should be ignored

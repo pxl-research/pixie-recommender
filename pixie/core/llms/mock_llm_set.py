@@ -92,8 +92,14 @@ class MockRelevance:
 
 
 class MockSQL:
-    def generate_sql(self, question: str, attributes: dict | None = None) -> str:
-        return "SELECT * FROM printers;"
+    def generate_sql(
+        self,
+        question: str,
+        attributes: dict | None = None,
+        table_name: str | None = None,
+    ) -> str:
+        table = table_name or "printers"
+        return f"SELECT * FROM {table};"
 
 
 class MockRefinement:

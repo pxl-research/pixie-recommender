@@ -58,10 +58,17 @@ def metrics():
     """Basic metrics endpoint for monitoring."""
     import time
 
+    # Get basic conversation statistics
+    if hasattr(_pixie_instance, '_pending_store'):
+        pending_count = len(_pixie_instance._pending_store._store)
+    else:
+        pending_count = 0
+
     return {
         "timestamp": int(time.time()),
         "status": "healthy",
-        "version": "0.6.0"
+        "version": "0.6.0",
+        "active_conversations": pending_count
     }
 
 
