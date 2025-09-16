@@ -9,6 +9,10 @@ class MockRelevance:
     def is_relevant(self, text: str) -> bool:
         return True
 
+    def detect_category(self, question: str) -> str | None:
+        """Mock category detection - always returns printers for testing."""
+        return "printers"
+
 
 class MockSQL:
     def generate_sql(self, question: str, attributes: dict | None = None) -> str:

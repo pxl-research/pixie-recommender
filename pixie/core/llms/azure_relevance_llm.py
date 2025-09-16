@@ -39,3 +39,33 @@ class AzureRelevanceLLM(AzureOpenAILLM):
             return answer == "yes" or answer.startswith("yes")
 
         raise ValueError("Invalid response format from Azure model")
+
+    def detect_category(self, question: Optional[str]) -> Optional[str]:
+        """Detect the product category from the question.
+
+        Returns one of: "printers", "laptops", "computers", "smartphones", or None
+        """
+        text = (question or "").strip()
+
+        if not self.model:
+            raise ValueError("Azure model is not available")
+
+        prompt = (
+            "Determine the product category from the following question. "
+            "Possible categories are: printers, laptops, computers, smartphones. "
+            "If the question is not related to any of these categories, return 'none'. "
+            "Answer with exactly one word: printers, laptops, computers, smartphones, or none.\n\n"
+            f"Question: {text}"
+        )
+
+        response = self.model.invoke(prompt)
+
+        if hasattr(response, "content"):
+            answer = response.content.lower().strip()
+            valid_categories = {"printers", "laptops", "computers", "smartphones"}
+            if answer in valid_categories:
+                return answer
+            elif answer == "none":
+                return None
+
+        raise ValueError("Invalid response format from Azure model")

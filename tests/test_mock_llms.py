@@ -66,6 +66,60 @@ def test_relevance_uses_azure_shape_and_fallback():
         assert "Azure model is not available" in str(e)
 
 
+def test_detect_category_uses_azure_shape():
+    # instantiate the real class (safe even without langchain installed)
+    r = AzureRelevanceLLM("v", "e", "k", "m")
+
+    # Mock Azure response for printer category
+    r.model = _StubModel(_InvokeResp("printers"))
+    assert r.detect_category("Ik zoek een printer") == "printers"
+
+    # Mock Azure response for laptop category
+    r.model = _StubModel(_InvokeResp("laptops"))
+    assert r.detect_category("Ik wil een laptop kopen") == "laptops"
+
+    # Mock Azure response for smartphone category
+    r.model = _StubModel(_InvokeResp("smartphones"))
+    assert r.detect_category("Welke telefoon is goed?") == "smartphones"
+
+    # Mock Azure response for none
+    r.model = _StubModel(_InvokeResp("none"))
+    assert r.detect_category("Hoe is het weer?") is None
+
+    # When model is absent, expect error
+    r.model = None
+    try:
+        r.detect_category("Ik zoek een printer")
+        assert False, "Expected ValueError when model is None"
+    except ValueError as e:
+        assert "Azure model is not available" in str(e)
+
+
+def test_mock_detect_category():
+    from pixie.core.llms.mock_llm_set import MockRelevance
+
+    mock_relevance = MockRelevance()
+
+    # Test printer detection
+    assert mock_relevance.detect_category("Ik zoek een printer") == "printers"
+    assert mock_relevance.detect_category("Welke laserprinter is goed?") == "printers"
+
+    # Test laptop detection
+    assert mock_relevance.detect_category("Ik wil een laptop kopen") == "laptops"
+    assert mock_relevance.detect_category("MacBook voor werk") == "laptops"
+
+    # Test computer detection
+    assert mock_relevance.detect_category("Nieuwe desktop computer") == "computers"
+    assert mock_relevance.detect_category("Gaming PC nodig") == "computers"
+
+    # Test smartphone detection
+    assert mock_relevance.detect_category("Welke telefoon is goed?") == "smartphones"
+    assert mock_relevance.detect_category("iPhone kopen") == "smartphones"
+
+    # Test non-product question
+    assert mock_relevance.detect_category("Hoe is het weer?") is None
+
+
 def test_sql_prefers_azure_response_but_falls_back():
     s = AzureSQLLLM("v", "e", "k", "m")
 

@@ -36,6 +36,49 @@ class MockRelevance:
 
         return any(keyword in text_lower for keyword in product_keywords)
 
+    def detect_category(self, question: str) -> str | None:
+        """Detect the product category using keyword-based approach.
+
+        Returns one of: "printers", "laptops", "computers", "smartphones", or None
+        """
+        text_lower = question.lower()
+
+        # Define keywords for each category
+        category_keywords = {
+            "printers": ["printer", "print", "laser", "inkjet", "drukker", "afdrukken"],
+            "laptops": ["laptop", "notebook", "ultrabook", "macbook", "chromebook"],
+            "computers": [
+                "computer",
+                "pc",
+                "desktop",
+                "tower",
+                "all-in-one",
+                "workstation",
+            ],
+            "smartphones": [
+                "smartphone",
+                "phone",
+                "telefoon",
+                "iphone",
+                "android",
+                "samsung",
+                "huawei",
+                "xiaomi",
+            ],
+        }
+
+        # Check for category-specific keywords
+        for category, keywords in category_keywords.items():
+            if any(keyword in text_lower for keyword in keywords):
+                return category
+
+        # If no specific category found but product-related,
+        # default to printers for backward compatibility
+        if self.is_relevant(question):
+            return "printers"
+
+        return None
+
 
 class MockSQL:
     def generate_sql(self, question: str, attributes: dict | None = None) -> str:
