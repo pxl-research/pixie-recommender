@@ -1,5 +1,5 @@
 {
-  "printer": {
+  "printers": {
     "attributes": [
       {
         "name": "budget",
@@ -19,18 +19,75 @@
         "question": "Welke printtechnologie heeft je voorkeur?",
         "description": "Inkjet vs laser printing technology",
         "options": ["inkjet", "laser"]
+      }
+    ]
+  },
+  "laptops": {
+    "attributes": [
+      {
+        "name": "budget",
+        "type": "range",
+        "question": "Wat is je budget voor een laptop?",
+        "description": "Price range the user is willing to spend"
       },
       {
-        "name": "has_color",
-        "type": "boolean",
-        "question": "Heb je kleurenprinting nodig?",
-        "description": "Whether color printing is required"
+        "name": "brand",
+        "type": "choice",
+        "question": "Heb je een voorkeur voor een bepaald merk?",
+        "description": "Preferred laptop brand"
       },
       {
-        "name": "is_multifunction",
-        "type": "boolean", 
-        "question": "Moet de printer ook kunnen scannen en kopiëren?",
-        "description": "Whether multifunction capabilities are needed"
+        "name": "screen_size",
+        "type": "choice",
+        "question": "Welke schermgrootte heeft je voorkeur?",
+        "description": "Preferred screen size",
+        "options": ["13 inch", "14 inch", "15 inch", "16 inch", "17 inch"]
+      }
+    ]
+  },
+  "computers": {
+    "attributes": [
+      {
+        "name": "budget",
+        "type": "range",
+        "question": "Wat is je budget voor een computer?",
+        "description": "Price range the user is willing to spend"
+      },
+      {
+        "name": "brand",
+        "type": "choice",
+        "question": "Heb je een voorkeur voor een bepaald merk?",
+        "description": "Preferred computer brand"
+      },
+      {
+        "name": "processor",
+        "type": "choice",
+        "question": "Welke processor heeft je voorkeur?",
+        "description": "Preferred processor type",
+        "options": ["Intel Core i3", "Intel Core i5", "Intel Core i7", "Intel Core i9", "AMD Ryzen 3", "AMD Ryzen 5", "AMD Ryzen 7", "AMD Ryzen 9"]
+      }
+    ]
+  },
+  "smartphones": {
+    "attributes": [
+      {
+        "name": "budget",
+        "type": "range",
+        "question": "Wat is je budget voor een smartphone?",
+        "description": "Price range the user is willing to spend"
+      },
+      {
+        "name": "brand",
+        "type": "choice",
+        "question": "Heb je een voorkeur voor een bepaald merk?",
+        "description": "Preferred smartphone brand"
+      },
+      {
+        "name": "screen_size",
+        "type": "choice",
+        "question": "Welke schermgrootte heeft je voorkeur?",
+        "description": "Preferred screen size",
+        "options": ["5 inch", "6 inch", "6.5 inch", "7 inch"]
       }
     ]
   }
