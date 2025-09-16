@@ -53,6 +53,18 @@ def health():
     return {"status": "ok"}
 
 
+@app.get("/metrics")
+def metrics():
+    """Basic metrics endpoint for monitoring."""
+    import time
+
+    return {
+        "timestamp": int(time.time()),
+        "status": "healthy",
+        "version": "0.6.0"
+    }
+
+
 @app.post("/ask")
 def ask(req: dict = Body(...)):
     """Unified endpoint for both new questions and replies to pending questions.
