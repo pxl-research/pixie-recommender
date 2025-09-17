@@ -202,5 +202,45 @@
         "required": false
       }
     ]
+  },
+  "mixer": {
+    "attributes": [
+      {
+        "name": "budget",
+        "question": "Wat is je budget voor de mixer?",
+        "type": "number",
+        "required": true
+      },
+      {
+        "name": "type",
+        "question": "Welk type mixer zoek je (handmixer, staafmixer, planetmixer, blender, of keukenmachine)?",
+        "type": "string",
+        "required": false
+      },
+      {
+        "name": "brand",
+        "question": "Heb je een voorkeur voor een merk zoals KitchenAid, Bosch, Philips, Braun, Kenwood, Smeg of Sage?",
+        "type": "string",
+        "required": false
+      },
+      {
+        "name": "power",
+        "question": "Hoeveel vermogen heeft je voorkeur (200-400W, 400-600W, 600-800W, 800-1000W, of 1000W+)?",
+        "type": "string",
+        "required": false
+      },
+      {
+        "name": "bowl_capacity",
+        "question": "Welke komgrootte heb je nodig (1-2L, 3-4L, 5-6L, of 7L+)?",
+        "type": "string",
+        "required": false
+      },
+      {
+        "name": "attachments",
+        "question": "Welke hulpstukken zijn belangrijk voor je (deeghaak, garde, platte beater, blender attachment, vleesmolen, pasta roller)?",
+        "type": "string",
+        "required": false
+      }
+    ]
   }
 }

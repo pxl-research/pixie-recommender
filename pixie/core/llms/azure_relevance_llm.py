@@ -30,7 +30,7 @@ class AzureRelevanceLLM(AzureOpenAILLM):
             prompt = (
                 "Is the following question related to buying or searching for products? "
                 "The products we support are: laptops, smartphones, headphones, "
-                "monitors, tablets, printers. "
+                "monitors, tablets, printers, mixers. "
                 "Answer with exactly 'yes' or 'no'.\n\n"
                 f"Question: {text}"
             )
@@ -66,6 +66,13 @@ class AzureRelevanceLLM(AzureOpenAILLM):
                 "printer",
                 "drukker",
                 "print",
+                "mixer",
+                "mixers",
+                "keukenmachine",
+                "handmixer",
+                "staafmixer",
+                "planetmixer",
+                "blender",
             ]
             text_lower = text.lower()
             return any(keyword in text_lower for keyword in product_keywords)
@@ -86,7 +93,7 @@ class AzureRelevanceLLM(AzureOpenAILLM):
             prompt = (
                 "Determine the product category from the following question. "
                 "Possible categories are: laptop, smartphone, headphones, "
-                "monitor, tablet, printers. "
+                "monitor, tablet, printers, mixer. "
                 "If the question is not related to any of these categories, return 'none'. "
                 "Answer with exactly one word: laptop, smartphone, headphones, "
                 "monitor, tablet, printers, or none.\n\n"
@@ -173,6 +180,23 @@ class AzureRelevanceLLM(AzureOpenAILLM):
                 "canon",
                 "epson",
                 "samsung",
+            ],
+            "mixer": [
+                "mixer",
+                "mixers", 
+                "keukenmixer",
+                "handmixer",
+                "staafmixer", 
+                "planetmixer",
+                "blender",
+                "keukenmachine",
+                "kitchenaid",
+                "bosch",
+                "philips",
+                "braun",
+                "kenwood",
+                "smeg",
+                "sage",
             ],
         }
 

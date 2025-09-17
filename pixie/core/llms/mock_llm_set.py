@@ -19,6 +19,7 @@ class MockRelevance:
             "speaker",
             "camera",
             "tv",
+            "mixer",
             "koop",
             "prijs",
             "budget",
@@ -37,6 +38,12 @@ class MockRelevance:
             "luidspreker",
             "fotocamera",
             "televisie",
+            "mixers",
+            "keukenmachine",
+            "handmixer",
+            "staafmixer",
+            "planetmixer",
+            "blender",
         ]
         text_lower = text.lower()
 
@@ -57,7 +64,7 @@ class MockRelevance:
         # Define keywords for each category
         category_keywords = {
             "printers": ["printer", "print", "laser", "inkjet", "drukker", "afdrukken"],
-            "laptops": ["laptop", "notebook", "ultrabook", "macbook", "chromebook"],
+            "laptop": ["laptop", "notebook", "ultrabook", "macbook", "chromebook"],
             "computers": [
                 "computer",
                 "pc",
@@ -66,7 +73,7 @@ class MockRelevance:
                 "all-in-one",
                 "workstation",
             ],
-            "smartphones": [
+            "smartphone": [
                 "smartphone",
                 "phone",
                 "telefoon",
@@ -75,6 +82,17 @@ class MockRelevance:
                 "samsung",
                 "huawei",
                 "xiaomi",
+            ],
+            "mixer": [
+                "mixer",
+                "mixers",
+                "keukenmachine",
+                "handmixer",
+                "staafmixer",
+                "planetmixer",
+                "blender",
+                "kitchenaid",
+                "bosch",
             ],
         }
 
