@@ -183,10 +183,10 @@ class AzureRelevanceLLM(AzureOpenAILLM):
             ],
             "mixer": [
                 "mixer",
-                "mixers", 
+                "mixers",
                 "keukenmixer",
                 "handmixer",
-                "staafmixer", 
+                "staafmixer",
                 "planetmixer",
                 "blender",
                 "keukenmachine",

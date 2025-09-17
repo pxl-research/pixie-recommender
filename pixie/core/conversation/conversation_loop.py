@@ -170,6 +170,8 @@ class ConversationLoopManager:
             # Fallback to old hardcoded logic for backward compatibility
             current_stage = context.get("stage")
             collected = set(context.get("collected_attributes", []))
+            skipped = set(context.get("skipped_attributes", []))
+            processed = collected.union(skipped)
 
             # For printers, use the full sequence
             if category == "printers":
@@ -181,14 +183,14 @@ class ConversationLoopManager:
                     "pages_per_minute",
                 ]
                 for attr in attr_sequence:
-                    if attr not in collected:
+                    if attr not in processed:
                         return f"ask_{attr}"
                 return None
 
             # Default fallback logic
-            if current_stage == "ask_budget" and "budget" not in collected:
+            if current_stage == "ask_budget" and "budget" not in processed:
                 return "ask_brand"
-            elif current_stage == "ask_brand" and "brand" not in collected:
+            elif current_stage == "ask_brand" and "brand" not in processed:
                 return "ask_tech"
             else:
                 return None
@@ -202,22 +204,25 @@ class ConversationLoopManager:
         ctx = pending_entry.conversation_context or {}
         stage = ctx.get("stage")
 
-        # Initialize collected_attributes if not exists
+        # Initialize collected_attributes and skipped_attributes if not exist
         if "collected_attributes" not in ctx:
             ctx["collected_attributes"] = []
+        if "skipped_attributes" not in ctx:
+            ctx["skipped_attributes"] = []
 
         # Extract attribute name from stage (e.g., "ask_budget" -> "budget")
         if stage and stage.startswith("ask_"):
             attribute_name = stage[4:]  # Remove "ask_" prefix
 
-            # Handle "Weet ik niet" responses specially - don't collect the attribute
+            # Handle "Weet ik niet" responses specially - mark as skipped
             if reply.lower().strip() in [
                 "weet ik niet",
                 "geen idee",
                 "whatever",
                 "maakt niet uit",
             ]:
-                # Don't add to collected_attributes, just increment iterations
+                # Mark as skipped and increment iterations
+                ctx["skipped_attributes"].append(attribute_name)
                 ctx["iterations"] = ctx.get("iterations", 0) + 1
             else:
                 # Normal response - collect the attribute

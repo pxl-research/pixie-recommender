@@ -24,39 +24,42 @@ def get_db_connection():
         port="5432",
         database="pixie_dev",
         user="pixie_user",
-        password="pixie_password"
+        password="pixie_password",
     )
 
 
 def add_mixers_data():
     """Add mixers product type, attributes, and sample products."""
-    
+
     conn = get_db_connection()
     cur = conn.cursor(cursor_factory=RealDictCursor)
-    
+
     try:
         # 1. Create mixer product type
         mixer_type_id = str(uuid4())
         now = datetime.now()
-        
+
         print("Creating mixer product type...")
-        cur.execute("""
+        cur.execute(
+            """
             INSERT INTO product_types 
             (id, name, display_name, description, is_active, created_at, updated_at)
             VALUES (%s, %s, %s, %s, %s, %s, %s)
-        """, (
-            mixer_type_id,
-            "mixer",
-            "Mixer",
-            "Kitchen mixers for food preparation",
-            True,
-            now,
-            now
-        ))
-        
+        """,
+            (
+                mixer_type_id,
+                "mixer",
+                "Mixer",
+                "Kitchen mixers for food preparation",
+                True,
+                now,
+                now,
+            ),
+        )
+
         # 2. Create attribute definitions for mixers
         print("Creating mixer attribute definitions...")
-        
+
         attributes = [
             {
                 "name": "budget",
@@ -66,13 +69,10 @@ def add_mixers_data():
                 "is_required": False,
                 "is_searchable": True,
                 "is_filterable": True,
-                "options": json.dumps({
-                    "min": 50,
-                    "max": 2000,
-                    "step": 10,
-                    "unit": "€"
-                }),
-                "display_order": 1
+                "options": json.dumps(
+                    {"min": 50, "max": 2000, "step": 10, "unit": "€"}
+                ),
+                "display_order": 1,
             },
             {
                 "name": "type",
@@ -82,14 +82,16 @@ def add_mixers_data():
                 "is_required": False,
                 "is_searchable": True,
                 "is_filterable": True,
-                "options": json.dumps([
-                    "Handmixer",
-                    "Staafmixer",
-                    "Planetmixer",
-                    "Blender",
-                    "Keukenmachine"
-                ]),
-                "display_order": 2
+                "options": json.dumps(
+                    [
+                        "Handmixer",
+                        "Staafmixer",
+                        "Planetmixer",
+                        "Blender",
+                        "Keukenmachine",
+                    ]
+                ),
+                "display_order": 2,
             },
             {
                 "name": "power",
@@ -99,14 +101,10 @@ def add_mixers_data():
                 "is_required": False,
                 "is_searchable": True,
                 "is_filterable": True,
-                "options": json.dumps([
-                    "200-400W",
-                    "400-600W",
-                    "600-800W",
-                    "800-1000W",
-                    "1000W+"
-                ]),
-                "display_order": 3
+                "options": json.dumps(
+                    ["200-400W", "400-600W", "600-800W", "800-1000W", "1000W+"]
+                ),
+                "display_order": 3,
             },
             {
                 "name": "brand",
@@ -116,16 +114,18 @@ def add_mixers_data():
                 "is_required": False,
                 "is_searchable": True,
                 "is_filterable": True,
-                "options": json.dumps([
-                    "KitchenAid",
-                    "Bosch",
-                    "Philips",
-                    "Braun",
-                    "Kenwood",
-                    "Smeg",
-                    "Sage"
-                ]),
-                "display_order": 4
+                "options": json.dumps(
+                    [
+                        "KitchenAid",
+                        "Bosch",
+                        "Philips",
+                        "Braun",
+                        "Kenwood",
+                        "Smeg",
+                        "Sage",
+                    ]
+                ),
+                "display_order": 4,
             },
             {
                 "name": "bowl_capacity",
@@ -135,13 +135,8 @@ def add_mixers_data():
                 "is_required": False,
                 "is_searchable": True,
                 "is_filterable": True,
-                "options": json.dumps([
-                    "1-2L",
-                    "3-4L",
-                    "5-6L",
-                    "7L+"
-                ]),
-                "display_order": 5
+                "options": json.dumps(["1-2L", "3-4L", "5-6L", "7L+"]),
+                "display_order": 5,
             },
             {
                 "name": "attachments",
@@ -151,49 +146,58 @@ def add_mixers_data():
                 "is_required": False,
                 "is_searchable": True,
                 "is_filterable": True,
-                "options": json.dumps([
-                    "Deeghaak",
-                    "Garde",
-                    "Platte beater",
-                    "Blender attachment",
-                    "Vleesmolen",
-                    "Pasta roller"
-                ]),
-                "display_order": 6
-            }
+                "options": json.dumps(
+                    [
+                        "Deeghaak",
+                        "Garde",
+                        "Platte beater",
+                        "Blender attachment",
+                        "Vleesmolen",
+                        "Pasta roller",
+                    ]
+                ),
+                "display_order": 6,
+            },
         ]
-        
+
         attribute_ids = {}
         for attr in attributes:
             attr_id = str(uuid4())
             attribute_ids[attr["name"]] = attr_id
-            
-            cur.execute("""
+
+            cur.execute(
+                """
                 INSERT INTO attribute_definitions 
                 (id, product_type_id, name, display_name, description, data_type, 
                  is_required, is_searchable, is_filterable, options, validation_rules, 
                  display_order, created_at, updated_at)
                 VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
-            """, (
-                attr_id,
-                mixer_type_id,
-                attr["name"],
-                attr["display_name"],
-                attr["description"],
-                attr["data_type"],
-                attr["is_required"],
-                attr["is_searchable"],
-                attr["is_filterable"],
-                json.dumps(attr["options"]) if isinstance(attr["options"], (list, dict)) else attr["options"],
-                None,  # validation_rules
-                attr["display_order"],
-                now,
-                now
-            ))
-        
+            """,
+                (
+                    attr_id,
+                    mixer_type_id,
+                    attr["name"],
+                    attr["display_name"],
+                    attr["description"],
+                    attr["data_type"],
+                    attr["is_required"],
+                    attr["is_searchable"],
+                    attr["is_filterable"],
+                    (
+                        json.dumps(attr["options"])
+                        if isinstance(attr["options"], (list, dict))
+                        else attr["options"]
+                    ),
+                    None,  # validation_rules
+                    attr["display_order"],
+                    now,
+                    now,
+                ),
+            )
+
         # 3. Create sample mixer products
         print("Creating sample mixer products...")
-        
+
         mixers = [
             {
                 "external_id": "MIX001",
@@ -209,8 +213,8 @@ def add_mixers_data():
                     "power": "600-800W",
                     "brand": "KitchenAid",
                     "bowl_capacity": "5-6L",
-                    "attachments": "Deeghaak"
-                }
+                    "attachments": "Deeghaak",
+                },
             },
             {
                 "external_id": "MIX002",
@@ -226,8 +230,8 @@ def add_mixers_data():
                     "power": "1000W+",
                     "brand": "Bosch",
                     "bowl_capacity": "3-4L",
-                    "attachments": "Deeghaak"
-                }
+                    "attachments": "Deeghaak",
+                },
             },
             {
                 "external_id": "MIX003",
@@ -243,8 +247,8 @@ def add_mixers_data():
                     "power": "400-600W",
                     "brand": "Philips",
                     "bowl_capacity": "1-2L",
-                    "attachments": "Garde"
-                }
+                    "attachments": "Garde",
+                },
             },
             {
                 "external_id": "MIX004",
@@ -260,8 +264,8 @@ def add_mixers_data():
                     "power": "600-800W",
                     "brand": "Braun",
                     "bowl_capacity": "1-2L",
-                    "attachments": "Blender attachment"
-                }
+                    "attachments": "Blender attachment",
+                },
             },
             {
                 "external_id": "MIX005",
@@ -277,8 +281,8 @@ def add_mixers_data():
                     "power": "1000W+",
                     "brand": "Kenwood",
                     "bowl_capacity": "7L+",
-                    "attachments": "Deeghaak"
-                }
+                    "attachments": "Deeghaak",
+                },
             },
             {
                 "external_id": "MIX006",
@@ -294,8 +298,8 @@ def add_mixers_data():
                     "power": "600-800W",
                     "brand": "Smeg",
                     "bowl_capacity": "5-6L",
-                    "attachments": "Garde"
-                }
+                    "attachments": "Garde",
+                },
             },
             {
                 "external_id": "MIX007",
@@ -311,8 +315,8 @@ def add_mixers_data():
                     "power": "1000W+",
                     "brand": "Sage",
                     "bowl_capacity": "5-6L",
-                    "attachments": "Platte beater"
-                }
+                    "attachments": "Platte beater",
+                },
             },
             {
                 "external_id": "MIX008",
@@ -328,79 +332,93 @@ def add_mixers_data():
                     "power": "400-600W",
                     "brand": "Philips",
                     "bowl_capacity": "1-2L",
-                    "attachments": "Blender attachment"
-                }
-            }
+                    "attachments": "Blender attachment",
+                },
+            },
         ]
-        
+
         for mixer in mixers:
             product_id = str(uuid4())
-            
+
             # Insert product
-            cur.execute("""
+            cur.execute(
+                """
                 INSERT INTO products 
                 (id, product_type_id, external_id, name, description, brand, model, 
                  price_cents, currency, image_url, product_url, availability_status, 
                  stock_level, is_active, created_at, updated_at)
                 VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
-            """, (
-                product_id,
-                mixer_type_id,
-                mixer["external_id"],
-                mixer["name"],
-                mixer["description"],
-                mixer["brand"],
-                mixer["model"],
-                mixer["price_cents"],
-                "EUR",
-                mixer["image_url"],
-                mixer["product_url"],
-                "in_stock",
-                10,  # stock_level
-                True,
-                now,
-                now
-            ))
-            
+            """,
+                (
+                    product_id,
+                    mixer_type_id,
+                    mixer["external_id"],
+                    mixer["name"],
+                    mixer["description"],
+                    mixer["brand"],
+                    mixer["model"],
+                    mixer["price_cents"],
+                    "EUR",
+                    mixer["image_url"],
+                    mixer["product_url"],
+                    "in_stock",
+                    10,  # stock_level
+                    True,
+                    now,
+                    now,
+                ),
+            )
+
             # Insert attribute values
             for attr_name, attr_value in mixer["attributes"].items():
                 if attr_name in attribute_ids:
                     attr_value_id = str(uuid4())
-                    
-                    cur.execute("""
+
+                    cur.execute(
+                        """
                         INSERT INTO product_attribute_values 
                         (id, product_id, attribute_definition_id, string_value, created_at, updated_at)
                         VALUES (%s, %s, %s, %s, %s, %s)
-                    """, (
-                        attr_value_id,
-                        product_id,
-                        attribute_ids[attr_name],
-                        attr_value,
-                        now,
-                        now
-                    ))
-        
+                    """,
+                        (
+                            attr_value_id,
+                            product_id,
+                            attribute_ids[attr_name],
+                            attr_value,
+                            now,
+                            now,
+                        ),
+                    )
+
         # Commit all changes
         conn.commit()
         print("✅ Successfully added mixers data to the database!")
-        
+
         # Show summary
-        cur.execute("SELECT COUNT(*) FROM products WHERE product_type_id = %s", (mixer_type_id,))
+        cur.execute(
+            "SELECT COUNT(*) FROM products WHERE product_type_id = %s", (mixer_type_id,)
+        )
         product_count = cur.fetchone()[0]
         print(f"Added {product_count} mixer products")
-        
-        cur.execute("SELECT COUNT(*) FROM attribute_definitions WHERE product_type_id = %s", (mixer_type_id,))
+
+        cur.execute(
+            "SELECT COUNT(*) FROM attribute_definitions WHERE product_type_id = %s",
+            (mixer_type_id,),
+        )
         attr_count = cur.fetchone()[0]
         print(f"Added {attr_count} attribute definitions")
-        
-        cur.execute("""
+
+        cur.execute(
+            """
             SELECT COUNT(*) FROM product_attribute_values pav
             JOIN products p ON pav.product_id = p.id
             WHERE p.product_type_id = %s
-        """, (mixer_type_id,))
+        """,
+            (mixer_type_id,),
+        )
         value_count = cur.fetchone()[0]
         print(f"Added {value_count} attribute values")
-        
+
     except Exception as e:
         print(f"❌ Error adding mixers data: {e}")
         conn.rollback()
@@ -413,38 +431,47 @@ def add_mixers_data():
 def test_flexible_repository():
     """Test the flexible repository with mixers data."""
     print("\n🧪 Testing flexible repository with mixers...")
-    
+
     try:
         # Import the flexible repository classes
         from pixie.core.database.repositories.flexible_repositories import (
             get_dynamic_repository,
-            discover_product_tables
+            discover_product_tables,
         )
         from pixie.core.database.connection import get_db_session
-        
+
         with get_db_session() as session:
             # Test table discovery
             tables = discover_product_tables(session)
             print(f"Discovered tables: {tables}")
-            
+
             # Test products table access
             products_repo = get_dynamic_repository(session, "products")
-            
+
             # Get all mixers
             all_products = products_repo.get_all(limit=20)
-            mixer_products = [p for p in all_products if "mixer" in p.get("name", "").lower() or "blender" in p.get("name", "").lower()]
+            mixer_products = [
+                p
+                for p in all_products
+                if "mixer" in p.get("name", "").lower()
+                or "blender" in p.get("name", "").lower()
+            ]
             print(f"Found {len(mixer_products)} mixer products")
-            
+
             # Test search functionality
-            search_results = products_repo.search_text("KitchenAid", ["name", "brand"], limit=5)
+            search_results = products_repo.search_text(
+                "KitchenAid", ["name", "brand"], limit=5
+            )
             print(f"Search for 'KitchenAid': {len(search_results)} results")
-            
+
             # Test attribute filtering
-            brand_filter = products_repo.filter_by_attributes({"brand": "Philips"}, limit=5)
+            brand_filter = products_repo.filter_by_attributes(
+                {"brand": "Philips"}, limit=5
+            )
             print(f"Filter by brand 'Philips': {len(brand_filter)} results")
-            
+
             print("✅ Flexible repository tests passed!")
-            
+
     except Exception as e:
         print(f"❌ Error testing flexible repository: {e}")
         raise
@@ -454,4 +481,6 @@ if __name__ == "__main__":
     print("🔧 Adding mixers data to test flexible repository system...")
     add_mixers_data()
     test_flexible_repository()
-    print("\n🎉 Mixers data added successfully! You can now ask questions about mixers.")
+    print(
+        "\n🎉 Mixers data added successfully! You can now ask questions about mixers."
+    )

@@ -10,41 +10,8 @@
       "step": 1,
       "status": 200,
       "resp": {
-        "type": "ask_user",
-        "text": null,
-        "prompt": "Wat is je budget?",
-        "pending_id": "pending-47daa4bb",
-        "reason": null
-      }
-    },
-    {
-      "step": 2,
-      "status": 200,
-      "resp": {
-        "type": "ask_user",
-        "text": null,
-        "prompt": "Heb je een voorkeur voor een merk?",
-        "pending_id": "pending-47daa4bb",
-        "reason": null
-      }
-    },
-    {
-      "step": 3,
-      "status": 200,
-      "resp": {
-        "type": "ask_user",
-        "text": null,
-        "prompt": "Welke technologie heeft je voorkeur (inkjet/laser)?",
-        "pending_id": "pending-47daa4bb",
-        "reason": null
-      }
-    },
-    {
-      "step": 4,
-      "status": 200,
-      "resp": {
         "type": "answer",
-        "text": "[{'id': 1, 'name': 'Brother HL-L2350DW', 'price': 129.99}, {'id': 10, 'name': 'Brother DCP-L2550DW', 'price': 159.99}, {'id': 17, 'name': 'Brother HL-L2305W', 'price': 109.99}]",
+        "text": "[{'id': 'e54753e0-3163-46cd-b26d-710ffac0b49e', 'external_id': 'DELL-XPS-13-1', 'name': 'Dell XPS 13', 'description': 'Ultra-portable laptop with stunning display', 'brand': 'Dell', 'model': 'XPS 13', 'price': 1299.0, 'product_type': None, 'created_at': datetime.datetime(2025, 9, 16, 13, 29, 30, 41194)}, {'id': '2d29dbbe-fc07-4c5c-9ccd-0af92419a5b5', 'external_id': 'MAC-MACBOOK-AIR-1', 'name': 'MacBook Air M2', 'description': \"Apple's thinnest laptop with M2 chip\", 'brand': 'Apple', 'model': 'MacBook Air', 'price': 1199.0, 'product_type': None, 'created_at': datetime.datetime(2025, 9, 16, 13, 29, 30, 74185)}, {'id': '4c105de6-8580-4f12-b2f0-1aac1dfac320', 'external_id': 'IPHONE-14-PRO-1', 'name': 'iPhone 14 Pro', 'description': 'Latest iPhone with Dynamic Island', 'brand': 'Apple', 'model': 'iPhone 14 Pro', 'price': 1299.0, 'product_type': None, 'created_at': datetime.datetime(2025, 9, 16, 13, 29, 30, 102163)}, {'id': '94844bb5-f801-48a7-81a3-7fa27e594196', 'external_id': 'SAMSUNG-S23-ULTRA-1', 'name': 'Samsung Galaxy S23 Ultra', 'description': 'Android flagship with S Pen', 'brand': 'Samsung', 'model': 'Galaxy S23 Ultra', 'price': 1199.0, 'product_type': None, 'created_at': datetime.datetime(2025, 9, 16, 13, 29, 30, 124722)}, {'id': '2eb31654-8f52-4690-a982-4429d36d08c1', 'external_id': 'SONY-WH-1000XM5-1', 'name': 'Sony WH-1000XM5', 'description': 'Industry-leading noise cancelling headphones', 'brand': 'Sony', 'model': 'WH-1000XM5', 'price': 349.0, 'product_type': None, 'created_at': datetime.datetime(2025, 9, 16, 13, 29, 30, 148134)}, {'id': '7cce56ca-7f10-4b9c-9a02-0ae0153dd296', 'external_id': 'LG-27UK650-W-1', 'name': 'LG 27UK650-W', 'description': '27-inch 4K UHD IPS monitor', 'brand': 'LG', 'model': '27UK650-W', 'price': 349.0, 'product_type': None, 'created_at': datetime.datetime(2025, 9, 16, 13, 29, 30, 173727)}, {'id': '57ca371f-3496-4b23-acf8-01c34fd7af25', 'external_id': 'IPAD-AIR-1', 'name': 'iPad Air', 'description': \"Apple's versatile tablet\", 'brand': 'Apple', 'model': 'iPad Air', 'price': 599.0, 'product_type': None, 'created_at': datetime.datetime(2025, 9, 16, 13, 29, 35, 208032)}, {'id': '861dd097-859b-4fee-bd8d-ab21cb1474e2', 'external_id': 'BROTHER-HL-L2350DW-1', 'name': 'Brother HL-L2350DW', 'description': 'Compact monochrome laser printer', 'brand': 'Brother', 'model': 'HL-L2350DW', 'price': 120.0, 'product_type': None, 'created_at': datetime.datetime(2025, 9, 16, 14, 43, 13, 5924)}, {'id': 'b3bf086b-918d-4b25-a6c7-b4837f5b2f13', 'external_id': 'HP-LASERJET-PRO-M182NW-1', 'name': 'HP LaserJet Pro M182nw', 'description': 'Wireless monochrome laser printer', 'brand': 'HP', 'model': 'LaserJet Pro M182nw', 'price': 150.0, 'product_type': None, 'created_at': datetime.datetime(2025, 9, 16, 14, 43, 13, 5924)}, {'id': 'dcc0f583-ff49-43b2-adae-4a61eafa57ce', 'external_id': 'EPSON-ECOTANK-ET-2720-1', 'name': 'Epson EcoTank ET-2720', 'description': 'Supertank color inkjet printer', 'brand': 'Epson', 'model': 'EcoTank ET-2720', 'price': 250.0, 'product_type': None, 'created_at': datetime.datetime(2025, 9, 16, 14, 43, 13, 5924)}, {'id': '2203639f-0a0f-4ca7-ac6e-9b7728010069', 'external_id': 'MIX001', 'name': 'KitchenAid Artisan Stand Mixer', 'description': 'Iconische planetmixer met 4,8L roestvrijstalen kom', 'brand': 'KitchenAid', 'model': '5KSM175PS', 'price': 599.99, 'product_type': None, 'created_at': datetime.datetime(2025, 9, 17, 8, 57, 22, 99387)}, {'id': '68dfeab2-44b6-4cb2-84c1-34fd42c65f24', 'external_id': 'MIX002', 'name': 'Bosch MUM5 CreationLine', 'description': 'Veelzijdige keukenmachine met planetair mengwerk', 'brand': 'Bosch', 'model': 'MUM58L20', 'price': 349.99, 'product_type': None, 'created_at': datetime.datetime(2025, 9, 17, 8, 57, 22, 99387)}, {'id': '91b14e44-71b6-4ebd-84d5-2b21ac84d050', 'external_id': 'MIX003', 'name': 'Philips Viva Collection Handmixer', 'description': 'Lichtgewicht handmixer met 5 snelheden', 'brand': 'Philips', 'model': 'HR3741/00', 'price': 49.99, 'product_type': None, 'created_at': datetime.datetime(2025, 9, 17, 8, 57, 22, 99387)}, {'id': '1208584b-a9c4-4700-872d-9d71e4fc53d4', 'external_id': 'MIX004', 'name': 'Braun MultiQuick 7 Staafmixer', 'description': 'Krachtige staafmixer met SmartSpeed technologie', 'brand': 'Braun', 'model': 'MQ7087X', 'price': 129.99, 'product_type': None, 'created_at': datetime.datetime(2025, 9, 17, 8, 57, 22, 99387)}, {'id': '05d1c15a-bde4-4f4b-88c8-977470bd0814', 'external_id': 'MIX005', 'name': 'Kenwood Chef Titanium', 'description': 'Professionele keukenmachine met titanium beslag-unit', 'brand': 'Kenwood', 'model': 'KVC7300S', 'price': 899.99, 'product_type': None, 'created_at': datetime.datetime(2025, 9, 17, 8, 57, 22, 99387)}, {'id': 'ab705cb9-ca3b-4959-8973-60a2f016064f', 'external_id': 'MIX006', 'name': 'Smeg Stand Mixer Pastel Green', 'description': 'Retro design planetmixer met 4,8L kom', 'brand': 'Smeg', 'model': 'SMF03PGEU', 'price': 749.99, 'product_type': None, 'created_at': datetime.datetime(2025, 9, 17, 8, 57, 22, 99387)}, {'id': 'c8eb9f05-0409-4df6-ba0b-2686f5a5f912', 'external_id': 'MIX007', 'name': 'Sage The Scraper Mixer Pro', 'description': 'Intelligente planetmixer met scraper beater', 'brand': 'Sage', 'model': 'BEM800BSS', 'price': 1199.99, 'product_type': None, 'created_at': datetime.datetime(2025, 9, 17, 8, 57, 22, 99387)}, {'id': 'd313b9b1-c1e1-4415-9476-b3c05ea3951c', 'external_id': 'MIX008', 'name': 'Philips Daily Collection Blender', 'description': 'Compacte blender voor smoothies en shakes', 'brand': 'Philips', 'model': 'HR2105/00', 'price': 79.99, 'product_type': None, 'created_at': datetime.datetime(2025, 9, 17, 8, 57, 22, 99387)}]",
         "prompt": null,
         "pending_id": null,
         "reason": null

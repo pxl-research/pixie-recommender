@@ -39,6 +39,14 @@ class SearchEngine:
             f"attributes={attributes}, category='{category}'"
         )
 
+        # If we have a meaningful SQL query, execute it
+        if sql and sql.strip() and sql.strip().lower() != "select":
+            try:
+                return self._execute_sql_query(sql)
+            except Exception as e:
+                logger.warning(f"Failed to execute SQL query: {e}")
+                # Fall back to attribute-based search
+
         # If attributes is None or empty, return default results
         if attributes is None or (
             isinstance(attributes, dict) and len(attributes) == 0
@@ -47,6 +55,90 @@ class SearchEngine:
 
         # Use attributes to filter results
         return self._filter_results_by_attributes(attributes, category)
+
+    def _execute_sql_query(self, sql: str) -> list:
+        """Execute a SQL query and return results."""
+        logger.info(f"Executing SQL query: {sql}")
+
+        with get_db_session() as session:
+            try:
+                # Attempt to detect naive queries like "SELECT * FROM mixer;"
+                # and rewrite them into a dynamic, safe query against the
+                # normalized `products` table if the referenced name is a
+                # product type in the database. This avoids errors when
+                # the LLM generates SQL that references category-named tables.
+                import re
+
+                # find first FROM <identifier>
+                m = re.search(r"from\s+([a-zA-Z_][\w]*)", sql, re.IGNORECASE)
+                if m:
+                    referenced = m.group(1).lower()
+
+                    try:
+                        # get discovered tables via TableDiscovery API
+                        discovery = get_table_discovery(session)
+                        if hasattr(discovery, "get_all_tables"):
+                            discovered_iter = discovery.get_all_tables()
+                        elif hasattr(discovery, "get_product_tables"):
+                            discovered_iter = discovery.get_product_tables()
+                        elif isinstance(discovery, (list, tuple, set)):
+                            discovered_iter = discovery
+                        else:
+                            discovered_iter = []
+
+                        discovered_names = set(str(t).lower() for t in discovered_iter)
+                    except Exception:
+                        discovered_names = set()
+
+                    # if the referenced name is not a real table but is a
+                    # product_type name, rewrite the query to select from
+                    # products joined with product_types
+                    if referenced not in discovered_names:
+                        try:
+                            type_repo = get_dynamic_repository(session, "product_types")
+                            product_types = type_repo.filter_by_attributes(
+                                {"name": referenced}
+                            )
+                            if product_types:
+                                logger.info(
+                                    "Rewriting SQL: referenced table '%s' is a product_type; "
+                                    "using products join instead",
+                                    referenced,
+                                )
+                                # safe rewrite
+                                sql = (
+                                    "SELECT p.* FROM products p "
+                                    "JOIN product_types pt ON p.product_type_id = pt.id "
+                                    f"WHERE pt.name = '{referenced}'"
+                                )
+                        except Exception:
+                            # ignore and fall back to executing original SQL
+                            pass
+                from sqlalchemy import text
+
+                result = session.execute(text(sql))
+                rows = result.fetchall()
+
+                # Convert rows to dictionaries
+                if rows:
+                    # Get column names from the result
+                    columns = result.keys()
+                    results = []
+                    for row in rows:
+                        row_dict = {}
+                        for i, col_name in enumerate(columns):
+                            row_dict[col_name] = row[i]
+                        results.append(self._map_product(row_dict))
+
+                    logger.info(f"SQL query returned {len(results)} results")
+                    return results
+                else:
+                    logger.info("SQL query returned no results")
+                    return []
+
+            except Exception as e:
+                logger.error(f"Error executing SQL query: {e}")
+                raise
 
     def _get_default_results(self, category: Optional[str]) -> list:
         """Get default results when no attributes are provided."""
@@ -244,47 +336,73 @@ class SearchEngine:
     ) -> set:
         """Apply budget filtering directly on products table."""
         try:
-            # Parse budget value - expect format like "minder dan 50€"
-            if "minder dan" in budget_value.lower():
-                # Extract the amount
-                parts = budget_value.lower().split("minder dan")
+            logger.info(f"Parsing budget value: {budget_value}")
+
+            # Parse budget value - handle multiple formats
+            budget_lower = budget_value.lower().strip()
+            max_price_euros = None
+
+            # Format: "minder dan 50€"
+            if "minder dan" in budget_lower:
+                parts = budget_lower.split("minder dan")
                 if len(parts) > 1:
                     amount_str = parts[1].strip().replace("€", "").replace(" ", "")
                     try:
                         max_price_euros = float(amount_str)
-                        max_price_cents = int(max_price_euros * 100)
-
-                        # Use raw SQL to filter by price with less than operator
-                        from sqlalchemy import text
-
-                        # Build query to get products with price <= max_price_cents
-                        query = """
-                            SELECT id FROM products
-                            WHERE price_cents <= :max_price
-                        """
-                        if current_product_ids:
-                            # Only include products that are already in our filtered set
-                            ids_list = list(current_product_ids)
-                            placeholders = ", ".join(
-                                [f":id_{i}" for i in range(len(ids_list))]
-                            )
-                            query += f" AND id IN ({placeholders})"
-
-                            # Add ID parameters
-                            params = {"max_price": max_price_cents}
-                            for i, product_id in enumerate(ids_list):
-                                params[f"id_{i}"] = product_id
-                        else:
-                            params = {"max_price": max_price_cents}
-
-                        result = session.execute(text(query), params)
-                        price_matching_ids = {row[0] for row in result.fetchall()}
-
-                        return price_matching_ids
-
                     except ValueError:
-                        logger.warning(f"Could not parse budget amount: {amount_str}")
-                        return current_product_ids
+                        pass
+
+            # Format: "500 euro", "€500", "500€"
+            elif any(currency in budget_lower for currency in ["euro", "€"]):
+                import re
+
+                # Extract numbers from the string
+                numbers = re.findall(r"\d+(?:\.\d+)?", budget_lower)
+                if numbers:
+                    try:
+                        max_price_euros = float(numbers[0])
+                    except ValueError:
+                        pass
+
+            # Format: just a number "500"
+            else:
+                try:
+                    max_price_euros = float(budget_lower)
+                except ValueError:
+                    pass
+
+            if max_price_euros is not None:
+                logger.info(f"Parsed budget as: €{max_price_euros}")
+
+                # Use raw SQL to filter by price with less than operator
+                from sqlalchemy import text
+
+                # Build query to get products with price <= max_price_cents
+                query = """
+                    SELECT id FROM products
+                    WHERE price_cents <= :max_price_cents
+                """
+                if current_product_ids:
+                    # Only include products that are already in our filtered set
+                    ids_list = list(current_product_ids)
+                    placeholders = ", ".join([f":id_{i}" for i in range(len(ids_list))])
+                    query += f" AND id IN ({placeholders})"
+
+                    # Add ID parameters
+                    params = {"max_price_cents": int(max_price_euros * 100)}
+                    for i, product_id in enumerate(ids_list):
+                        params[f"id_{i}"] = product_id
+                else:
+                    params = {"max_price_cents": int(max_price_euros * 100)}
+
+                result = session.execute(text(query), params)
+                price_matching_ids = {row[0] for row in result.fetchall()}
+
+                logger.info(f"Budget filter matched {len(price_matching_ids)} products")
+                return price_matching_ids
+            else:
+                logger.warning(f"Could not parse budget amount from: {budget_value}")
+                return current_product_ids
 
             logger.warning(f"Unsupported budget format: {budget_value}")
             return current_product_ids

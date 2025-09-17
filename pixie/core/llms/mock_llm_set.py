@@ -137,6 +137,15 @@ class MockRefinement:
                 "color",
                 "pages_per_minute",
             ]
+        elif category == "mixer":
+            attr_sequence = [
+                "budget",
+                "type",
+                "brand",
+                "power",
+                "bowl_capacity",
+                "attachments",
+            ]
         else:
             # Default sequence for other categories
             attr_sequence = ["budget", "brand"]
@@ -144,11 +153,13 @@ class MockRefinement:
         # Find next uncollected attribute
         for attr in attr_sequence:
             if attr not in collected:
-                return self._get_mock_question_for_attribute(attr)
+                return self._get_mock_question_for_attribute(attr, category)
 
         return None  # All attributes collected
 
-    def _get_mock_question_for_attribute(self, attr_name: str) -> str:
+    def _get_mock_question_for_attribute(
+        self, attr_name: str, category: str = "printers"
+    ) -> str:
         """Get mock question for an attribute."""
         questions = {
             "budget": "Wat is je budget?",
@@ -165,7 +176,38 @@ class MockRefinement:
             "battery_life": "Hoe belangrijk is de batterijduur?",
             "usage_type": "Waar ga je het apparaat voor gebruiken?",
             "operating_system": "Welk besturingssysteem heeft je voorkeur?",
+            # Mixer-specific questions
+            "type": (
+                "Welk type mixer heb je in gedachten? Handmixer, staafmixer, "
+                "planetmixer, blender of keukenmachine?"
+            ),
+            "power": (
+                "Hoeveel vermogen heeft je voorkeur "
+                "(200-400W, 400-600W, 600-800W, 800-1000W, of 1000W+)?"
+            ),
+            "bowl_capacity": "Welke komgrootte heb je nodig (1-2L, 3-4L, 5-6L, of 7L+)?",
+            "attachments": (
+                "Welke hulpstukken zijn belangrijk voor je "
+                "(deeghaak, garde, platte beater, blender attachment, "
+                "vleesmolen, pasta roller)?"
+            ),
         }
+
+        # For brand questions, make them category-specific
+        if attr_name == "brand":
+            if category == "mixer":
+                return (
+                    "Heb je een voorkeur voor een merk, zoals KitchenAid, Bosch, "
+                    "Philips, Braun, Kenwood, Smeg of Sage?"
+                )
+            elif category == "printers":
+                return (
+                    "Heb je een voorkeur voor een merk zoals HP, Brother, "
+                    "Canon, Epson of Samsung?"
+                )
+            else:
+                return "Heb je een voorkeur voor een merk?"
+
         return questions.get(attr_name, f"Wat zijn je voorkeuren voor {attr_name}?")
 
 
