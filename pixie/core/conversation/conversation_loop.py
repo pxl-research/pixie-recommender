@@ -44,6 +44,22 @@ class ConversationLoopManager:
             self.refinement_model,
         ) = llm_set
         self.search_fn = search_fn
+        # Wrap search_fn to add simple call-count logging for debugging
+        self._search_calls = 0
+        original_search_fn = self.search_fn
+
+        def _wrapped_search(sql_query, attrs=None):
+            self._search_calls += 1
+            try:
+                snippet = (sql_query or "")[:200]
+            except Exception:
+                snippet = "<non-string-sql>"
+            print(
+                f"[debug] search_fn call #{self._search_calls} | sql_snippet: {snippet}"
+            )
+            return original_search_fn(sql_query, attrs)
+
+        self.search_fn = _wrapped_search
         self.pending_store = pending_store or InMemoryPendingStore()
         self.max_iterations = max_iterations
         self.search_engine = search_engine or create_search_engine()
@@ -203,6 +219,10 @@ class ConversationLoopManager:
 
         ctx = pending_entry.conversation_context or {}
         stage = ctx.get("stage")
+        print("[debug] handle_reply start | stage=", stage)
+        print("[debug] collected=", ctx.get("collected_attributes"))
+        print("[debug] skipped=", ctx.get("skipped_attributes"))
+        print("[debug] iterations=", ctx.get("iterations"))
 
         # Initialize collected_attributes and skipped_attributes if not exist
         if "collected_attributes" not in ctx:
@@ -229,6 +249,15 @@ class ConversationLoopManager:
                 ctx[attribute_name] = reply
                 ctx["collected_attributes"].append(attribute_name)
                 ctx["iterations"] = ctx.get("iterations", 0) + 1
+
+            logger.debug(
+                "attribute handled",
+                extra={
+                    "attribute": attribute_name,
+                    "collected": ctx.get("collected_attributes"),
+                    "skipped": ctx.get("skipped_attributes"),
+                },
+            )
 
             # Check if we've reached max iterations
             if ctx["iterations"] >= self.max_iterations:
@@ -277,11 +306,25 @@ class ConversationLoopManager:
                         exc_info=e,
                     )
                     return AskResponse(type="error", reason="llm_failure")
+                logger.info(
+                    "asking next attribute",
+                    extra={
+                        "next_stage": next_stage,
+                        "iterations": ctx.get("iterations"),
+                    },
+                )
                 return AskResponse(
                     type="ask_user", prompt=prompt, pending_id=pending_id
                 )
             else:
                 # All attributes collected, generate SQL and search
+                logger.info(
+                    "all attributes collected, generating SQL",
+                    extra={
+                        "iterations": ctx.get("iterations"),
+                        "context_keys": list(ctx.keys()),
+                    },
+                )
                 try:
                     # Use category to determine the correct table name
                     category = ctx.get("category", "printers")
@@ -295,7 +338,16 @@ class ConversationLoopManager:
                         exc_info=e,
                     )
                     return AskResponse(type="error", reason="llm_failure")
+                print("[debug] SQL after collecting attrs:", sql)
                 results = self.search_fn(sql, ctx)
+                print(
+                    "[debug] Results after collecting attrs len:",
+                    len(results) if results is not None else 0,
+                )
+                logger.info(
+                    "search results after collecting all attributes",
+                    extra={"results_len": len(results) if results is not None else 0},
+                )
                 if results:
                     self.pending_store.resolve_pending(pending_id)
                     return AskResponse(type="answer", text=str(results))
@@ -355,6 +407,14 @@ class ConversationLoopManager:
 
         if stage == "choose_result_view":
             # User selects a view (e.g., 'gesorteerd op prijs' or 'willekeurig')
+            logger.info(
+                "entering choose_result_view",
+                extra={
+                    "iterations": ctx.get("iterations"),
+                    "stage": stage,
+                    "context_keys": list(ctx.keys()),
+                },
+            )
             ctx["view"] = reply
             ctx["iterations"] = ctx.get("iterations", 0) + 1
             # Regenerate SQL with chosen view and perform search
@@ -370,7 +430,12 @@ class ConversationLoopManager:
                     "Failed to generate SQL for choose_result_view", exc_info=e
                 )
                 return AskResponse(type="error", reason="llm_failure")
+            print("[debug] SQL for chosen view:", sql)
             results = self.search_fn(sql, ctx)
+            print(
+                "[debug] Results for chosen view len:",
+                len(results) if results is not None else 0,
+            )
             if results:
                 self.pending_store.resolve_pending(pending_id)
                 return AskResponse(type="answer", text=str(results))

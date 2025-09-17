@@ -51,7 +51,19 @@ class AttributeManager:
         if self._use_database:
             try:
                 db_manager = get_database_attribute_manager()
-                return db_manager.get_next_missing_attribute(category, context)
+                next_attr = db_manager.get_next_missing_attribute(category, context)
+                if next_attr:
+                    return next_attr
+                # If DB manager returned None (no attributes configured in DB),
+                # fall back to the JSON-based ordering for backward compatibility.
+                # This preserves expected flows for categories seeded only via
+                # the bundled JSON files.
+                attributes = self._load_attributes()
+                attrs_for_cat = attributes.get(category, {}).get("attributes", [])
+                for attr in attrs_for_cat:
+                    name = attr.get("name")
+                    if name and name not in context:
+                        return attr
             except Exception as e:
                 print(f"Database next attribute lookup failed for {category}: {e}")
 

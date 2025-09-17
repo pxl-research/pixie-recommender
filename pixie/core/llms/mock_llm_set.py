@@ -64,7 +64,7 @@ class MockRelevance:
         # Define keywords for each category
         category_keywords = {
             "printers": ["printer", "print", "laser", "inkjet", "drukker", "afdrukken"],
-            "laptop": ["laptop", "notebook", "ultrabook", "macbook", "chromebook"],
+            "laptops": ["laptop", "notebook", "ultrabook", "macbook", "chromebook"],
             "computers": [
                 "computer",
                 "pc",
@@ -73,7 +73,7 @@ class MockRelevance:
                 "all-in-one",
                 "workstation",
             ],
-            "smartphone": [
+            "smartphones": [
                 "smartphone",
                 "phone",
                 "telefoon",
@@ -83,7 +83,7 @@ class MockRelevance:
                 "huawei",
                 "xiaomi",
             ],
-            "mixer": [
+            "mixers": [
                 "mixer",
                 "mixers",
                 "keukenmachine",

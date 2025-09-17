@@ -227,6 +227,49 @@ def seed_attribute_definitions_with_session(
                 "display_order": 4,
             },
         ],
+        # Add printers attributes via seed (present in JSON fallback but not earlier)
+        "printers": [
+            {
+                "name": "pages_per_minute",
+                "display_name": "Pages per minute",
+                "data_type": "number",
+                "is_required": False,
+                "display_order": 5,
+                "canonical_name": "pages_per_minute",
+            },
+            {
+                "name": "print_type",
+                "display_name": "Print technology",
+                "data_type": "choice",
+                "is_required": False,
+                "display_order": 3,
+                "canonical_name": "technology",
+            },
+            {
+                "name": "color_support",
+                "display_name": "Color support",
+                "data_type": "choice",
+                "is_required": False,
+                "display_order": 4,
+                "canonical_name": "color",
+            },
+            {
+                "name": "brand",
+                "display_name": "Brand",
+                "data_type": "choice",
+                "is_required": False,
+                "display_order": 2,
+                "canonical_name": "brand",
+            },
+            {
+                "name": "budget",
+                "display_name": "Budget",
+                "data_type": "number",
+                "is_required": True,
+                "display_order": 1,
+                "canonical_name": "budget",
+            },
+        ],
     }
 
     created_attributes = {}
@@ -251,6 +294,9 @@ def seed_attribute_definitions_with_session(
 
                 attr_data_copy = attr_data.copy()
                 attr_data_copy["product_type_id"] = UUID(str(pt.id))
+                # Preserve optional canonical_name when present
+                if "canonical_name" in attr_data:
+                    attr_data_copy["canonical_name"] = attr_data["canonical_name"]
                 attr = attr_repo.create(attr_data_copy)
                 pt_attributes.append(attr)
                 logger.info(f"Created attribute '{attr.name}' for {pt_name}")

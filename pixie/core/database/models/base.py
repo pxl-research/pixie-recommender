@@ -61,6 +61,8 @@ class AttributeDefinition(Base):
     )
     name = Column(String(100), nullable=False)
     display_name = Column(String(200), nullable=False)
+    # Optional canonical name used by conversation layer to map attribute keys
+    canonical_name = Column(String(100), nullable=True)
     description = Column(Text, nullable=True)
     data_type = Column(
         String(50), nullable=False
