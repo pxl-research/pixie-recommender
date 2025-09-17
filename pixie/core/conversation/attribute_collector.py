@@ -5,9 +5,9 @@ Extracts the complex attribute gathering from conversation_loop.py
 Into a clean, testable, single-responsibility class.
 """
 
-from dataclasses import dataclass
-from typing import Dict, List, Optional, Any
 import logging
+from dataclasses import dataclass
+from typing import Any, Dict, List, Optional
 
 logger = logging.getLogger(__name__)
 
@@ -15,6 +15,7 @@ logger = logging.getLogger(__name__)
 @dataclass
 class AttributeValue:
     """Represents a collected attribute value."""
+
     name: str
     value: str
     is_skipped: bool = False
@@ -24,6 +25,7 @@ class AttributeValue:
 @dataclass
 class AttributeRequest:
     """Represents a request for an attribute."""
+
     name: str
     question: str
     required: bool = True
@@ -37,7 +39,7 @@ class AttributeCollector:
     - Generate appropriate questions
     - Validate responses
     - Determine when collection is complete
-    
+
     Replaces complex scattered logic from conversation_loop.py
     """
 
@@ -46,14 +48,16 @@ class AttributeCollector:
         self.max_attributes = max_attributes
         self.collected_attributes: Dict[str, AttributeValue] = {}
         self.attribute_definitions = self._load_attribute_definitions(category)
-    
+
     def _load_attribute_definitions(self, category: str) -> List[AttributeRequest]:
         """Load attribute definitions for category - centralized configuration."""
         definitions = {
             "printers": [
                 AttributeRequest("budget", "Wat is je budget voor een printer?"),
                 AttributeRequest("brand", "Heb je een voorkeur voor een bepaald merk?"),
-                AttributeRequest("technology", "Welke printtechnologie prefereer je (inkjet/laser)?"),
+                AttributeRequest(
+                    "technology", "Welke printtechnologie prefereer je (inkjet/laser)?"
+                ),
                 AttributeRequest("connectivity", "Welke verbindingsopties wil je?"),
             ],
             "laptops": [
@@ -70,68 +74,77 @@ class AttributeCollector:
                 AttributeRequest("budget", "Wat is je budget voor een computer?"),
                 AttributeRequest("brand", "Heb je een voorkeur voor een bepaald merk?"),
                 AttributeRequest("processor", "Welke processor prefereer je?"),
-            ]
+            ],
         }
         return definitions.get(category, [])
-    
+
     def get_next_question(self) -> Optional[AttributeRequest]:
         """
         Get the next attribute question to ask.
-        
+
         Replaces complex _get_next_stage logic from conversation_loop.py
         """
         # Find first non-collected required attribute
         for attr_def in self.attribute_definitions:
             if attr_def.name not in self.collected_attributes:
-                if attr_def.required or len(self.collected_attributes) < self.max_attributes:
+                if (
+                    attr_def.required
+                    or len(self.collected_attributes) < self.max_attributes
+                ):
                     return attr_def
-        
+
         return None  # All required attributes collected
-    
+
     def collect_attribute(self, attribute_name: str, response: str) -> AttributeValue:
         """
         Process and store an attribute response.
-        
+
         Replaces complex reply processing from conversation_loop.py
         """
         # Handle "don't know" responses
         skip_responses = [
-            "weet ik niet", "geen idee", "whatever", "maakt niet uit",
-            "geen voorkeur", "doet er niet toe"
+            "weet ik niet",
+            "geen idee",
+            "whatever",
+            "maakt niet uit",
+            "geen voorkeur",
+            "doet er niet toe",
         ]
-        
+
         is_skipped = response.lower().strip() in skip_responses
-        
+
         # Validate response if not skipped
         if not is_skipped:
             response = self._validate_response(attribute_name, response)
-        
+
         # Store the attribute
         attr_value = AttributeValue(
             name=attribute_name,
             value=response,
             is_skipped=is_skipped,
-            confidence=0.5 if is_skipped else 1.0
+            confidence=0.5 if is_skipped else 1.0,
         )
-        
+
         self.collected_attributes[attribute_name] = attr_value
-        
-        logger.info(f"Collected attribute: {attribute_name} = {response} (skipped: {is_skipped})")
-        
+
+        logger.info(
+            f"Collected attribute: {attribute_name} = {response} (skipped: {is_skipped})"
+        )
+
         return attr_value
-    
+
     def _validate_response(self, attribute_name: str, response: str) -> str:
         """Validate and normalize attribute responses."""
         response = response.strip()
-        
+
         # Budget validation and normalization
         if attribute_name == "budget":
             return self._normalize_budget(response)
-        
+
         # Brand validation - capitalize first letter
         if attribute_name == "brand":
             return response.title()
-        
+
         # Technology validation for printers
         if attribute_name == "technology":
             response_lower = response.lower()
@@ -139,56 +152,55 @@ class AttributeCollector:
                 return "laser"
             elif "inkjet" in response_lower or "inkt" in response_lower:
                 return "inkjet"
-        
+
         return response
-    
+
     def _normalize_budget(self, budget_str: str) -> str:
         """Normalize budget input to consistent format."""
         budget_lower = budget_str.lower().strip()
-        
+
         # Handle "minder dan X" format
         if "minder dan" in budget_lower:
             return budget_str  # Keep original format
-        
+
         # Add euro symbol if missing
         if "€" not in budget_str and "euro" not in budget_lower:
             if budget_str.isdigit():
                 return f"€{budget_str}"
-        
+
         return budget_str
-    
+
     def is_collection_complete(self) -> bool:
         """
         Determine if we have enough attributes to proceed.
-        
+
         Replaces complex iteration and completion logic.
         """
         # Must have at least budget (most important)
         if "budget" not in self.collected_attributes:
             return False
-        
+
         # Must have minimum number of attributes
-        collected_count = len([
-            attr for attr in self.collected_attributes.values() 
-            if not attr.is_skipped
-        ])
-        
+        collected_count = len(
+            [attr for attr in self.collected_attributes.values() if not attr.is_skipped]
+        )
+
         return collected_count >= min(2, len(self.attribute_definitions))
-    
+
     def get_collection_summary(self) -> Dict[str, Any]:
         """Get summary of collected attributes for search/SQL generation."""
         summary = {
             "category": self.category,
             "total_collected": len(self.collected_attributes),
-            "attributes": {}
+            "attributes": {},
         }
-        
+
         for attr_name, attr_value in self.collected_attributes.items():
             if not attr_value.is_skipped:
                 summary["attributes"][attr_name] = attr_value.value
-        
+
         return summary
-    
+
     def get_missing_attributes(self) -> List[str]:
         """Get list of missing required attributes."""
         missing = []
@@ -196,7 +208,7 @@ class AttributeCollector:
             if attr_def.required and attr_def.name not in self.collected_attributes:
                 missing.append(attr_def.name)
         return missing
-    
+
     def reset(self):
         """Reset collection state for new conversation."""
         self.collected_attributes.clear()

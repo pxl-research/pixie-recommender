@@ -377,7 +377,8 @@ def add_mixers_data():
                     cur.execute(
                         """
                         INSERT INTO product_attribute_values 
-                        (id, product_id, attribute_definition_id, string_value, created_at, updated_at)
+                        (id, product_id, attribute_definition_id, string_value, created_at, 
+                        updated_at)
                         VALUES (%s, %s, %s, %s, %s, %s)
                     """,
                         (
@@ -434,11 +435,11 @@ def test_flexible_repository():
 
     try:
         # Import the flexible repository classes
-        from pixie.core.database.repositories.flexible_repositories import (
-            get_dynamic_repository,
-            discover_product_tables,
-        )
         from pixie.core.database.connection import get_db_session
+        from pixie.core.database.repositories.flexible_repositories import (
+            discover_product_tables,
+            get_dynamic_repository,
+        )
 
         with get_db_session() as session:
             # Test table discovery

@@ -3,8 +3,8 @@
 Test script to verify mixer questions work end-to-end via the API.
 """
 
+
 import requests
-import json
 
 
 def test_mixer_conversation():

@@ -12,7 +12,9 @@ sys.path.append(os.path.dirname(os.path.abspath(__file__)))
 from pixie.core.conversation.attribute_collector import AttributeCollector
 from pixie.core.conversation.flow_config import ConversationFlowManager
 from pixie.core.conversation.llm_orchestrator import MockLLMOrchestrator
-from pixie.core.conversation.simplified_conversation_manager import SimplifiedConversationManager
+from pixie.core.conversation.simplified_conversation_manager import (
+    SimplifiedConversationManager,
+)
 
 
 def mock_search_function(query: str, context: dict | None = None):
@@ -20,9 +22,9 @@ def mock_search_function(query: str, context: dict | None = None):
     category = None
     if context and isinstance(context, dict):
         category = context.get("category")
-    
+
     print(f"    Mock search called with query='{query}', category='{category}'")
-    
+
     # Mock different categories with different results
     if category == "laptops":
         return [
@@ -48,18 +50,18 @@ def mock_search_function(query: str, context: dict | None = None):
 def test_basic_conversation():
     """Test basic conversation flow without database dependencies."""
     print("Testing simplified conversation manager...")
-    
+
     # Initialize components
     flow_manager = ConversationFlowManager()
     orchestrator = MockLLMOrchestrator()
     conversation_manager = SimplifiedConversationManager(
         search_fn=mock_search_function,
         flow_manager=flow_manager,
-        llm_orchestrator=orchestrator
+        llm_orchestrator=orchestrator,
     )
-    
+
     print("✅ Components initialized successfully")
-    
+
     # Test laptop search (should only return laptops)
     try:
         print("\n🔍 Testing laptop search...")
@@ -69,13 +71,14 @@ def test_basic_conversation():
         print(f"✅ Laptop question handled: {result.text}")
         print(f"   Type: {result.type}")
         print(f"   Pending ID: {result.pending_id}")
-        
+
     except Exception as e:
         print(f"❌ Error handling laptop question: {e}")
         import traceback
+
         traceback.print_exc()
         return False
-    
+
     # Test printer search (should only return printers)
     try:
         print("\n🔍 Testing printer search...")
@@ -84,24 +87,25 @@ def test_basic_conversation():
         )
         print(f"✅ Printer question handled: {result.text}")
         print(f"   Type: {result.type}")
-        
+
     except Exception as e:
         print(f"❌ Error handling printer question: {e}")
         import traceback
+
         traceback.print_exc()
         return False
-    
+
     return True
 
 
 def test_attribute_collector():
     """Test the attribute collector functionality."""
     print("\nTesting attribute collector...")
-    
+
     try:
         collector = AttributeCollector(category="printers")
         print("✅ AttributeCollector initialized")
-        
+
         # Test getting next question
         next_question = collector.get_next_question()
         if next_question:
@@ -109,9 +113,9 @@ def test_attribute_collector():
             print(f"   Attribute: {next_question.name}")
         else:
             print("✅ No next question (collection complete)")
-            
+
         return True
-        
+
     except Exception as e:
         print(f"❌ Error in attribute collector: {e}")
         return False
@@ -120,11 +124,11 @@ def test_attribute_collector():
 def test_flow_config():
     """Test the flow configuration."""
     print("\nTesting flow configuration...")
-    
+
     try:
         flow_manager = ConversationFlowManager()
         print("✅ ConversationFlowManager initialized")
-        
+
         # Test getting flow for category
         flow = flow_manager.get_flow("printers")
         if flow:
@@ -133,9 +137,9 @@ def test_flow_config():
         else:
             print("❌ No flow found for printers")
             return False
-            
+
         return True
-        
+
     except Exception as e:
         print(f"❌ Error in flow config: {e}")
         return False
@@ -143,12 +147,12 @@ def test_flow_config():
 
 if __name__ == "__main__":
     print("=== Simplified Conversation Manager Test ===\n")
-    
+
     success = True
     success &= test_flow_config()
     success &= test_attribute_collector()
     success &= test_basic_conversation()
-    
+
     if success:
         print("\n🎉 All tests passed! The simplified conversation manager is working.")
     else:
