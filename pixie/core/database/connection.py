@@ -2,7 +2,7 @@
 
 import logging
 from contextlib import contextmanager
-from typing import Generator
+from typing import Generator, Optional
 
 from sqlalchemy import create_engine, event, text
 from sqlalchemy.engine import Engine
@@ -14,8 +14,8 @@ from ..utils.config import get_config
 logger = logging.getLogger(__name__)
 
 # Global variables for engine and session factory
-_engine: Engine | None = None
-_SessionLocal: sessionmaker | None = None
+_engine: Optional[Engine] = None
+_SessionLocal: Optional[sessionmaker] = None
 
 
 def get_engine() -> Engine:

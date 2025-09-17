@@ -180,12 +180,15 @@ class AttributeCollector:
         if "budget" not in self.collected_attributes:
             return False
 
-        # Must have minimum number of attributes
+        # Must have minimum number of attributes. The threshold should respect
+        # the configured max_attributes (set by the conversation manager) and
+        # the total number of defined attributes for the category.
         collected_count = len(
             [attr for attr in self.collected_attributes.values() if not attr.is_skipped]
         )
 
-        return collected_count >= min(2, len(self.attribute_definitions))
+        required_min = min(self.max_attributes, len(self.attribute_definitions))
+        return collected_count >= required_min
 
     def get_collection_summary(self) -> Dict[str, Any]:
         """Get summary of collected attributes for search/SQL generation."""
