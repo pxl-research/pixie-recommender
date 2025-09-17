@@ -5,20 +5,20 @@ import logging
 from ..search.unified_search_engine import SearchEngine
 from ..storage.pending_store import InMemoryPendingStore
 from ..utils.contracts import AskResponse
-from .conversation_loop import ConversationLoopManager
+from .simplified_conversation_manager import SimplifiedConversationManager
 
 
 class Pixie:
     """Main interface for handling user questions and replies using Azure LLMs.
 
-    Delegates all processing to the ConversationLoopManager for real LLM-based
+    Delegates all processing to the SimplifiedConversationManager for real LLM-based
     conversation flows.
     """
 
     def __init__(
         self,
         pending_store: InMemoryPendingStore | None = None,
-        conversation_manager: ConversationLoopManager | None = None,
+        conversation_manager: SimplifiedConversationManager | None = None,
     ):
         self._pending_store = pending_store or InMemoryPendingStore()
         # If no conversation_manager was provided, create one using
@@ -27,7 +27,7 @@ class Pixie:
             self._conversation_manager = conversation_manager
         else:
             # Provide a default search function that will be used by the
-            # ConversationLoopManager.
+            # SimplifiedConversationManager.
             engine = SearchEngine()
 
             # Create a wrapper function that extracts category from context
@@ -46,10 +46,9 @@ class Pixie:
                 else:
                     return []
 
-            self._conversation_manager = ConversationLoopManager(
+            self._conversation_manager = SimplifiedConversationManager(
                 search_with_category,
                 pending_store=self._pending_store,
-                search_engine=engine,
             )
 
     def answer(self, question: str) -> AskResponse:
