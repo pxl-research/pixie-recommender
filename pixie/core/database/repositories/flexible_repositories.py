@@ -1,249 +1,306 @@
-"""Generic repository for flexible product system."""
+"""Generic repository for flexible product system that works with any table structure."""
 
-from typing import Any, Dict, Generic, List, Optional, Type, TypeVar
-from uuid import UUID
+from typing import Any, Dict, List, Optional
 
-from sqlalchemy import and_
+from sqlalchemy import text
 from sqlalchemy.orm import Session
 
-from ..connection import get_db_session
-from ..models.base import (
-    AttributeDefinition,
-    Product,
-    ProductAttributeValue,
-    ProductType,
-)
 
-T = TypeVar("T")
+class DynamicRepository:
+    """Dynamic repository that works with any table structure discovered at runtime."""
 
-
-class BaseRepository(Generic[T]):
-    """Generic base repository with common CRUD operations."""
-
-    def __init__(self, session: Session, model_class: Type[T]):
+    def __init__(self, session: Session, table_name: str):
         self.session = session
-        self.model_class = model_class
+        self.table_name = table_name
+        self._columns = None
+        self._primary_key = None
 
-    def get_all(self) -> List[T]:
-        """Get all records."""
-        return self.session.query(self.model_class).all()
+    def _get_columns(self) -> List[Dict[str, Any]]:
+        """Get column information for the table."""
+        if self._columns is None:
+            # Use SQLAlchemy inspector to get column info
+            from sqlalchemy import inspect
 
-    def get_by_id(self, id: UUID) -> Optional[T]:
+            inspector = inspect(self.session.bind)
+            if inspector is not None:
+                self._columns = inspector.get_columns(self.table_name)
+            else:
+                raise RuntimeError("Could not create database inspector")
+
+        return self._columns
+
+    def _get_primary_key(self) -> str:
+        """Get primary key column name."""
+        if self._primary_key is None:
+            from sqlalchemy import inspect
+
+            inspector = inspect(self.session.bind)
+            if inspector is not None:
+                pk_constraint = inspector.get_pk_constraint(self.table_name)
+                if pk_constraint and pk_constraint["constrained_columns"]:
+                    self._primary_key = pk_constraint["constrained_columns"][0]
+                else:
+                    # Fallback to 'id' if no primary key found
+                    self._primary_key = "id"
+            else:
+                raise RuntimeError("Could not create database inspector")
+
+        return self._primary_key
+
+    def get_all(self, limit: Optional[int] = None) -> List[Dict[str, Any]]:
+        """Get all records from the table."""
+        query = f"SELECT * FROM {self.table_name}"
+        if limit:
+            query += f" LIMIT {limit}"
+
+        result = self.session.execute(text(query))
+        columns = [col["name"] for col in self._get_columns()]
+
+        return [dict(zip(columns, row)) for row in result.fetchall()]
+
+    def get_by_id(self, id_value: Any) -> Optional[Dict[str, Any]]:
         """Get record by ID."""
-        return (
-            self.session.query(self.model_class)
-            .filter(self.model_class.id == id)
-            .first()
-        )
+        pk_column = self._get_primary_key()
+        query = f"SELECT * FROM {self.table_name} WHERE {pk_column} = :id"
 
-    def create(self, data: Dict[str, Any]) -> T:
+        result = self.session.execute(text(query), {"id": id_value})
+        columns = [col["name"] for col in self._get_columns()]
+        row = result.fetchone()
+
+        return dict(zip(columns, row)) if row else None
+
+    def find_by_column(
+        self, column: str, value: Any, limit: Optional[int] = None
+    ) -> List[Dict[str, Any]]:
+        """Find records by column value."""
+        # Validate column exists
+        columns = [col["name"] for col in self._get_columns()]
+        if column not in columns:
+            raise ValueError(
+                f"Column '{column}' does not exist in table '{self.table_name}'"
+            )
+
+        query = f"SELECT * FROM {self.table_name} WHERE {column} = :value"
+        if limit:
+            query += f" LIMIT {limit}"
+
+        result = self.session.execute(text(query), {"value": value})
+        return [dict(zip(columns, row)) for row in result.fetchall()]
+
+    def search_text(
+        self, search_term: str, columns: List[str], limit: Optional[int] = None
+    ) -> List[Dict[str, Any]]:
+        """Search for text in specified columns."""
+        # Validate columns exist
+        all_columns = [col["name"] for col in self._get_columns()]
+        invalid_columns = [col for col in columns if col not in all_columns]
+        if invalid_columns:
+            raise ValueError(
+                f"Columns {invalid_columns} do not exist in table '{self.table_name}'"
+            )
+
+        # Build search conditions
+        conditions = [f"{col} ILIKE :search_term" for col in columns]
+        where_clause = " OR ".join(conditions)
+
+        query = f"SELECT * FROM {self.table_name} WHERE {where_clause}"
+        if limit:
+            query += f" LIMIT {limit}"
+
+        result = self.session.execute(text(query), {"search_term": f"%{search_term}%"})
+        return [dict(zip(all_columns, row)) for row in result.fetchall()]
+
+    def filter_by_attributes(
+        self, filters: Dict[str, Any], limit: Optional[int] = None
+    ) -> List[Dict[str, Any]]:
+        """Filter records by multiple attributes."""
+        # Validate columns exist
+        all_columns = [col["name"] for col in self._get_columns()]
+        invalid_columns = [col for col in filters.keys() if col not in all_columns]
+        if invalid_columns:
+            raise ValueError(
+                f"Columns {invalid_columns} do not exist in table '{self.table_name}'"
+            )
+
+        # Build WHERE conditions
+        conditions = []
+        params = {}
+
+        for i, (column, value) in enumerate(filters.items()):
+            param_name = f"param_{i}"
+            conditions.append(f"{column} = :{param_name}")
+            params[param_name] = value
+
+        where_clause = " AND ".join(conditions)
+        query = f"SELECT * FROM {self.table_name} WHERE {where_clause}"
+        if limit:
+            query += f" LIMIT {limit}"
+
+        result = self.session.execute(text(query), params)
+        return [dict(zip(all_columns, row)) for row in result.fetchall()]
+
+    def create(self, data: Dict[str, Any]) -> Dict[str, Any]:
         """Create a new record."""
-        instance = self.model_class(**data)
-        self.session.add(instance)
+        # Validate columns exist
+        all_columns = [col["name"] for col in self._get_columns()]
+        invalid_columns = [col for col in data.keys() if col not in all_columns]
+        if invalid_columns:
+            raise ValueError(
+                f"Columns {invalid_columns} do not exist in table '{self.table_name}'"
+            )
+
+        # Build INSERT query
+        columns = list(data.keys())
+        placeholders = [f":{col}" for col in columns]
+
+        query = f"""
+            INSERT INTO {self.table_name} ({', '.join(columns)})
+            VALUES ({', '.join(placeholders)})
+            RETURNING *
+        """
+
+        result = self.session.execute(text(query), data)
         self.session.commit()
-        self.session.refresh(instance)
-        return instance
 
-    def update(self, id: UUID, data: Dict[str, Any]) -> Optional[T]:
+        row = result.fetchone()
+        return dict(zip(all_columns, row)) if row else {}
+
+    def update(self, id_value: Any, data: Dict[str, Any]) -> Optional[Dict[str, Any]]:
         """Update a record."""
-        instance = self.get_by_id(id)
-        if instance:
-            for key, value in data.items():
-                if hasattr(instance, key):
-                    setattr(instance, key, value)
-            self.session.commit()
-            self.session.refresh(instance)
-        return instance
+        # Validate columns exist
+        all_columns = [col["name"] for col in self._get_columns()]
+        invalid_columns = [col for col in data.keys() if col not in all_columns]
+        if invalid_columns:
+            raise ValueError(
+                f"Columns {invalid_columns} do not exist in table '{self.table_name}'"
+            )
 
-    def delete(self, id: UUID) -> bool:
+        pk_column = self._get_primary_key()
+
+        # Build UPDATE query
+        set_parts = [f"{col} = :{col}" for col in data.keys()]
+        query = f"""
+            UPDATE {self.table_name}
+            SET {', '.join(set_parts)}
+            WHERE {pk_column} = :id
+            RETURNING *
+        """
+
+        params = data.copy()
+        params["id"] = id_value
+
+        result = self.session.execute(text(query), params)
+        self.session.commit()
+
+        row = result.fetchone()
+        return dict(zip(all_columns, row)) if row else None
+
+    def delete(self, id_value: Any) -> bool:
         """Delete a record."""
-        instance = self.get_by_id(id)
-        if instance:
-            self.session.delete(instance)
-            self.session.commit()
-            return True
-        return False
+        pk_column = self._get_primary_key()
+        query = f"DELETE FROM {self.table_name} WHERE {pk_column} = :id"
+
+        self.session.execute(text(query), {"id": id_value})
+        self.session.commit()
+
+        # Check if any rows were affected
+        return True  # Assume success if no exception was raised
+
+    def get_table_info(self) -> Dict[str, Any]:
+        """Get information about the table structure."""
+        return {
+            "table_name": self.table_name,
+            "columns": self._get_columns(),
+            "primary_key": self._get_primary_key(),
+            "row_count": self._get_row_count(),
+        }
+
+    def _get_row_count(self) -> int:
+        """Get total number of rows in the table."""
+        query = f"SELECT COUNT(*) FROM {self.table_name}"
+        result = self.session.execute(text(query))
+        count = result.scalar()
+        return count if count is not None else 0
 
 
-class ProductTypeRepository(BaseRepository[ProductType]):
-    """Repository for product types."""
-
-    def __init__(self, session: Session):
-        super().__init__(session, ProductType)
-
-    def get_by_name(self, name: str) -> Optional[ProductType]:
-        """Get product type by name."""
-        return self.session.query(ProductType).filter(ProductType.name == name).first()
-
-    def get_active(self) -> List[ProductType]:
-        """Get all active product types."""
-        return self.session.query(ProductType).filter(ProductType.is_active).all()
-
-
-class AttributeDefinitionRepository(BaseRepository[AttributeDefinition]):
-    """Repository for attribute definitions."""
-
-    def __init__(self, session: Session):
-        super().__init__(session, AttributeDefinition)
-
-    def get_by_product_type(self, product_type_id: UUID) -> List[AttributeDefinition]:
-        """Get all attribute definitions for a product type."""
-        return (
-            self.session.query(AttributeDefinition)
-            .filter(AttributeDefinition.product_type_id == product_type_id)
-            .order_by(AttributeDefinition.display_order)
-            .all()
-        )
-
-    def get_by_name_and_type(
-        self, name: str, product_type_id: UUID
-    ) -> Optional[AttributeDefinition]:
-        """Get attribute definition by name and product type."""
-        return (
-            self.session.query(AttributeDefinition)
-            .filter(
-                and_(
-                    AttributeDefinition.name == name,
-                    AttributeDefinition.product_type_id == product_type_id,
-                )
-            )
-            .first()
-        )
-
-
-class ProductRepository(BaseRepository[Product]):
-    """Repository for products."""
+class TableDiscovery:
+    """Utility class to discover and work with all available tables."""
 
     def __init__(self, session: Session):
-        super().__init__(session, Product)
+        self.session = session
 
-    def get_by_product_type(self, product_type_id: UUID) -> List[Product]:
-        """Get all products of a specific type."""
-        return (
-            self.session.query(Product)
-            .filter(Product.product_type_id == product_type_id)
-            .all()
-        )
+    def get_all_tables(self) -> List[str]:
+        """Get all table names in the database."""
+        from sqlalchemy import inspect
 
-    def get_by_external_id(self, external_id: str) -> Optional[Product]:
-        """Get product by external ID."""
-        return (
-            self.session.query(Product)
-            .filter(Product.external_id == external_id)
-            .first()
-        )
-
-    def search_by_name(self, name_query: str) -> List[Product]:
-        """Search products by name."""
-        return (
-            self.session.query(Product)
-            .filter(Product.name.ilike(f"%{name_query}%"))
-            .all()
-        )
-
-    def get_active(self) -> List[Product]:
-        """Get all active products."""
-        return self.session.query(Product).filter(Product.is_active).all()
-
-
-class ProductAttributeValueRepository(BaseRepository[ProductAttributeValue]):
-    """Repository for product attribute values."""
-
-    def __init__(self, session: Session):
-        super().__init__(session, ProductAttributeValue)
-
-    def get_by_product(self, product_id: UUID) -> List[ProductAttributeValue]:
-        """Get all attribute values for a product."""
-        return (
-            self.session.query(ProductAttributeValue)
-            .join(AttributeDefinition)
-            .filter(ProductAttributeValue.product_id == product_id)
-            .order_by(AttributeDefinition.display_order)
-            .all()
-        )
-
-    def get_by_attribute_definition(
-        self, attribute_definition_id: UUID
-    ) -> List[ProductAttributeValue]:
-        """Get all values for a specific attribute definition."""
-        return (
-            self.session.query(ProductAttributeValue)
-            .filter(
-                ProductAttributeValue.attribute_definition_id == attribute_definition_id
-            )
-            .all()
-        )
-
-    def get_value(
-        self, product_id: UUID, attribute_definition_id: UUID
-    ) -> Optional[ProductAttributeValue]:
-        """Get a specific attribute value."""
-        return (
-            self.session.query(ProductAttributeValue)
-            .filter(
-                and_(
-                    ProductAttributeValue.product_id == product_id,
-                    ProductAttributeValue.attribute_definition_id
-                    == attribute_definition_id,
-                )
-            )
-            .first()
-        )
-
-    def set_value(
-        self, product_id: UUID, attribute_definition_id: UUID, value: Any
-    ) -> ProductAttributeValue:
-        """Set or update an attribute value."""
-        existing = self.get_value(product_id, attribute_definition_id)
-        if existing:
-            existing.value = value
-            self.session.commit()
-            self.session.refresh(existing)
-            return existing
+        inspector = inspect(self.session.bind)
+        if inspector is not None:
+            return inspector.get_table_names()
         else:
-            return self.create(
-                {
-                    "product_id": product_id,
-                    "attribute_definition_id": attribute_definition_id,
-                    "value": value,
-                }
-            )
+            raise RuntimeError("Could not create database inspector")
+
+    def get_product_tables(self) -> List[str]:
+        """Get tables that appear to be product tables (excluding system tables)."""
+        all_tables = self.get_all_tables()
+
+        # Exclude system tables and known non-product tables
+        exclude_patterns = [
+            "alembic_version",
+            "spatial_ref_sys",
+            "geography_columns",
+            "geometry_columns",
+            "raster_columns",
+            "raster_overviews",
+        ]
+
+        product_tables = []
+        for table in all_tables:
+            if not any(pattern in table for pattern in exclude_patterns):
+                product_tables.append(table)
+
+        return product_tables
+
+    def create_repository_for_table(self, table_name: str) -> DynamicRepository:
+        """Create a repository instance for a specific table."""
+        return DynamicRepository(self.session, table_name)
+
+    def get_table_summary(self) -> List[Dict[str, Any]]:
+        """Get summary information for all product tables."""
+        summaries = []
+        for table_name in self.get_product_tables():
+            try:
+                repo = self.create_repository_for_table(table_name)
+                info = repo.get_table_info()
+                summaries.append(info)
+            except Exception as e:
+                summaries.append({"table_name": table_name, "error": str(e)})
+
+        return summaries
 
 
-# Convenience functions for getting repositories
-def get_product_type_repository(
-    session: Optional[Session] = None,
-) -> ProductTypeRepository:
-    """Get product type repository."""
-    if session is None:
-        with get_db_session() as s:
-            return ProductTypeRepository(s)
-    return ProductTypeRepository(session)
+# Factory functions for easy access
+def get_dynamic_repository(session: Session, table_name: str) -> DynamicRepository:
+    """Create a dynamic repository for any table."""
+    return DynamicRepository(session, table_name)
 
 
-def get_attribute_definition_repository(
-    session: Optional[Session] = None,
-) -> AttributeDefinitionRepository:
-    """Get attribute definition repository."""
-    if session is None:
-        with get_db_session() as s:
-            return AttributeDefinitionRepository(s)
-    return AttributeDefinitionRepository(session)
+def get_table_discovery(session: Session) -> TableDiscovery:
+    """Create a table discovery instance."""
+    return TableDiscovery(session)
 
 
-def get_product_repository(session: Optional[Session] = None) -> ProductRepository:
-    """Get product repository."""
-    if session is None:
-        with get_db_session() as s:
-            return ProductRepository(s)
-    return ProductRepository(session)
+def discover_product_tables(session: Session) -> List[str]:
+    """Discover all product tables in the database."""
+    discovery = TableDiscovery(session)
+    return discovery.get_product_tables()
 
 
-def get_product_attribute_value_repository(
-    session: Optional[Session] = None,
-) -> ProductAttributeValueRepository:
-    """Get product attribute value repository."""
-    if session is None:
-        with get_db_session() as s:
-            return ProductAttributeValueRepository(s)
-    return ProductAttributeValueRepository(session)
+# Legacy compatibility functions
+def get_product_repository(session: Session):
+    """Legacy function - now returns dynamic repository for products table."""
+    return get_dynamic_repository(session, "products")
+
+
+def get_product_type_repository(session: Session):
+    """Legacy function - now returns dynamic repository for product_types table."""
+    return get_dynamic_repository(session, "product_types")

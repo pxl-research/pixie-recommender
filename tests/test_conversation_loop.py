@@ -112,48 +112,44 @@ def test_max_iterations_reached(mock_llm_set):
 
 
 def test_choose_result_view_large_results(mock_llm_set):
-    # Use SearchEngine so initial search (attributes None) returns many results
-    from pixie.core.search import SearchEngine
-
-    engine = SearchEngine()
-    # make the sql model generate SQL that will return empty until refinements are provided
-    mgr = ConversationLoopManager(engine.search, llm_set=mock_llm_set)
-
-    # initial new question -> first search returns many results (attributes None) -> ask_user
-    first = mgr.handle_new_question("Ik zoek een nieuwe printer")
-    assert first.type == "ask_user"
-
-    # But to test the choose_result_view flow, simulate a flow where initial search is empty.
-    # We'll create a search_fn that returns [] initially and then returns many when view chosen.
+    # Use a mock search function that returns results after view selection
     calls = {"count": 0}
 
     def search_fn(sql_query, attrs):
-        # first call (initial) empty, subsequent calls return many
         calls["count"] += 1
-        # return empty for the first call (after ask_tech)
-        # this makes the manager reach the choose_result_view stage
-        if calls["count"] <= 1:
+        # Return empty for initial search after all attributes collected
+        if calls["count"] <= 1:  # Empty for initial search
             return []
-        return engine.search(sql_query, attrs)
+        # Return mock results for view selection
+        return [
+            {"name": "HP LaserJet", "price": 299.99, "brand": "HP"},
+            {"name": "Brother MFC", "price": 349.99, "brand": "Brother"},
+        ]
 
-    mgr2 = ConversationLoopManager(search_fn, max_iterations=5, llm_set=mock_llm_set)
-    first = mgr2.handle_new_question("Ik zoek een nieuwe printer")
+    mgr = ConversationLoopManager(search_fn, max_iterations=6, llm_set=mock_llm_set)
+    first = mgr.handle_new_question("Ik zoek een nieuwe printer")
     assert first.type == "ask_user"
     pending_id = first.pending_id
     assert pending_id is not None
 
     # reply to ask_budget
-    second = mgr2.handle_reply(pending_id, "minder dan 150€")
+    second = mgr.handle_reply(pending_id, "minder dan 150€")
     assert second.type == "ask_user"
     # reply to ask_brand
-    third = mgr2.handle_reply(pending_id, "Brother")
+    third = mgr.handle_reply(pending_id, "Brother")
     assert third.type == "ask_user"
-    # reply to ask_tech -> search still empty -> should reach choose_result_view
-    fourth = mgr2.handle_reply(pending_id, "laser")
+    # reply to ask_technology
+    fourth = mgr.handle_reply(pending_id, "laser")
     assert fourth.type == "ask_user"
+    # reply to ask_color
+    fifth = mgr.handle_reply(pending_id, "zwart-wit")
+    assert fifth.type == "ask_user"
+    # reply to ask_pages_per_minute -> should reach choose_result_view
+    sixth = mgr.handle_reply(pending_id, "20")
+    assert sixth.type == "ask_user"
     # now choose a view (e.g., sorted by price)
-    fifth = mgr2.handle_reply(pending_id, "gesorteerd op prijs")
-    assert fifth.type == "answer"
+    seventh = mgr.handle_reply(pending_id, "gesorteerd op prijs")
+    assert seventh.type == "answer"
 
 
 def test_ttl_integration(mock_llm_set):

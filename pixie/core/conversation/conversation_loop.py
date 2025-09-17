@@ -169,9 +169,26 @@ class ConversationLoopManager:
         except Exception:
             # Fallback to old hardcoded logic for backward compatibility
             current_stage = context.get("stage")
-            if current_stage == "ask_budget":
+            collected = set(context.get("collected_attributes", []))
+
+            # For printers, use the full sequence
+            if category == "printers":
+                attr_sequence = [
+                    "budget",
+                    "brand",
+                    "technology",
+                    "color",
+                    "pages_per_minute",
+                ]
+                for attr in attr_sequence:
+                    if attr not in collected:
+                        return f"ask_{attr}"
+                return None
+
+            # Default fallback logic
+            if current_stage == "ask_budget" and "budget" not in collected:
                 return "ask_brand"
-            elif current_stage == "ask_brand":
+            elif current_stage == "ask_brand" and "brand" not in collected:
                 return "ask_tech"
             else:
                 return None
@@ -192,9 +209,53 @@ class ConversationLoopManager:
         # Extract attribute name from stage (e.g., "ask_budget" -> "budget")
         if stage and stage.startswith("ask_"):
             attribute_name = stage[4:]  # Remove "ask_" prefix
-            ctx[attribute_name] = reply
-            ctx["collected_attributes"].append(attribute_name)
-            ctx["iterations"] = ctx.get("iterations", 0) + 1
+
+            # Handle "Weet ik niet" responses specially - don't collect the attribute
+            if reply.lower().strip() in [
+                "weet ik niet",
+                "geen idee",
+                "whatever",
+                "maakt niet uit",
+            ]:
+                # Don't add to collected_attributes, just increment iterations
+                ctx["iterations"] = ctx.get("iterations", 0) + 1
+            else:
+                # Normal response - collect the attribute
+                ctx[attribute_name] = reply
+                ctx["collected_attributes"].append(attribute_name)
+                ctx["iterations"] = ctx.get("iterations", 0) + 1
+
+            # Check if we've reached max iterations
+            if ctx["iterations"] >= self.max_iterations:
+                # Too many iterations, generate SQL and search
+                try:
+                    # Use category to determine the correct table name
+                    category = ctx.get("category", "printers")
+                    table_name = category  # Table name matches category name
+                    sql = self.sql_model.generate_sql(
+                        pending_entry.question, ctx, table_name=table_name
+                    )
+                except Exception as e:
+                    logger.error(
+                        "Failed to generate SQL after max iterations",
+                        exc_info=e,
+                    )
+                    return AskResponse(type="error", reason="llm_failure")
+                results = self.search_fn(sql, ctx)
+                if results:
+                    self.pending_store.resolve_pending(pending_id)
+                    return AskResponse(type="answer", text=str(results))
+                # No results -> ask for result view if iterations allow
+                ctx["stage"] = "choose_result_view"
+                self.pending_store.save_pending(
+                    pending_id, pending_entry.question, conversation_context=ctx
+                )
+                return AskResponse(
+                    type="ask_user",
+                    prompt="No results found. Would you like to try a different view "
+                    "or adjust your criteria?",
+                    pending_id=pending_id,
+                )
 
             # Determine next stage
             next_stage = self._get_next_stage(ctx)

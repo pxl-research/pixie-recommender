@@ -31,8 +31,23 @@ def mock_client():
 
     # Create conversation manager with mock LLMs
     search_engine = SearchEngine()
+
+    # Create wrapper function to match expected signature
+    def search_with_category(sql: str, context: dict | None = None) -> list[dict]:
+        category = None
+        if context and isinstance(context, dict):
+            category = context.get("category")
+        result = search_engine.search(sql, context, category)
+        # Handle both old dict format and new list format
+        if isinstance(result, dict):
+            return result.get("results", [])
+        elif isinstance(result, list):
+            return result
+        else:
+            return []
+
     conversation_manager = ConversationLoopManager(
-        search_fn=search_engine.search, llm_set=mock_llms
+        search_fn=search_with_category, llm_set=mock_llms, max_iterations=6
     )
 
     # Create Pixie instance with mock conversation manager
@@ -150,12 +165,36 @@ def test_product_found_flow(mock_client):
     ), f"Expected technology question but got: {d3.get('prompt', '')}"
     pending = d3.get("pending_id")
 
-    # Reply tech -> final answer
+    # Reply tech -> ask color
     r4 = mock_client.post("/ask", json={"pending_id": pending, "message": "laser"})
     assert r4.status_code == 200
     d4 = r4.json()
-    assert d4["type"] == "answer"
-    assert "Brother" in (d4.get("text") or "")
+    assert d4["type"] == "ask_user"
+    prompt4 = d4.get("prompt", "").lower()
+    color_keywords = ["kleur", "color", "kleurenprinter"]
+    assert any(
+        word in prompt4 for word in color_keywords
+    ), f"Expected color question but got: {d4.get('prompt', '')}"
+    pending = d4.get("pending_id")
+
+    # Reply color -> ask pages_per_minute
+    r5 = mock_client.post("/ask", json={"pending_id": pending, "message": "kleur"})
+    assert r5.status_code == 200
+    d5 = r5.json()
+    assert d5["type"] == "ask_user"
+    prompt5 = d5.get("prompt", "").lower()
+    pages_keywords = ["pagina", "per minuut", "pages", "minute"]
+    assert any(
+        word in prompt5 for word in pages_keywords
+    ), f"Expected pages per minute question but got: {d5.get('prompt', '')}"
+    pending = d5.get("pending_id")
+
+    # Reply pages_per_minute -> final answer
+    r6 = mock_client.post("/ask", json={"pending_id": pending, "message": "20"})
+    assert r6.status_code == 200
+    d6 = r6.json()
+    assert d6["type"] == "answer"
+    assert "Brother" in (d6.get("text") or "")
 
 
 def test_not_relevant_flow(mock_client):
@@ -195,8 +234,8 @@ def test_too_many_results_flow(mock_client):
     d1 = r1.json()
     pending = d1.get("pending_id")
 
-    # Answer 'Weet ik niet' three times - system might finish or ask for view choice
-    for i in range(3):
+    # Answer 'Weet ik niet' six times to reach max_iterations - system should finish
+    for i in range(6):
         r = mock_client.post(
             "/ask", json={"pending_id": pending, "message": "Weet ik niet"}
         )
@@ -210,13 +249,13 @@ def test_too_many_results_flow(mock_client):
 
     # If pending still exists, try to choose sorted view
     if pending:
-        r5 = mock_client.post(
+        r7 = mock_client.post(
             "/ask", json={"pending_id": pending, "message": "Gesorteerd op prijs"}
         )
-        assert r5.status_code == 200
-        d5 = r5.json()
-        assert d5["type"] == "answer"
-        text = d5.get("text") or ""
+        assert r7.status_code == 200
+        d7 = r7.json()
+        assert d7["type"] == "answer"
+        text = d7.get("text") or ""
         assert "Brother ZX 1570" in text or "Ik heb volgende printers" in text
     else:
         # Conversation ended after repeated "Weet ik niet" - this is acceptable behavior

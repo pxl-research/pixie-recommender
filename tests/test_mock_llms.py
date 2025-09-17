@@ -75,12 +75,12 @@ def test_detect_category_uses_azure_shape():
     assert r.detect_category("Ik zoek een printer") == "printers"
 
     # Mock Azure response for laptop category
-    r.model = _StubModel(_InvokeResp("laptops"))
-    assert r.detect_category("Ik wil een laptop kopen") == "laptops"
+    r.model = _StubModel(_InvokeResp("laptop"))
+    assert r.detect_category("Ik wil een laptop kopen") == "laptop"
 
     # Mock Azure response for smartphone category
-    r.model = _StubModel(_InvokeResp("smartphones"))
-    assert r.detect_category("Welke telefoon is goed?") == "smartphones"
+    r.model = _StubModel(_InvokeResp("smartphone"))
+    assert r.detect_category("Welke telefoon is goed?") == "smartphone"
 
     # Mock Azure response for none
     r.model = _StubModel(_InvokeResp("none"))
@@ -89,7 +89,7 @@ def test_detect_category_uses_azure_shape():
     # When model is absent, expect fallback to keyword detection
     r.model = None
     assert r.detect_category("Ik zoek een printer") == "printers"
-    assert r.detect_category("Ik wil een laptop") == "laptops"
+    assert r.detect_category("Ik wil een laptop") == "laptop"
     assert r.detect_category("Hoe is het weer?") is None
 
 

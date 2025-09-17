@@ -205,8 +205,23 @@ class TestRealLLMEndToEndFlow:
 
         # Create conversation manager with real LLMs
         search_engine = SearchEngine()
+
+        # Create wrapper function to match expected signature
+        def search_with_category(sql: str, context: dict | None = None) -> list[dict]:
+            category = None
+            if context and isinstance(context, dict):
+                category = context.get("category")
+            result = search_engine.search(sql, context, category)
+            # Handle both old dict format and new list format
+            if isinstance(result, dict):
+                return result.get("results", [])
+            elif isinstance(result, list):
+                return result
+            else:
+                return []
+
         manager = ConversationLoopManager(
-            search_fn=search_engine.search, llm_set=real_azure_llms
+            search_fn=search_with_category, llm_set=real_azure_llms
         )
 
         # Test new question handling

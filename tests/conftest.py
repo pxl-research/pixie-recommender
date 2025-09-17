@@ -13,11 +13,11 @@ class MockRelevance:
         """Mock category detection based on question content."""
         question_lower = question.lower()
         if "laptop" in question_lower:
-            return "laptops"
+            return "laptop"
         elif "printer" in question_lower or "print" in question_lower:
             return "printers"
         elif "smartphone" in question_lower or "telefoon" in question_lower:
-            return "smartphones"
+            return "smartphone"
         elif "computer" in question_lower or "pc" in question_lower:
             return "computers"
         else:
@@ -147,17 +147,17 @@ class MockRefinement:
         # Category-specific questions based on stage
         if stage == "ask_technology" and category == "printers":
             return "Welke technologie heeft je voorkeur (inkjet/laser)?"
-        elif stage == "ask_screen_size" and category in ["laptops", "smartphones"]:
+        elif stage == "ask_screen_size" and category in ["laptop", "smartphone"]:
             return "Welke schermgrootte heeft je voorkeur?"
-        elif stage == "ask_processor" and category in ["laptops", "computers"]:
+        elif stage == "ask_processor" and category in ["laptop", "computers"]:
             return "Welke processor heeft je voorkeur?"
-        elif stage == "ask_ram" and category == "laptops":
+        elif stage == "ask_ram" and category == "laptop":
             return "Hoeveel RAM heb je nodig?"
-        elif stage == "ask_storage" and category == "laptops":
+        elif stage == "ask_storage" and category == "laptop":
             return "Hoeveel opslagruimte heb je nodig?"
-        elif stage == "ask_battery_capacity" and category == "smartphones":
+        elif stage == "ask_battery_capacity" and category == "smartphone":
             return "Wat is je gewenste batterij capaciteit?"
-        elif stage == "ask_camera" and category == "smartphones":
+        elif stage == "ask_camera" and category == "smartphone":
             return "Welke camera kwaliteit heb je nodig?"
         elif stage == "ask_motherboard" and category == "computers":
             return "Welke motherboard heb je nodig?"

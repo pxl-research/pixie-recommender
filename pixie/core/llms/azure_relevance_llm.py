@@ -29,7 +29,8 @@ class AzureRelevanceLLM(AzureOpenAILLM):
         try:
             prompt = (
                 "Is the following question related to buying or searching for products? "
-                "The products we support are: laptops, smartphones, headphones, monitors, tablets. "
+                "The products we support are: laptops, smartphones, headphones, "
+                "monitors, tablets, printers. "
                 "Answer with exactly 'yes' or 'no'.\n\n"
                 f"Question: {text}"
             )
@@ -62,6 +63,9 @@ class AzureRelevanceLLM(AzureOpenAILLM):
                 "computer",
                 "pc",
                 "desktop",
+                "printer",
+                "drukker",
+                "print",
             ]
             text_lower = text.lower()
             return any(keyword in text_lower for keyword in product_keywords)
@@ -69,7 +73,8 @@ class AzureRelevanceLLM(AzureOpenAILLM):
     def detect_category(self, question: Optional[str]) -> Optional[str]:
         """Detect the product category from the question.
 
-        Returns one of: "laptop", "smartphone", "headphones", "monitor", "tablet", or None
+        Returns one of: "laptop", "smartphone", "headphones", "monitor",
+        "tablet", "printers", or None
         """
         text = (question or "").strip()
 
@@ -80,10 +85,11 @@ class AzureRelevanceLLM(AzureOpenAILLM):
         try:
             prompt = (
                 "Determine the product category from the following question. "
-                "Possible categories are: laptop, smartphone, headphones, monitor, tablet. "
+                "Possible categories are: laptop, smartphone, headphones, "
+                "monitor, tablet, printers. "
                 "If the question is not related to any of these categories, return 'none'. "
                 "Answer with exactly one word: laptop, smartphone, headphones, "
-                "monitor, tablet, or none.\n\n"
+                "monitor, tablet, printers, or none.\n\n"
                 f"Question: {text}"
             )
 
@@ -97,6 +103,7 @@ class AzureRelevanceLLM(AzureOpenAILLM):
                     "headphones",
                     "monitor",
                     "tablet",
+                    "printers",
                 }
                 if answer in valid_categories:
                     return answer
@@ -154,6 +161,18 @@ class AzureRelevanceLLM(AzureOpenAILLM):
                 "lenovo",
                 "microsoft",
                 "apple",
+            ],
+            "printers": [
+                "printer",
+                "print",
+                "drukker",
+                "laserprinter",
+                "inkjet",
+                "hp",
+                "brother",
+                "canon",
+                "epson",
+                "samsung",
             ],
         }
 

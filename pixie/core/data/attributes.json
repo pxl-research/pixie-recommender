@@ -168,5 +168,39 @@
         "required": false
       }
     ]
+  },
+  "printers": {
+    "attributes": [
+      {
+        "name": "budget",
+        "question": "Wat is je budget voor de printer?",
+        "type": "number",
+        "required": true
+      },
+      {
+        "name": "brand",
+        "question": "Heb je een voorkeur voor een merk zoals HP, Brother, Canon, Epson of Samsung?",
+        "type": "string",
+        "required": false
+      },
+      {
+        "name": "technology",
+        "question": "Welke technologie heeft je voorkeur (inkjet, laser, of dot-matrix)?",
+        "type": "string",
+        "required": false
+      },
+      {
+        "name": "color",
+        "question": "Wil je een kleurenprinter of is zwart-wit voldoende?",
+        "type": "string",
+        "required": false
+      },
+      {
+        "name": "pages_per_minute",
+        "question": "Hoeveel pagina's per minuut moet de printer minimaal kunnen printen?",
+        "type": "number",
+        "required": false
+      }
+    ]
   }
 }

@@ -38,7 +38,13 @@ class Pixie:
                 if context and isinstance(context, dict):
                     category = context.get("category")
                 result = engine.search(sql, context, category)
-                return result.get("results", [])
+                # Handle both old dict format and new list format
+                if isinstance(result, dict):
+                    return result.get("results", [])
+                elif isinstance(result, list):
+                    return result
+                else:
+                    return []
 
             self._conversation_manager = ConversationLoopManager(
                 search_with_category,

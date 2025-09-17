@@ -7,10 +7,7 @@ from uuid import UUID
 from .connection import get_db_session
 from .models.base import AttributeDefinition, ProductType
 from .repositories.flexible_repositories import (
-    get_attribute_definition_repository,
-    get_product_attribute_value_repository,
-    get_product_repository,
-    get_product_type_repository,
+    get_dynamic_repository,
 )
 
 logger = logging.getLogger(__name__)
@@ -44,10 +41,14 @@ def seed_product_types_with_session(session) -> List[ProductType]:
     ]
 
     created_types = []
-    repo = get_product_type_repository(session)
+    repo = get_dynamic_repository(session, "product_types")
     for pt_data in product_types_data:
         # Check if already exists
-        existing = repo.get_by_name(pt_data["name"])
+        existing = repo.find_by_column("name", pt_data["name"])
+        if existing:
+            logger.info(f"Product type '{pt_data['name']}' already exists")
+            created_types.append(existing[0] if existing else None)
+            continue
         if existing:
             logger.info(f"Product type '{pt_data['name']}' already exists")
             created_types.append(existing)
@@ -229,7 +230,7 @@ def seed_attribute_definitions_with_session(
     }
 
     created_attributes = {}
-    attr_repo = get_attribute_definition_repository(session)
+    attr_repo = get_dynamic_repository(session, "attribute_definitions")
 
     for pt in product_types:
         pt_attributes = []
@@ -237,9 +238,10 @@ def seed_attribute_definitions_with_session(
         if pt_name in attributes_data:
             for attr_data in attributes_data[pt_name]:
                 # Check if already exists
-                existing = attr_repo.get_by_name_and_type(
-                    attr_data["name"], UUID(str(pt.id))
+                existing_list = attr_repo.filter_by_attributes(
+                    {"name": attr_data["name"], "product_type_id": str(pt.id)}
                 )
+                existing = existing_list[0] if existing_list else None
                 if existing:
                     logger.info(
                         f"Attribute '{attr_data['name']}' already exists for {pt_name}"
@@ -366,8 +368,8 @@ def seed_sample_products_with_session(
         ],
     }
 
-    product_repo = get_product_repository(session)
-    attr_value_repo = get_product_attribute_value_repository(session)
+    product_repo = get_dynamic_repository(session, "products")
+    attr_value_repo = get_dynamic_repository(session, "product_attribute_values")
 
     for pt in product_types:
         pt_name = str(pt.name)  # Explicit string conversion
