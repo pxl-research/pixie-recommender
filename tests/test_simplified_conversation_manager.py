@@ -186,6 +186,7 @@ class TestAttributeCollector:
 
     def test_collection_completion(self):
         """Test determining when collection is complete."""
+
     collector = AttributeCollector("printers")
 
     # Not complete without budget
