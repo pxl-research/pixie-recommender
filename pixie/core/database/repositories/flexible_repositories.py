@@ -141,6 +141,8 @@ class DynamicRepository:
 
     def create(self, data: Dict[str, Any]) -> Dict[str, Any]:
         """Create a new record."""
+        from datetime import datetime, timezone
+        
         # Validate columns exist
         all_columns = [col["name"] for col in self._get_columns()]
         invalid_columns = [col for col in data.keys() if col not in all_columns]
@@ -149,8 +151,17 @@ class DynamicRepository:
                 f"Columns {invalid_columns} do not exist in table '{self.table_name}'"
             )
 
+        # Add timestamps if columns exist and not provided
+        data_with_timestamps = data.copy()
+        current_time = datetime.now(timezone.utc)
+        
+        if "created_at" in all_columns and "created_at" not in data_with_timestamps:
+            data_with_timestamps["created_at"] = current_time
+        if "updated_at" in all_columns and "updated_at" not in data_with_timestamps:
+            data_with_timestamps["updated_at"] = current_time
+
         # Build INSERT query
-        columns = list(data.keys())
+        columns = list(data_with_timestamps.keys())
         placeholders = [f":{col}" for col in columns]
 
         query = f"""
@@ -159,7 +170,7 @@ class DynamicRepository:
             RETURNING *
         """
 
-        result = self.session.execute(text(query), data)
+        result = self.session.execute(text(query), data_with_timestamps)
         self.session.commit()
 
         row = result.fetchone()
@@ -167,6 +178,8 @@ class DynamicRepository:
 
     def update(self, id_value: Any, data: Dict[str, Any]) -> Optional[Dict[str, Any]]:
         """Update a record."""
+        from datetime import datetime, timezone
+        
         # Validate columns exist
         all_columns = [col["name"] for col in self._get_columns()]
         invalid_columns = [col for col in data.keys() if col not in all_columns]
@@ -177,8 +190,13 @@ class DynamicRepository:
 
         pk_column = self._get_primary_key()
 
+        # Add updated_at timestamp if column exists and not provided
+        data_with_timestamps = data.copy()
+        if "updated_at" in all_columns and "updated_at" not in data_with_timestamps:
+            data_with_timestamps["updated_at"] = datetime.now(timezone.utc)
+
         # Build UPDATE query
-        set_parts = [f"{col} = :{col}" for col in data.keys()]
+        set_parts = [f"{col} = :{col}" for col in data_with_timestamps.keys()]
         query = f"""
             UPDATE {self.table_name}
             SET {', '.join(set_parts)}
@@ -186,7 +204,7 @@ class DynamicRepository:
             RETURNING *
         """
 
-        params = data.copy()
+        params = data_with_timestamps.copy()
         params["id"] = id_value
 
         result = self.session.execute(text(query), params)

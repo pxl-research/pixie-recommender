@@ -13,7 +13,7 @@
         "type": "ask_user",
         "text": null,
         "prompt": "Wat is je budget voor een printer?",
-        "pending_id": "pending-6d1c586e",
+        "pending_id": "pending-e99d4de2",
         "reason": null
       }
     },
@@ -24,7 +24,7 @@
         "type": "ask_user",
         "text": null,
         "prompt": "Heb je een voorkeur voor een bepaald merk?",
-        "pending_id": "pending-6d1c586e",
+        "pending_id": "pending-e99d4de2",
         "reason": null
       }
     },
@@ -35,7 +35,7 @@
         "type": "ask_user",
         "text": null,
         "prompt": "Welke printtechnologie prefereer je (inkjet/laser)?",
-        "pending_id": "pending-6d1c586e",
+        "pending_id": "pending-e99d4de2",
         "reason": null
       }
     },

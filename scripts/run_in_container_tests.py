@@ -56,6 +56,24 @@ def post(body):
         return r.status, {"raw": data}
 
 
+def post_to_endpoint(endpoint, body):
+    """POST to arbitrary endpoint."""
+    conn = http.client.HTTPConnection(API_HOST, API_PORT)
+    conn.request(
+        "POST",
+        endpoint,
+        body=json.dumps(body),
+        headers={"Content-Type": "application/json"},
+    )
+    r = conn.getresponse()
+    data = r.read().decode()
+    conn.close()
+    try:
+        return r.status, json.loads(data)
+    except Exception:
+        return r.status, {"raw": data}
+
+
 out = {"health": None, "flow": []}
 
 # Health check
@@ -113,7 +131,18 @@ while retry_count < max_retries:
 
 if retry_count >= max_retries:
     print("❌ Database verification failed after all retries")
-    print("   Attempting to force database seeding...")
+    print("   Attempting to reset database configuration and force seeding...")
+
+    # Try to reset the database configuration in case of cached connection issues
+    try:
+        reset_status, reset_resp = post_to_endpoint("/debug/reset-db-connection", {})
+        if reset_status == 200 and isinstance(reset_resp, dict):
+            new_url = reset_resp.get('new_database_url', 'unknown')
+            print(f"✅ Configuration reset successful: {new_url}")
+        else:
+            print(f"⚠️  Configuration reset failed: {reset_status} {reset_resp}")
+    except Exception as e:
+        print(f"⚠️  Could not reset configuration: {e}")
 
     # Try to trigger seeding by calling the API health endpoint multiple times
     for i in range(3):

@@ -78,12 +78,23 @@ def get_db_session() -> Generator[Session, None, None]:
     try:
         yield session
         session.commit()
-    except Exception as e:
+    except Exception:
         session.rollback()
-        logger.error(f"Database session error: {e}")
         raise
     finally:
         session.close()
+
+
+def reset_engine() -> None:
+    """Reset cached engine and session factory.
+    
+    Useful for testing or when configuration changes.
+    """
+    global _engine, _SessionLocal
+    if _engine:
+        _engine.dispose()
+    _engine = None
+    _SessionLocal = None
 
 
 def get_db() -> Generator[Session, None, None]:

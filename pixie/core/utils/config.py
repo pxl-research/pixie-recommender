@@ -106,3 +106,9 @@ def get_config() -> Config:
     if _config is None:
         _config = Config.from_env()
     return _config
+
+
+def reset_config() -> None:
+    """Reset cached configuration - useful for testing or when environment changes."""
+    global _config
+    _config = None
