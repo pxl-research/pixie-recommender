@@ -23,7 +23,7 @@ class AzureSQLLLM(AzureOpenAILLM):
         model_version: str,
         temperature: float = 0.01,
         model_name: str = "azure-sql-llm",
-        default_table: str = "printers",
+        default_table: str = "products",  # Use generic products table
     ):
         super().__init__(api_version, api_endpoint, api_key, model_version, temperature)
         self.model_name = model_name
