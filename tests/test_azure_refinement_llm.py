@@ -87,8 +87,14 @@ class TestAzureSQLLLMSimple:
             mock_schema.return_value = mock_schema_manager
             mock_schema_manager.generate_table_description.return_value = "Mock schema"
 
-            # Test without LLM model (fallback)
-            self.sql_llm.model = None
+            # Provide a mocked LLM response
+            mock_response = Mock()
+            mock_response.content = (
+                "SELECT p.* FROM products p JOIN product_types pt ON "
+                "p.product_type_id = pt.id WHERE pt.name = 'printers'"
+            )
+            self.sql_llm.model = Mock()
+            self.sql_llm.model.invoke.return_value = mock_response
             sql = self.sql_llm.generate_sql("Ik zoek een printer")
 
             assert "SELECT p.* FROM products p" in sql

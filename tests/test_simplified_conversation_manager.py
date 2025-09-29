@@ -201,23 +201,22 @@ class TestAttributeCollector:
 
     def test_collection_completion(self):
         """Test determining when collection is complete."""
+        collector = AttributeCollector("printers")
 
-    collector = AttributeCollector("printers")
+        # Not complete without budget
+        assert not collector.is_collection_complete()
 
-    # Not complete without budget
-    assert not collector.is_collection_complete()
+        # Collect budget and one other attribute
+        collector.collect_attribute("budget", "€150")
+        collector.collect_attribute("brand", "HP")
 
-    # Collect budget and one other attribute
-    collector.collect_attribute("budget", "€150")
-    collector.collect_attribute("brand", "HP")
+        # With default max_attributes=3 we need a third attribute (or iterations)
+        # so the collector should NOT be complete yet after only two attributes.
+        assert not collector.is_collection_complete()
 
-    # With default max_attributes=3 we need a third attribute (or iterations)
-    # so the collector should NOT be complete yet after only two attributes.
-    assert not collector.is_collection_complete()
-
-    # After collecting one more attribute it should be complete
-    collector.collect_attribute("technology", "laser")
-    assert collector.is_collection_complete()
+        # After collecting one more attribute it should be complete
+        collector.collect_attribute("technology", "laser")
+        assert collector.is_collection_complete()
 
     def test_budget_normalization(self):
         """Test budget response normalization."""
