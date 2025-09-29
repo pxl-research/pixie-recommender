@@ -59,14 +59,19 @@ def seed_product_types_with_session(session) -> List[ProductType]:
             logger.info(f"Product type '{pt_data['name']}' already exists")
             created_types.append(existing[0] if existing else None)
             continue
-        if existing:
-            logger.info(f"Product type '{pt_data['name']}' already exists")
-            created_types.append(existing)
-            continue
 
-        pt = repo.create(pt_data)
-        created_types.append(pt)
-        logger.info(f"Created product type: {pt.name}")
+        try:
+            pt = repo.create(pt_data)
+            created_types.append(pt)
+            logger.info(f"Created product type: {pt.name}")
+        except Exception as e:
+            logger.warning(f"Failed to create product type '{pt_data['name']}': {e}")
+            # Try to find it again in case it was created by another process
+            existing = repo.find_by_column("name", pt_data["name"])
+            if existing:
+                created_types.append(existing[0] if existing else None)
+            else:
+                created_types.append(None)
 
     return created_types
 
@@ -499,27 +504,44 @@ def seed_sample_products_with_session(
 
             for product_data in products_data[pt_name]:
                 # Check if product already exists
-                existing = product_repo.get_by_external_id(product_data["external_id"])
+                existing = product_repo.filter_by_attributes(
+                    {"external_id": product_data["external_id"]}
+                )
                 if existing:
                     logger.info(f"Product '{product_data['name']}' already exists")
                     continue
 
                 # Create product
-                product_attrs = product_data.copy()
-                product_attrs["product_type_id"] = UUID(str(pt.id))
-                del product_attrs["attributes"]
+                try:
+                    product_attrs = product_data.copy()
+                    product_attrs["product_type_id"] = UUID(str(pt.id))
+                    del product_attrs["attributes"]
 
-                product = product_repo.create(product_attrs)
-                logger.info(f"Created product: {product.name}")
+                    product = product_repo.create(product_attrs)
+                    logger.info(f"Created product: {product_data['name']}")
 
-                # Create attribute values
-                for attr_name, value in product_data["attributes"].items():
-                    if attr_name in attr_lookup:
-                        attr_def = attr_lookup[attr_name]
-                        attr_value_repo.set_value(
-                            UUID(str(product.id)), UUID(str(attr_def.id)), value
-                        )
-                        logger.info(f"Set {attr_name} = {value} for {product.name}")
+                    # Create attribute values
+                    for attr_name, value in product_data["attributes"].items():
+                        if attr_name in attr_lookup:
+                            attr_def = attr_lookup[attr_name]
+                            try:
+                                attr_value_repo.set_value(
+                                    UUID(str(product["id"])),
+                                    UUID(str(attr_def["id"])),
+                                    value,
+                                )
+                                logger.info(
+                                    f"Set {attr_name} = {value} for {product_data['name']}"
+                                )
+                            except Exception as e:
+                                logger.warning(
+                                    f"Failed to set attribute {attr_name} for "
+                                    f"{product_data['name']}: {e}"
+                                )
+                except Exception as e:
+                    logger.warning(
+                        f"Failed to create product '{product_data['name']}': {e}"
+                    )
 
 
 def seed_database() -> None:

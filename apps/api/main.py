@@ -19,6 +19,38 @@ pixie_logging.configure_logging()
 async def lifespan(app: FastAPI):
     # Configure logging at startup using the lifespan handler (replacement for on_event)
     pixie_logging.configure_logging()
+
+    # Initialize database and seed data on startup
+    try:
+        from pixie.core.database.init import create_tables
+
+        # Create tables if they don't exist
+        create_tables()
+        logging.info("Database tables created/verified successfully")
+
+        # Try simple database seeding for critical data (printers)
+        try:
+            import sys
+
+            sys.path.append("/app")
+            from scripts.init_database import init_database_simple
+
+            init_database_simple()
+        except Exception as e:
+            logging.warning(f"Simple database seeding failed, trying full seeding: {e}")
+            # Fallback to full seeding
+            try:
+                from pixie.core.database.seed import seed_database
+
+                seed_database()
+                logging.info("Full database seeding completed successfully")
+            except Exception as e2:
+                logging.error(f"Full database seeding also failed: {e2}")
+
+    except Exception as e:
+        logging.error(f"Database initialization failed: {e}")
+        # Continue anyway - the app might still work with existing data
+
     yield
 
 

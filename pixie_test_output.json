@@ -13,7 +13,7 @@
         "type": "ask_user",
         "text": null,
         "prompt": "Wat is je budget voor een printer?",
-        "pending_id": "pending-16af2bb0",
+        "pending_id": "pending-2f4fde2c",
         "reason": null
       }
     },
@@ -24,7 +24,7 @@
         "type": "ask_user",
         "text": null,
         "prompt": "Heb je een voorkeur voor een bepaald merk?",
-        "pending_id": "pending-16af2bb0",
+        "pending_id": "pending-2f4fde2c",
         "reason": null
       }
     },
@@ -35,7 +35,7 @@
         "type": "ask_user",
         "text": null,
         "prompt": "Welke printtechnologie prefereer je (inkjet/laser)?",
-        "pending_id": "pending-16af2bb0",
+        "pending_id": "pending-2f4fde2c",
         "reason": null
       }
     },
@@ -44,7 +44,7 @@
       "status": 200,
       "resp": {
         "type": "answer",
-        "text": "[{'id': 'bbab0b20-3e41-4893-82be-b9a3cf3e340e', 'external_id': 'BROTHER-XC-2570-1', 'name': 'Brother XC 2570', 'description': 'Reliable laser printer for home and office use', 'brand': 'Brother', 'model': 'XC 2570', 'price': 199.0, 'product_type': None, 'created_at': datetime.datetime(2025, 9, 29, 8, 37, 50, 486391)}, {'id': '251ef4c8-9660-4393-ad4c-e02297878458', 'external_id': 'BROTHER-XT-3560-1', 'name': 'Brother XT 3560', 'description': 'Compact laser printer with wireless connectivity', 'brand': 'Brother', 'model': 'XT 3560', 'price': 159.0, 'product_type': None, 'created_at': datetime.datetime(2025, 9, 29, 8, 37, 50, 486391)}, {'id': '14c8b247-8965-4830-a747-9bc52790e552', 'external_id': 'HP-LASERJET-PRO-1', 'name': 'HP LaserJet Pro M404n', 'description': 'Professional laser printer with fast printing speeds', 'brand': 'HP', 'model': 'LaserJet Pro M404n', 'price': 179.0, 'product_type': None, 'created_at': datetime.datetime(2025, 9, 29, 8, 37, 50, 486391)}, {'id': '6900d675-7fb8-4064-948f-fc974bf83f90', 'external_id': 'CANON-INKJET-1', 'name': 'Canon PIXMA TS3350', 'description': 'All-in-one inkjet printer for home use', 'brand': 'Canon', 'model': 'PIXMA TS3350', 'price': 89.0, 'product_type': None, 'created_at': datetime.datetime(2025, 9, 29, 8, 37, 50, 486391)}]",
+        "text": "[{'id': '5473e0bc-1615-4c3e-b4d9-1a6f4b0f781f', 'external_id': 'BROTHER-XC-2570-1', 'name': 'Brother XC 2570', 'description': 'Reliable laser printer for home and office use', 'brand': 'Brother', 'model': 'XC 2570', 'price': 199.0, 'product_type': None, 'created_at': datetime.datetime(2025, 9, 29, 8, 53, 34, 324702)}, {'id': 'cbbd42e2-ce3f-4fdb-a027-72604307b1d2', 'external_id': 'BROTHER-XT-3560-1', 'name': 'Brother XT 3560', 'description': 'Compact laser printer with wireless connectivity', 'brand': 'Brother', 'model': 'XT 3560', 'price': 159.0, 'product_type': None, 'created_at': datetime.datetime(2025, 9, 29, 8, 53, 34, 324702)}, {'id': '16dbfb06-6808-46fa-8dc0-d899fedcc56c', 'external_id': 'HP-LASERJET-PRO-1', 'name': 'HP LaserJet Pro M404n', 'description': 'Professional laser printer with fast printing speeds', 'brand': 'HP', 'model': 'LaserJet Pro M404n', 'price': 179.0, 'product_type': None, 'created_at': datetime.datetime(2025, 9, 29, 8, 53, 34, 324702)}, {'id': 'd3f125b9-4df7-4733-bf1c-9d4341d95b5e', 'external_id': 'CANON-INKJET-1', 'name': 'Canon PIXMA TS3350', 'description': 'All-in-one inkjet printer for home use', 'brand': 'Canon', 'model': 'PIXMA TS3350', 'price': 89.0, 'product_type': None, 'created_at': datetime.datetime(2025, 9, 29, 8, 53, 34, 324702)}]",
         "prompt": null,
         "pending_id": null,
         "reason": null
