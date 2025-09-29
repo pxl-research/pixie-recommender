@@ -22,21 +22,31 @@ def seed_product_types_with_session(session) -> List[ProductType]:
             "name": "laptop",
             "display_name": "Laptop",
             "description": "Portable computers for work and entertainment",
+            "is_active": True,
         },
         {
             "name": "smartphone",
             "display_name": "Smartphone",
             "description": "Mobile phones with advanced computing capabilities",
+            "is_active": True,
         },
         {
             "name": "headphones",
             "display_name": "Headphones",
             "description": "Audio devices for listening to music and calls",
+            "is_active": True,
         },
         {
             "name": "monitor",
             "display_name": "Monitor",
             "description": "Display devices for computers",
+            "is_active": True,
+        },
+        {
+            "name": "printers",
+            "display_name": "Printers", 
+            "description": "Various types of printers including inkjet and laser",
+            "is_active": True,
         },
     ]
 
@@ -409,6 +419,68 @@ def seed_sample_products_with_session(
                     "resolution": "3840x2160",
                     "refresh_rate_hz": 60,
                     "panel_type": "IPS",
+                },
+            },
+        ],
+        "printers": [
+            {
+                "external_id": "BROTHER-XC-2570-1",
+                "name": "Brother XC 2570",
+                "description": "Reliable laser printer for home and office use",
+                "brand": "Brother", 
+                "model": "XC 2570",
+                "price_cents": 19900,  # €199.00
+                "attributes": {
+                    "print_type": "laser",
+                    "color_support": "monochrome", 
+                    "pages_per_minute": 28,
+                    "brand": "Brother",
+                    "budget": 19900,
+                },
+            },
+            {
+                "external_id": "BROTHER-XT-3560-1", 
+                "name": "Brother XT 3560",
+                "description": "Compact laser printer with wireless connectivity",
+                "brand": "Brother",
+                "model": "XT 3560", 
+                "price_cents": 15900,  # €159.00
+                "attributes": {
+                    "print_type": "laser",
+                    "color_support": "monochrome",
+                    "pages_per_minute": 32,
+                    "brand": "Brother",
+                    "budget": 15900,
+                },
+            },
+            {
+                "external_id": "HP-LASERJET-PRO-1",
+                "name": "HP LaserJet Pro M404n",
+                "description": "Professional laser printer with fast printing speeds",
+                "brand": "HP",
+                "model": "LaserJet Pro M404n",
+                "price_cents": 17900,  # €179.00
+                "attributes": {
+                    "print_type": "laser", 
+                    "color_support": "monochrome",
+                    "pages_per_minute": 40,
+                    "brand": "HP",
+                    "budget": 17900,
+                },
+            },
+            {
+                "external_id": "CANON-INKJET-1",
+                "name": "Canon PIXMA TS3350",
+                "description": "All-in-one inkjet printer for home use", 
+                "brand": "Canon",
+                "model": "PIXMA TS3350",
+                "price_cents": 8900,  # €89.00
+                "attributes": {
+                    "print_type": "inkjet",
+                    "color_support": "color",
+                    "pages_per_minute": 15,
+                    "brand": "Canon", 
+                    "budget": 8900,
                 },
             },
         ],
