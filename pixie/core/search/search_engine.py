@@ -64,7 +64,7 @@ class SearchEngine:
             try:
                 # Attempt to rewrite naive queries that reference product types as tables
                 rewritten_sql = self._rewrite_product_type_queries(session, sql)
-                
+
                 # Execute the (possibly rewritten) SQL query
                 return self._execute_and_map_sql(session, rewritten_sql)
 
@@ -75,22 +75,22 @@ class SearchEngine:
     def _rewrite_product_type_queries(self, session, sql: str) -> str:
         """Rewrite queries that reference product types as table names."""
         import re
-        
+
         # Check if query references a table name that might be a product type
         table_match = re.search(r"from\s+([a-zA-Z_][\w]*)", sql, re.IGNORECASE)
         if not table_match:
             return sql
-            
+
         referenced_table = table_match.group(1).lower()
-        
+
         # Check if this table actually exists in the database
         if self._table_exists(session, referenced_table):
             return sql
-            
+
         # Check if it's a product type instead
         if self._is_product_type(session, referenced_table):
             return self._rewrite_as_product_type_query(sql, referenced_table)
-            
+
         return sql
 
     def _table_exists(self, session, table_name: str) -> bool:
@@ -108,7 +108,7 @@ class SearchEngine:
 
             discovered_names = {str(t).lower() for t in discovered_iter}
             return table_name in discovered_names
-            
+
         except Exception:
             return False
 
@@ -124,12 +124,12 @@ class SearchEngine:
     def _rewrite_as_product_type_query(self, sql: str, product_type: str) -> str:
         """Rewrite SQL to use products table with product type join."""
         import re
-        
+
         logger.info(
             f"Rewriting SQL: referenced table '{product_type}' is a "
             "product_type; using products join instead"
         )
-        
+
         # Extract WHERE clause if present
         where_match = re.search(r"where\s+(.*)$", sql, re.IGNORECASE | re.DOTALL)
         original_where = None
@@ -301,7 +301,7 @@ class SearchEngine:
                 filtered_product_ids = self._apply_single_attribute_filter(
                     session, filtered_product_ids, attr_name, attr_value
                 )
-                
+
                 if not filtered_product_ids:
                     return []
 

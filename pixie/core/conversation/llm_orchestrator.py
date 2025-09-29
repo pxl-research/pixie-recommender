@@ -251,8 +251,7 @@ class MockLLMOrchestrator(LLMOrchestrator):
         )
 
         return LLMResponse(
-            success=True, 
-            result={"sql": sql, "table": "products", "params": [category]}
+            success=True, result={"sql": sql, "table": "products", "params": [category]}
         )
 
 
