@@ -1,211 +1,51 @@
 import os
-from typing import Optional
+from typing import Tuple, Any
 
 import pytest
 
 from pixie.core.llms import azure_llm_set
 
 
-class MockRelevance:
-    def is_relevant(self, text: str) -> bool:
-        return True
-
-    def detect_category(self, question: str) -> Optional[str]:
-        """Mock category detection based on question content."""
-        question_lower = question.lower()
-        if "laptop" in question_lower:
-            return "laptop"
-        elif "printer" in question_lower or "print" in question_lower:
-            return "printers"
-        elif "smartphone" in question_lower or "telefoon" in question_lower:
-            return "smartphone"
-        elif "computer" in question_lower or "pc" in question_lower:
-            return "computers"
-        else:
-            return "printers"  # fallback
-
-
-class MockSQL:
-    def generate_sql(
-        self,
-        question: str,
-        attributes: Optional[dict] = None,
-        table_name: Optional[str] = None,
-    ) -> str:
-        """Generate SQL query with proper budget filtering."""
-        table = table_name or "printers"
-        base_query = f"SELECT * FROM {table}"
-        conditions = []
-
-        # Define vague responses that should be ignored
-        vague_responses = [
-            "weet ik niet",
-            "geen idee",
-            "maakt niet uit",
-            "doet er niet toe",
-            "geen voorkeur",
-            "weet niet",
-            "onbekend",
-            "nvt",
-            "n.v.t.",
-        ]
-
-        if attributes:
-            # Handle budget filtering
-            if "budget" in attributes:
-                budget_str = attributes["budget"].lower().strip()
-
-                # Skip vague responses
-                if budget_str not in vague_responses:
-                    # Parse budget values (supporting different formats)
-                    if "-" in budget_str and any(char.isdigit() for char in budget_str):
-                        # Range format like "100-200" or "100-200 euro"
-                        import re
-
-                        numbers = re.findall(r"\d+", budget_str)
-                        if len(numbers) >= 2:
-                            min_price = int(numbers[0])
-                            max_price = int(numbers[1])
-                            conditions.append(
-                                f"price >= {min_price} AND price <= {max_price}"
-                            )
-                        elif len(numbers) == 1:
-                            max_price = int(numbers[0])
-                            conditions.append(f"price <= {max_price}")
-                    elif "maximaal" in budget_str or "max" in budget_str:
-                        # Extract maximum value
-                        import re
-
-                        numbers = re.findall(r"\d+", budget_str)
-                        if numbers:
-                            max_price = int(numbers[-1])
-                            conditions.append(f"price <= {max_price}")
-                    elif any(char.isdigit() for char in budget_str):
-                        # Extract any numeric value and treat as maximum
-                        import re
-
-                        numbers = re.findall(r"\d+", budget_str)
-                        if numbers:
-                            max_price = int(numbers[-1])
-                            conditions.append(f"price <= {max_price}")
-
-            # Handle brand filtering
-            if "brand" in attributes and attributes["brand"]:
-                brand = attributes["brand"].strip()
-                if brand.lower() not in vague_responses:
-                    conditions.append(f"brand = '{brand}'")
-
-            # Handle technology filtering
-            if "technology" in attributes and attributes["technology"]:
-                tech = attributes["technology"].strip().lower()
-                if tech not in vague_responses:
-                    conditions.append(f"LOWER(technology) = '{tech}'")
-
-            # Handle color requirement
-            if "has_color" in attributes:
-                if attributes["has_color"]:
-                    conditions.append("has_color = true")
-                else:
-                    conditions.append("has_color = false")
-
-            # Handle multifunction requirement
-            if "is_multifunction" in attributes:
-                if attributes["is_multifunction"]:
-                    conditions.append("is_multifunction = true")
-                else:
-                    conditions.append("is_multifunction = false")
-
-        # Combine base query with conditions
-        if conditions:
-            where_clause = " WHERE " + " AND ".join(conditions)
-            return base_query + where_clause + ";"
-
-        return base_query + ";"
-
-
-class MockRefinement:
-    def generate_refinement_question(self, context: dict) -> "Optional[str]":
-        stage = context.get("stage", "")
-        category = context.get("category", "printers")
-
-        # Check if this is the first question (ask_budget stage or no user attributes)
-        system_keys = [
-            "flow",
-            "stage",
-            "iterations",
-            "question",
-            "collected_attributes",
-            "category",
-        ]
-        user_attrs = [k for k in context.keys() if k not in system_keys]
-
-        # If stage indicates asking for budget and no user attributes yet
-        if stage == "ask_budget" or len(user_attrs) == 0:
-            return "Wat is je budget?"
-        if "budget" in context and "brand" not in context:
-            return "Heb je een voorkeur voor een merk?"
-
-        # Category-specific questions based on stage
-        if stage == "ask_technology" and category == "printers":
-            return "Welke technologie heeft je voorkeur (inkjet/laser)?"
-        elif stage == "ask_screen_size" and category in ["laptop", "smartphone"]:
-            return "Welke schermgrootte heeft je voorkeur?"
-        elif stage == "ask_processor" and category in ["laptop", "computers"]:
-            return "Welke processor heeft je voorkeur?"
-        elif stage == "ask_ram" and category == "laptop":
-            return "Hoeveel RAM heb je nodig?"
-        elif stage == "ask_storage" and category == "laptop":
-            return "Hoeveel opslagruimte heb je nodig?"
-        elif stage == "ask_battery_capacity" and category == "smartphone":
-            return "Wat is je gewenste batterij capaciteit?"
-        elif stage == "ask_camera" and category == "smartphone":
-            return "Welke camera kwaliteit heb je nodig?"
-        elif stage == "ask_motherboard" and category == "computers":
-            return "Welke motherboard heb je nodig?"
-        elif stage == "ask_power_supply" and category == "computers":
-            return "Welke voeding heb je nodig?"
-
-        return None
-
-
-@pytest.fixture
-def mock_llm_set():
-    """LLM fixture that uses real Azure LLMs when available, falls back to mocks.
-
-    This allows v0.5 real LLM testing while maintaining fast/reliable mock fallback.
-    Set PIXIE_FORCE_MOCKS=1 to always use mocks even when Azure is configured.
+@pytest.fixture(scope="session")
+def azure_llm_set_fixture() -> Tuple[Any, Any, Any]:
     """
-    # Check if we should force mock usage
-    force_mocks = os.getenv("PIXIE_FORCE_MOCKS", "0") == "1"
+    Fixture that provides Azure LLM instances for testing.
+    
+    Requires proper Azure OpenAI configuration to run tests.
+    """
+    # Check if Azure is properly configured
+    azure_endpoint = os.getenv("AZURE_OPENAI_ENDPOINT", "")
+    azure_key = os.getenv("AZURE_OPENAI_KEY", "")
+    azure_api_version = os.getenv("AZURE_OPENAI_API_VERSION", "")
+    azure_model = os.getenv("AZURE_OPENAI_MODEL", "")
 
-    if not force_mocks:
-        # Try to use real Azure LLMs if properly configured
-        azure_endpoint = os.getenv("AZURE_OPENAI_ENDPOINT", "")
-        azure_key = os.getenv("AZURE_OPENAI_KEY", "")
-        azure_api_version = os.getenv("AZURE_OPENAI_API_VERSION", "")
-        azure_model = os.getenv("AZURE_OPENAI_MODEL", "")
-
-        # Check if Azure is properly configured (all required vars present)
-        azure_configured = (
-            azure_endpoint
-            and azure_endpoint != "https://example.openai.azure.com/"
-            and azure_key
-            and azure_key != "dummy-key-for-development"
-            and azure_api_version
-            and azure_model
+    azure_configured = (
+        azure_endpoint
+        and azure_endpoint not in ["https://example.openai.azure.com/", "https://your-resource.openai.azure.com/"]
+        and azure_key
+        and azure_key not in ["dummy-key-for-development", "your-api-key-here"]
+        and azure_api_version
+        and azure_model
+    )
+    
+    if not azure_configured:
+        pytest.skip(
+            "Azure OpenAI configuration is required for tests. "
+            "Please set AZURE_OPENAI_ENDPOINT, AZURE_OPENAI_KEY, "
+            "AZURE_OPENAI_API_VERSION, and AZURE_OPENAI_MODEL environment variables."
         )
-        if azure_configured:
-            try:
-                # Attempt to create real Azure LLMs
-                real_llms = azure_llm_set.create_azure_llm_set()
-                print(
-                    f"✅ Using REAL Azure LLMs for testing (endpoint: {azure_endpoint})"
-                )
-                return real_llms
-            except Exception as e:
-                # If Azure LLMs fail, fall back to mocks with warning
-                print(f"⚠️  Azure LLMs failed ({e}), falling back to mocks")
 
-    # Default: Use mock LLMs for fast, predictable tests
-    print("🔧 Using MOCK LLMs for testing")
-    return MockRelevance(), MockSQL(), MockRefinement()
+    try:
+        # Create real Azure LLMs
+        real_llms = azure_llm_set.create_azure_llm_set()
+        print(f"✅ Using Azure LLMs for testing (endpoint: {azure_endpoint})")
+        return real_llms
+    except Exception as e:
+        pytest.skip(f"Failed to create Azure LLMs: {e}")
+
+
+# Legacy compatibility - can be removed once all tests are updated
+@pytest.fixture(scope="session")  
+def llm_set(azure_llm_set_fixture):
+    """Legacy fixture name for backward compatibility."""
+    return azure_llm_set_fixture

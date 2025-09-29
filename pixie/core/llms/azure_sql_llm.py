@@ -41,32 +41,46 @@ class AzureSQLLLM(AzureOpenAILLM):
             return self._fallback_sql_generation(q, attrs, table)
 
         try:
+            # Map table parameter to actual product type name in database
+            category_to_product_type = {
+                "printers": "printers",
+                "laptops": "laptop",  # category "laptops" maps to product_type "laptop"
+                "computers": "computer",
+                "smartphones": "smartphone",
+            }
+            product_type = category_to_product_type.get(table, table)
+
             # Generate schema information dynamically
             schema_manager = get_schema_manager()
-            schema_info = schema_manager.generate_table_description(table)
+            schema_info = schema_manager.generate_table_description("products")
 
-            # Build prompt with specific instructions for budget handling
+            # Build prompt with specific instructions for the normalized database structure
             prompt = (
                 f"Generate a single SQL query (no explanation) that answers the user's request.\n\n"
                 f"{schema_info}\n\n"
+                f"DATABASE STRUCTURE:\n"
+                f"- Use products table with JOIN to product_types table\n"
+                f"- Product type to search: '{product_type}'\n"
+                f"- Use product_attribute_values table for brand, technology, "
+                f"and other attributes\n\n"
                 f"User Question: {q}\n"
                 f"User Attributes: {attrs}\n\n"
                 "IMPORTANT RULES:\n"
-                "1. Always use 'price_cents' column for price comparisons (price in cents)\n"
-                "2. For budget constraints, use <= for maximum budget\n"
-                "3. Use exact string matching for brands and technology\n"
-                "4. Convert technology to lowercase for comparison: LOWER(technology) = 'inkjet'\n"
-                "5. Use boolean values true/false (not 1/0)\n"
-                '6. IGNORE vague responses like "weet ik niet", "geen idee", '
-                '"maakt niet uit" - no WHERE clause\n\n'
-                "Examples:\n"
-                '- Budget "200 euro" → WHERE price_cents <= 20000\n'
-                '- Budget "maximaal 150" → WHERE price_cents <= 15000\n'
-                '- Budget "weet ik niet" → IGNORE (no budget filter)\n'
-                "- Brand \"HP\" → WHERE brand = 'HP'\n"
-                '- Brand "geen voorkeur" → IGNORE (no brand filter)\n'
-                "- Technology \"inkjet\" → WHERE LOWER(technology) = 'inkjet'\n"
-                '- Technology "maakt niet uit" → IGNORE (no technology filter)\n\n'
+                "1. Always use JOIN: 'FROM products p JOIN product_types pt "
+                "ON p.product_type_id = pt.id'\n"
+                "2. Filter by product type: 'WHERE pt.name = '{product_type}'\n"
+                "3. Use 'p.price_cents' for price comparisons (price in cents)\n"
+                "4. For budget constraints, use <= for maximum budget\n"
+                "5. For brand/technology/attributes, use EXISTS with product_attribute_values\n"
+                '6. IGNORE vague responses like "weet ik niet", "geen idee", "maakt niet uit"\n\n'
+                "EXAMPLES:\n"
+                f"- Basic query: SELECT p.* FROM products p JOIN product_types pt "
+                f"ON p.product_type_id = pt.id WHERE pt.name = '{product_type}'\n"
+                f"- With budget: ... AND p.price_cents <= 20000\n"
+                "- With brand: ... AND EXISTS (SELECT 1 FROM product_attribute_values pav "
+                "JOIN attribute_definitions ad ON pav.attribute_definition_id = ad.id "
+                "WHERE pav.product_id = p.id AND ad.name = 'brand' AND pav.value = 'HP')\n"
+                '- Ignore "weet ik niet" responses completely\n\n'
                 "Generate the SQL query:"
             )
 
@@ -87,7 +101,17 @@ class AzureSQLLLM(AzureOpenAILLM):
         self, question: str, attributes: dict, table: str
     ) -> str:
         """Fallback SQL generation when Azure LLM is not available."""
-        # Simple fallback that generates basic SQL based on attributes
+        # Map category table names to actual product type names in database
+        category_to_product_type = {
+            "printers": "printers",
+            "laptops": "laptop",  # category "laptops" maps to product_type "laptop"
+            "computers": "computer",
+            "smartphones": "smartphone",
+        }
+
+        product_type = category_to_product_type.get(table, table)
+
+        # Generate conditions for filtering
         conditions = []
 
         if "price" in attributes and attributes["price"]:
@@ -96,7 +120,7 @@ class AzureSQLLLM(AzureOpenAILLM):
                     attributes["price"].replace("€", "").replace("euro", "").strip()
                 )
                 price_cents = int(price_val * 100)  # Convert euros to cents
-                conditions.append(f"price_cents <= {price_cents}")
+                conditions.append(f"p.price_cents <= {price_cents}")
             except (ValueError, AttributeError):
                 pass
 
@@ -114,50 +138,73 @@ class AzureSQLLLM(AzureOpenAILLM):
                 if budget_str and budget_str.lower() not in vague_responses:
                     budget_val = float(budget_str)
                     budget_cents = int(budget_val * 100)  # Convert euros to cents
-                    conditions.append(f"price_cents <= {budget_cents}")
+                    conditions.append(f"p.price_cents <= {budget_cents}")
             except (ValueError, AttributeError):
                 pass
 
+        # Handle brand filtering using product_attribute_values
         if "brand" in attributes and attributes["brand"]:
             brand_val = attributes["brand"].strip()
             if brand_val and brand_val.lower() not in [
                 "geen voorkeur",
                 "maakt niet uit",
+                "weet ik niet",
             ]:
-                conditions.append(f"brand = '{brand_val}'")
+                conditions.append(
+                    f"""EXISTS (
+                    SELECT 1 FROM product_attribute_values pav 
+                    JOIN attribute_definitions ad ON pav.attribute_definition_id = ad.id 
+                    WHERE pav.product_id = p.id AND ad.name = 'brand' AND pav.value = '{brand_val}'
+                )"""
+                )
 
+        # Handle technology filtering using product_attribute_values
         if "technology" in attributes and attributes["technology"]:
             tech_val = attributes["technology"].strip()
-            if tech_val and tech_val.lower() not in ["geen voorkeur", "maakt niet uit"]:
-                conditions.append(f"LOWER(technology) = '{tech_val.lower()}'")
+            if tech_val and tech_val.lower() not in [
+                "geen voorkeur",
+                "maakt niet uit",
+                "weet ik niet",
+            ]:
+                conditions.append(
+                    f"""EXISTS (
+                    SELECT 1 FROM product_attribute_values pav 
+                    JOIN attribute_definitions ad ON pav.attribute_definition_id = ad.id 
+                    WHERE pav.product_id = p.id AND ad.name = 'technology' 
+                    AND LOWER(pav.value) = '{tech_val.lower()}'
+                )"""
+                )
 
-        # Category-specific conditions
-        if table == "laptops":
-            if "screen_size" in attributes and attributes["screen_size"]:
-                screen_val = attributes["screen_size"].strip()
-                if screen_val and screen_val.lower() not in [
+        # Handle other category-specific attributes using product_attribute_values
+        for attr_name, attr_value in attributes.items():
+            if (
+                attr_name not in ["budget", "price", "brand", "technology"]
+                and attr_value
+            ):
+                attr_val = str(attr_value).strip()
+                if attr_val and attr_val.lower() not in [
                     "geen voorkeur",
                     "maakt niet uit",
+                    "weet ik niet",
                 ]:
-                    conditions.append(f"screen_size_inches >= {screen_val}")
-            if "ram" in attributes and attributes["ram"]:
-                ram_val = attributes["ram"].strip()
-                if ram_val and ram_val.lower() not in [
-                    "geen voorkeur",
-                    "maakt niet uit",
-                ]:
-                    conditions.append(f"ram_gb >= {ram_val}")
-        elif table == "smartphones":
-            if "storage" in attributes and attributes["storage"]:
-                storage_val = attributes["storage"].strip()
-                if storage_val and storage_val.lower() not in [
-                    "geen voorkeur",
-                    "maakt niet uit",
-                ]:
-                    conditions.append(f"storage_gb >= {storage_val}")
+                    conditions.append(
+                        f"""EXISTS (
+                        SELECT 1 FROM product_attribute_values pav 
+                        JOIN attribute_definitions ad ON pav.attribute_definition_id = ad.id 
+                        WHERE pav.product_id = p.id AND ad.name = '{attr_name}' 
+                        AND pav.value = '{attr_val}'
+                    )"""
+                    )
 
-        where_clause = " AND ".join(conditions) if conditions else ""
-        if where_clause:
-            return f"SELECT * FROM {table} WHERE {where_clause} LIMIT 10"
+        # Build the final SQL query using products table with JOIN
+        base_sql = f"""
+        SELECT p.* FROM products p 
+        JOIN product_types pt ON p.product_type_id = pt.id 
+        WHERE pt.name = '{product_type}'
+        """
+
+        if conditions:
+            where_clause = " AND ".join(conditions)
+            return f"{base_sql} AND ({where_clause}) LIMIT 10"
         else:
-            return f"SELECT * FROM {table} LIMIT 10"
+            return f"{base_sql} LIMIT 10"

@@ -139,34 +139,43 @@ class LLMOrchestrator:
         Centralizes SQL generation with proper error handling.
         """
         try:
-            # Map category to table name
-            table_mapping = {
+            # Map category to actual product type name in database
+            category_to_product_type = {
                 "printers": "printers",
-                "laptops": "laptops",
-                "computers": "computers",
-                "smartphones": "smartphones",
+                "laptops": "laptop",  # category "laptops" maps to product_type "laptop"
+                "computers": "computer",
+                "smartphones": "smartphone",
             }
 
-            table_name = table_mapping.get(category, "products")
+            product_type = category_to_product_type.get(category, category)
 
-            sql_query = self.sql_llm.generate_sql(question, context, table_name)
+            sql_query = self.sql_llm.generate_sql(question, context, product_type)
 
             return LLMResponse(
-                success=True, result={"sql": sql_query, "table": table_name}
+                success=True, result={"sql": sql_query, "table": "products"}
             )
 
         except Exception as e:
             logger.error(f"Failed SQL generation: {e}")
-            # Fallback to simple parameterized query
+            # Fallback to simple JOIN query for the category
+            category_to_product_type = {
+                "printers": "printers",
+                "laptops": "laptop",
+                "computers": "computer",
+                "smartphones": "smartphone",
+            }
+            product_type = category_to_product_type.get(category, category)
+
             fallback_sql = (
-                "SELECT * FROM products WHERE product_type_id = "
-                "(SELECT id FROM product_types WHERE name = %s)"
+                f"SELECT p.* FROM products p "
+                f"JOIN product_types pt ON p.product_type_id = pt.id "
+                f"WHERE pt.name = '{product_type}' LIMIT 10"
             )
 
             return LLMResponse(
                 success=False,
                 error="sql_generation_failed",
-                result={"sql": fallback_sql, "table": "products", "params": [category]},
+                result={"sql": fallback_sql, "table": "products"},
             )
 
     def generate_attribute_question(
@@ -197,73 +206,12 @@ class LLMOrchestrator:
             )
 
 
-class MockLLMOrchestrator(LLMOrchestrator):
+def create_llm_orchestrator() -> LLMOrchestrator:
     """
-    Mock implementation for testing and development.
+    Factory function for LLM orchestrator creation.
 
-    Provides predictable responses without Azure LLM calls.
+    Creates Azure LLM instances with proper error handling.
     """
-
-    def __init__(self):
-        # Don't call super().__init__ since we don't need real LLMs
-        pass
-
-    def check_relevance_and_category(self, question: str) -> LLMResponse:
-        """Mock relevance and category detection."""
-        question_lower = question.lower()
-
-        # Simple keyword-based detection
-        categories = {
-            "printer": "printers",
-            "laptop": "laptops",
-            "computer": "computers",
-            "smartphone": "smartphones",
-            "telefoon": "smartphones",
-        }
-
-        category = None
-        for keyword, cat in categories.items():
-            if keyword in question_lower:
-                category = cat
-                break
-
-        relevant = category is not None
-
-        return LLMResponse(
-            success=True,
-            result={"relevant": relevant, "category": category},
-            confidence=0.8,
-        )
-
-    def should_collect_attributes(
-        self, question: str, context: Dict[str, Any]
-    ) -> LLMResponse:
-        """Mock refinement decision - always collect attributes."""
-        return LLMResponse(success=True, result={"should_collect": True})
-
-    def generate_search_query(
-        self, question: str, context: Dict[str, Any], category: str
-    ) -> LLMResponse:
-        """Mock SQL generation."""
-        sql = (
-            "SELECT * FROM products WHERE product_type_id = "
-            "(SELECT id FROM product_types WHERE name = %s)"
-        )
-
-        return LLMResponse(
-            success=True, result={"sql": sql, "table": "products", "params": [category]}
-        )
-
-
-def create_llm_orchestrator(use_mocks: bool = False) -> LLMOrchestrator:
-    """
-    Factory function for LLM orchestrator with dependency injection.
-
-    Makes testing easy and reduces coupling.
-    """
-    if use_mocks:
-        return MockLLMOrchestrator()
-
     # Import real LLMs only when needed
     from ..llms import azure_llm_set
 
@@ -271,8 +219,10 @@ def create_llm_orchestrator(use_mocks: bool = False) -> LLMOrchestrator:
         relevance_llm, sql_llm, refinement_llm = azure_llm_set.create_azure_llm_set()
         return LLMOrchestrator(relevance_llm, sql_llm, refinement_llm)
     except Exception as e:
-        logger.warning(f"Failed to create Azure LLMs, falling back to mocks: {e}")
-        return MockLLMOrchestrator()
+        logger.error(f"Failed to create Azure LLMs: {e}")
+        raise RuntimeError(
+            "Azure LLM configuration is required. Please check your Azure OpenAI settings."
+        ) from e
 
 
 """
@@ -282,9 +232,8 @@ Benefits of this orchestration pattern:
 2. **Centralized Error Handling**: Consistent error responses  
 3. **Protocol-Based Design**: Clear interfaces, loose coupling
 4. **Single Responsibility**: Only handles LLM coordination
-5. **Fallback Support**: Graceful degradation to mocks
-6. **Consistent Response Format**: LLMResponse standardizes outputs
+5. **Consistent Response Format**: LLMResponse standardizes outputs
 
-Replaces scattered try/catch blocks and LLM calls throughout conversation_loop.py
+Replaces scattered LLM calls throughout conversation_loop.py
 with clean, testable, reusable orchestration logic.
 """

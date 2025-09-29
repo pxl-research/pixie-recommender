@@ -1,7 +1,7 @@
 """
 Unit tests for SimplifiedConversationManager
 
-Tests the refactored conversation management with mocks
+Tests the refactored conversation management with dependency injection
 to verify functionality and demonstrate improved testability.
 """
 
@@ -9,7 +9,7 @@ from unittest.mock import Mock
 
 from pixie.core.conversation.attribute_collector import AttributeCollector
 from pixie.core.conversation.flow_config import ConversationFlowManager
-from pixie.core.conversation.llm_orchestrator import LLMResponse, MockLLMOrchestrator
+from pixie.core.conversation.llm_orchestrator import LLMOrchestrator, LLMResponse
 from pixie.core.conversation.simplified_conversation_manager import (
     SimplifiedConversationManager,
 )
@@ -23,7 +23,19 @@ class TestSimplifiedConversationManager:
         """Setup clean test environment for each test."""
         self.search_fn = Mock(return_value=[{"id": "1", "name": "Test Product"}])
         self.pending_store = InMemoryPendingStore()
-        self.llm_orchestrator = MockLLMOrchestrator()
+
+        # Create a mock LLM orchestrator with proper interface
+        self.llm_orchestrator = Mock(spec=LLMOrchestrator)
+        self.llm_orchestrator.check_relevance_and_category.return_value = LLMResponse(
+            success=True, result={"relevant": True, "category": "laptops"}
+        )
+        self.llm_orchestrator.should_collect_attributes.return_value = LLMResponse(
+            success=True, result={"should_collect": True}
+        )
+        self.llm_orchestrator.generate_search_query.return_value = LLMResponse(
+            success=True, result={"sql": "SELECT * FROM products", "table": "products"}
+        )
+
         self.flow_manager = ConversationFlowManager()
 
         self.manager = SimplifiedConversationManager(
@@ -233,34 +245,22 @@ class TestAttributeCollector:
         assert "technology" not in summary["attributes"]  # Skipped
 
 
-class TestLLMOrchestrator:
-    """Test suite for the LLM orchestrator."""
-
-    def test_mock_relevance_detection(self):
-        """Test mock relevance and category detection."""
-        orchestrator = MockLLMOrchestrator()
-
-        # Test printer detection
-        response = orchestrator.check_relevance_and_category("Ik zoek een printer")
-
-        assert response.success
-        assert response.result["relevant"]
-        assert response.result["category"] == "printers"
-
-    def test_mock_sql_generation(self):
-        """Test mock SQL generation."""
-        orchestrator = MockLLMOrchestrator()
-
-        response = orchestrator.generate_search_query(
-            "printer query", {"budget": "€150"}, "printers"
-        )
-
-        assert response.success
-        assert "SELECT" in response.result["sql"]
-        assert "products" in response.result["sql"]
-
-
 """
+Benefits of the refactored architecture:
+
+1. **Easy Mocking**: Clean interfaces make dependency injection simple
+2. **Isolated Testing**: Each component can be tested independently  
+3. **Clear Responsibilities**: Single-purpose classes are easier to understand
+4. **Improved Maintainability**: Changes to one component don't ripple everywhere
+5. **Better Error Handling**: Centralized error responses and logging
+
+The refactored code demonstrates significant improvements in:
+- Code clarity and readability (150 lines vs 447 lines)
+- Testability through dependency injection
+- Maintainability through separation of concerns
+- Error handling through centralized response patterns
+
+
 Benefits of the refactored testing approach:
 
 1. **Easy Mocking**: Clean interfaces make dependency injection simple

@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-import os
 from typing import Any, Tuple
 
 from ..utils.config import get_config
@@ -12,24 +11,21 @@ from .azure_sql_llm import AzureSQLLLM
 def create_azure_llm_set() -> Tuple[Any, Any, Any]:
     """Create Azure LLM instances using centralized configuration.
 
-    Falls back to mock LLMs if Azure deployment is not available.
+    Requires proper Azure OpenAI configuration.
     """
-    # Check if we should force mock usage
-    if os.getenv("PIXIE_FORCE_MOCKS", "0") == "1":
-        from .mock_llm_set import create_mock_llm_set
-
-        return create_mock_llm_set()
-
     azure_config = get_config().azure
 
-    # Check if endpoint and key are properly configured
+    # Validate Azure configuration
     if (
         azure_config.api_endpoint == "https://example.openai.azure.com/"
+        or azure_config.api_endpoint == "https://your-resource.openai.azure.com/"
         or azure_config.api_key == "dummy-key-for-development"
+        or azure_config.api_key == "your-api-key-here"
     ):
-        from .mock_llm_set import create_mock_llm_set
-
-        return create_mock_llm_set()
+        raise ValueError(
+            "Azure OpenAI configuration is not properly set. "
+            "Please update AZURE_OPENAI_ENDPOINT and AZURE_OPENAI_KEY in your environment."
+        )
 
     try:
         relevance = AzureRelevanceLLM(
@@ -53,17 +49,13 @@ def create_azure_llm_set() -> Tuple[Any, Any, Any]:
 
         # Test if the models work by making a simple call
         try:
-            relevance.is_relevant("test")
-        except Exception:
-            # If the test call fails, fall back to mocks
-            from .mock_llm_set import create_mock_llm_set
-
-            return create_mock_llm_set()
+            relevance.is_relevant("test query")
+        except Exception as e:
+            raise RuntimeError(
+                f"Azure LLM validation failed. Please check your Azure OpenAI configuration: {e}"
+            ) from e
 
         return relevance, sql, refinement
 
-    except Exception:
-        # If any Azure LLM creation fails, fall back to mocks
-        from .mock_llm_set import create_mock_llm_set
-
-        return create_mock_llm_set()
+    except Exception as e:
+        raise RuntimeError(f"Failed to create Azure LLM instances: {e}") from e
