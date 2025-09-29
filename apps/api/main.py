@@ -104,6 +104,41 @@ def metrics():
     }
 
 
+@app.get("/debug/db-status")
+def debug_db_status():
+    """Debug endpoint to check database seeding status."""
+    try:
+        from pixie.core.database.connection import get_db_session
+        from sqlalchemy import text
+
+        with get_db_session() as session:
+            # Check products
+            result = session.execute(text("SELECT COUNT(*) FROM products"))
+            product_count = result.scalar()
+            
+            # Check attribute definitions
+            result = session.execute(text("SELECT COUNT(*) FROM attribute_definitions"))
+            attr_def_count = result.scalar()
+            
+            # Check attribute values
+            result = session.execute(text("SELECT COUNT(*) FROM product_attribute_values"))
+            attr_val_count = result.scalar()
+            
+            return {
+                "database_status": "connected",
+                "product_count": product_count,
+                "attribute_definition_count": attr_def_count,
+                "product_attribute_value_count": attr_val_count,
+                "seeding_complete": (product_count or 0) > 0 and (attr_def_count or 0) > 0 and (attr_val_count or 0) > 0
+            }
+    except Exception as e:
+        return {
+            "database_status": "error",
+            "error": str(e),
+            "seeding_complete": False
+        }
+
+
 @app.post("/ask")
 def ask(req: dict = Body(...)):
     """Unified endpoint for both new questions and replies to pending questions.
