@@ -3,8 +3,6 @@ Demonstration of the refined azure_refinement_llm functionality.
 Shows how it works without hardcoded fallbacks, using only database attributes.
 """
 
-import pytest
-
 from pixie.core.llms.azure_refinement_llm import AzureRefinementLLM
 from pixie.core.utils.database_attributes import get_database_attribute_manager
 
