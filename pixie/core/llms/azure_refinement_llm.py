@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from typing import Optional
 
-from ..utils.attributes import get_attribute_manager
+from ..utils.database_attributes import get_database_attribute_manager
 from .azure_openai_llm import AzureOpenAILLM
 
 
@@ -31,15 +31,15 @@ class AzureRefinementLLM(AzureOpenAILLM):
     ) -> Optional[str]:
         ctx = context or {}
         category = ctx.get(
-            "category", "printers"
-        )  # Use category from context, default to printers
+            "category", "laptop"
+        )  # Use category from context, default to laptop
 
         if not self.model:
             return self._fallback_refinement_question(ctx, category)
 
         try:
             # Use attribute manager to get the next missing attribute
-            attr_manager = get_attribute_manager()
+            attr_manager = get_database_attribute_manager()
             next_attr = attr_manager.get_next_missing_attribute(category, ctx)
 
             if not next_attr:
@@ -91,39 +91,48 @@ class AzureRefinementLLM(AzureOpenAILLM):
 
     def _get_default_category_attributes(self, category: str) -> list[str]:
         """Get default attribute list for a category."""
-        if category == "laptops":
+        if category == "laptop":
             return [
-                "price",
+                "budget",
                 "brand",
                 "screen_size",
                 "processor",
                 "ram",
-                "storage",
-                "battery_life",
-                "usage_type",
             ]
-        elif category == "smartphones":
+        elif category == "smartphone":
             return [
-                "price",
+                "budget",
                 "brand",
                 "screen_size",
                 "storage",
-                "operating_system",
-                "camera_megapixels",
-                "battery_capacity",
+                "camera",
             ]
-        elif category == "computers":
+        elif category == "headphones":
             return [
-                "price",
+                "budget",
                 "brand",
-                "processor",
-                "ram",
-                "storage",
-                "form_factor",
-                "usage_type",
+                "type",
+                "wireless",
+                "noise_cancelling",
             ]
-        else:  # printers or unknown
-            return ["budget", "brand", "technology", "has_color", "is_multifunction"]
+        elif category == "monitor":
+            return [
+                "budget",
+                "brand",
+                "screen_size",
+                "resolution",
+                "refresh_rate",
+            ]
+        elif category == "tablet":
+            return [
+                "budget",
+                "brand",
+                "screen_size",
+                "storage",
+                "cellular",
+            ]
+        else:  # unknown category
+            return ["budget", "brand"]
 
     def _get_question_for_attribute(self, attr_name: str, category: str) -> str:
         """Get the appropriate question for an attribute based on category."""

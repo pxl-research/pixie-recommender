@@ -46,3 +46,12 @@ htmlcov/
 uv.lock.bak
 # MacOS
 .DS_Store
+
+# Copilot tracking dir (local research artifacts)
+.copilot-tracking/
+
+# Project egg-info
+pixie_core.egg-info/
+
+# Lockfile sometimes generated locally
+uv.lock

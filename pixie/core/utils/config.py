@@ -4,6 +4,15 @@ from __future__ import annotations
 
 import os
 from dataclasses import dataclass
+from pathlib import Path
+
+# Load environment variables from .env.dev if it exists
+project_root = Path(__file__).parent.parent.parent
+env_dev_path = project_root / ".env.dev"
+if env_dev_path.exists():
+    from dotenv import load_dotenv
+
+    load_dotenv(env_dev_path)
 
 
 @dataclass
@@ -25,11 +34,24 @@ class SearchConfig:
 
 
 @dataclass
+class DatabaseConfig:
+    """Database configuration."""
+
+    url: str
+    pool_size: int
+    max_overflow: int
+    pool_timeout: int
+    pool_recycle: int
+    echo: bool
+
+
+@dataclass
 class Config:
     """Main configuration."""
 
     azure: AzureConfig
     search: SearchConfig
+    database: DatabaseConfig
 
     @classmethod
     def from_env(cls) -> Config:
@@ -50,7 +72,28 @@ class Config:
             default_page_size=int(os.getenv("PIXIE_DEFAULT_PAGE_SIZE", "10")),
         )
 
-        return cls(azure=azure_config, search=search_config)
+        # Auto-detect database URL based on environment
+        if os.path.exists("/app") and os.path.exists("/.dockerenv"):
+            # Inside container - use service name
+            default_db_url = (
+                "postgresql://pixie_user:pixie_password@postgres:5432/pixie_dev"
+            )
+        else:
+            # Outside container - use localhost
+            default_db_url = (
+                "postgresql://pixie_user:pixie_password@localhost:5432/pixie_dev"
+            )
+
+        database_config = DatabaseConfig(
+            url=os.getenv("DATABASE_URL", default_db_url),
+            pool_size=int(os.getenv("DATABASE_POOL_SIZE", "10")),
+            max_overflow=int(os.getenv("DATABASE_MAX_OVERFLOW", "20")),
+            pool_timeout=int(os.getenv("DATABASE_POOL_TIMEOUT", "30")),
+            pool_recycle=int(os.getenv("DATABASE_POOL_RECYCLE", "3600")),
+            echo=os.getenv("DATABASE_ECHO", "false").lower() == "true",
+        )
+
+        return cls(azure=azure_config, search=search_config, database=database_config)
 
 
 # Global config instance
@@ -63,3 +106,9 @@ def get_config() -> Config:
     if _config is None:
         _config = Config.from_env()
     return _config
+
+
+def reset_config() -> None:
+    """Reset cached configuration - useful for testing or when environment changes."""
+    global _config
+    _config = None

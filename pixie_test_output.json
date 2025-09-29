@@ -12,8 +12,8 @@
       "resp": {
         "type": "ask_user",
         "text": null,
-        "prompt": "Wat is je budget?",
-        "pending_id": "pending-47daa4bb",
+        "prompt": "Wat is je budget voor een printer?",
+        "pending_id": "pending-6199bc51",
         "reason": null
       }
     },
@@ -23,8 +23,8 @@
       "resp": {
         "type": "ask_user",
         "text": null,
-        "prompt": "Heb je een voorkeur voor een merk?",
-        "pending_id": "pending-47daa4bb",
+        "prompt": "Heb je een voorkeur voor een bepaald merk?",
+        "pending_id": "pending-6199bc51",
         "reason": null
       }
     },
@@ -34,8 +34,8 @@
       "resp": {
         "type": "ask_user",
         "text": null,
-        "prompt": "Welke technologie heeft je voorkeur (inkjet/laser)?",
-        "pending_id": "pending-47daa4bb",
+        "prompt": "Welke printtechnologie prefereer je (inkjet/laser)?",
+        "pending_id": "pending-6199bc51",
         "reason": null
       }
     },
@@ -43,8 +43,8 @@
       "step": 4,
       "status": 200,
       "resp": {
-        "type": "answer",
-        "text": "[{'id': 1, 'name': 'Brother HL-L2350DW', 'price': 129.99}, {'id': 10, 'name': 'Brother DCP-L2550DW', 'price': 159.99}, {'id': 17, 'name': 'Brother HL-L2305W', 'price': 109.99}]",
+        "type": "no_results",
+        "text": "No matching products found",
         "prompt": null,
         "pending_id": null,
         "reason": null

@@ -8,8 +8,11 @@ kept intentionally small for v0.0.
 import json
 import logging
 from contextvars import ContextVar
+from typing import Optional
 
-trace_id_ctx: ContextVar[str | None] = ContextVar("trace_id", default=None)
+# Use Optional[str] for compatibility with Python versions that may not
+# support the `str | None` syntax at runtime in some typing contexts.
+trace_id_ctx: ContextVar[Optional[str]] = ContextVar("trace_id", default=None)
 
 
 class TraceIdFilter(logging.Filter):

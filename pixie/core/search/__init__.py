@@ -1,6 +1,7 @@
-from .search_engine import RealSearchEngine, create_real_search_engine
+# Enable the real search engine
+from .search_engine import SearchEngine, create_search_engine
 
 __all__ = [
-    "RealSearchEngine",
-    "create_real_search_engine",
+    "SearchEngine",
+    "create_search_engine",
 ]

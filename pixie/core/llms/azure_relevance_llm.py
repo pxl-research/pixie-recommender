@@ -29,7 +29,8 @@ class AzureRelevanceLLM(AzureOpenAILLM):
         try:
             prompt = (
                 "Is the following question related to buying or searching for products? "
-                "The products we support are: printers, laptops, computers, smartphones. "
+                "The products we support are: laptops, smartphones, headphones, "
+                "monitors, tablets, printers, mixers. "
                 "Answer with exactly 'yes' or 'no'.\n\n"
                 f"Question: {text}"
             )
@@ -44,21 +45,34 @@ class AzureRelevanceLLM(AzureOpenAILLM):
         except Exception:
             # If Azure call fails, fall back to simple keyword-based relevance check
             product_keywords = [
-                "printer",
                 "laptop",
-                "computer",
-                "phone",
                 "smartphone",
+                "phone",
+                "telefoon",
                 "tablet",
                 "monitor",
+                "scherm",
+                "headphones",
+                "koptelefoon",
+                "oortjes",
                 "keyboard",
                 "mouse",
-                "headphones",
                 "speaker",
                 "camera",
                 "tv",
+                "computer",
+                "pc",
+                "desktop",
+                "printer",
                 "drukker",
-                "telefoon",
+                "print",
+                "mixer",
+                "mixers",
+                "keukenmachine",
+                "handmixer",
+                "staafmixer",
+                "planetmixer",
+                "blender",
             ]
             text_lower = text.lower()
             return any(keyword in text_lower for keyword in product_keywords)
@@ -66,7 +80,8 @@ class AzureRelevanceLLM(AzureOpenAILLM):
     def detect_category(self, question: Optional[str]) -> Optional[str]:
         """Detect the product category from the question.
 
-        Returns one of: "printers", "laptops", "computers", "smartphones", or None
+        Returns one of: "laptop", "smartphone", "headphones", "monitor",
+        "tablet", "printers", or None
         """
         text = (question or "").strip()
 
@@ -77,10 +92,11 @@ class AzureRelevanceLLM(AzureOpenAILLM):
         try:
             prompt = (
                 "Determine the product category from the following question. "
-                "Possible categories are: printers, laptops, computers, smartphones. "
+                "Possible categories are: laptop, smartphone, headphones, "
+                "monitor, tablet, printers, mixer. "
                 "If the question is not related to any of these categories, return 'none'. "
-                "Answer with exactly one word: printers, laptops, computers, "
-                "smartphones, or none.\n\n"
+                "Answer with exactly one word: laptop, smartphone, headphones, "
+                "monitor, tablet, printers, or none.\n\n"
                 f"Question: {text}"
             )
 
@@ -88,7 +104,14 @@ class AzureRelevanceLLM(AzureOpenAILLM):
 
             if hasattr(response, "content"):
                 answer = response.content.lower().strip()
-                valid_categories = {"printers", "laptops", "computers", "smartphones"}
+                valid_categories = {
+                    "laptop",
+                    "smartphone",
+                    "headphones",
+                    "monitor",
+                    "tablet",
+                    "printers",
+                }
                 if answer in valid_categories:
                     return answer
                 elif answer == "none":
@@ -105,17 +128,8 @@ class AzureRelevanceLLM(AzureOpenAILLM):
 
         # Define keywords for each category
         category_keywords = {
-            "printers": ["printer", "print", "laser", "inkjet", "drukker", "afdrukken"],
-            "laptops": ["laptop", "notebook", "ultrabook", "macbook", "chromebook"],
-            "computers": [
-                "computer",
-                "pc",
-                "desktop",
-                "tower",
-                "all-in-one",
-                "workstation",
-            ],
-            "smartphones": [
+            "laptop": ["laptop", "notebook", "ultrabook", "macbook", "chromebook"],
+            "smartphone": [
                 "smartphone",
                 "phone",
                 "telefoon",
@@ -124,6 +138,65 @@ class AzureRelevanceLLM(AzureOpenAILLM):
                 "samsung",
                 "huawei",
                 "xiaomi",
+            ],
+            "headphones": [
+                "headphones",
+                "headset",
+                "earbuds",
+                "earphones",
+                "koptelefoon",
+                "oortjes",
+                "sony",
+                "bose",
+                "sennheiser",
+            ],
+            "monitor": [
+                "monitor",
+                "scherm",
+                "display",
+                "beeldscherm",
+                "lg",
+                "dell",
+                "samsung",
+                "asus",
+            ],
+            "tablet": [
+                "tablet",
+                "ipad",
+                "surface",
+                "galaxy tab",
+                "lenovo",
+                "microsoft",
+                "apple",
+            ],
+            "printers": [
+                "printer",
+                "print",
+                "drukker",
+                "laserprinter",
+                "inkjet",
+                "hp",
+                "brother",
+                "canon",
+                "epson",
+                "samsung",
+            ],
+            "mixer": [
+                "mixer",
+                "mixers",
+                "keukenmixer",
+                "handmixer",
+                "staafmixer",
+                "planetmixer",
+                "blender",
+                "keukenmachine",
+                "kitchenaid",
+                "bosch",
+                "philips",
+                "braun",
+                "kenwood",
+                "smeg",
+                "sage",
             ],
         }
 

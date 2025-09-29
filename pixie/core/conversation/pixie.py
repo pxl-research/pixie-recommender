@@ -2,23 +2,23 @@ from __future__ import annotations
 
 import logging
 
-from ..search.search_engine import RealSearchEngine
+from ..search.search_engine import SearchEngine
 from ..storage.pending_store import InMemoryPendingStore
 from ..utils.contracts import AskResponse
-from .conversation_loop import ConversationLoopManager
+from .simplified_conversation_manager import SimplifiedConversationManager
 
 
 class Pixie:
     """Main interface for handling user questions and replies using Azure LLMs.
 
-    Delegates all processing to the ConversationLoopManager for real LLM-based
+    Delegates all processing to the SimplifiedConversationManager for real LLM-based
     conversation flows.
     """
 
     def __init__(
         self,
         pending_store: InMemoryPendingStore | None = None,
-        conversation_manager: ConversationLoopManager | None = None,
+        conversation_manager: SimplifiedConversationManager | None = None,
     ):
         self._pending_store = pending_store or InMemoryPendingStore()
         # If no conversation_manager was provided, create one using
@@ -27,8 +27,8 @@ class Pixie:
             self._conversation_manager = conversation_manager
         else:
             # Provide a default search function that will be used by the
-            # ConversationLoopManager.
-            engine = RealSearchEngine()
+            # SimplifiedConversationManager.
+            engine = SearchEngine()
 
             # Create a wrapper function that extracts category from context
             def search_with_category(
@@ -37,12 +37,18 @@ class Pixie:
                 category = None
                 if context and isinstance(context, dict):
                     category = context.get("category")
-                return engine.search(sql, context, category)
+                result = engine.search(sql, context, category)
+                # Handle both old dict format and new list format
+                if isinstance(result, dict):
+                    return result.get("results", [])
+                elif isinstance(result, list):
+                    return result
+                else:
+                    return []
 
-            self._conversation_manager = ConversationLoopManager(
+            self._conversation_manager = SimplifiedConversationManager(
                 search_with_category,
                 pending_store=self._pending_store,
-                search_engine=engine,
             )
 
     def answer(self, question: str) -> AskResponse:

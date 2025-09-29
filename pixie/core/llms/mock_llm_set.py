@@ -19,6 +19,7 @@ class MockRelevance:
             "speaker",
             "camera",
             "tv",
+            "mixer",
             "koop",
             "prijs",
             "budget",
@@ -37,6 +38,12 @@ class MockRelevance:
             "luidspreker",
             "fotocamera",
             "televisie",
+            "mixers",
+            "keukenmachine",
+            "handmixer",
+            "staafmixer",
+            "planetmixer",
+            "blender",
         ]
         text_lower = text.lower()
 
@@ -76,6 +83,17 @@ class MockRelevance:
                 "huawei",
                 "xiaomi",
             ],
+            "mixers": [
+                "mixer",
+                "mixers",
+                "keukenmachine",
+                "handmixer",
+                "staafmixer",
+                "planetmixer",
+                "blender",
+                "kitchenaid",
+                "bosch",
+            ],
         }
 
         # Check for category-specific keywords
@@ -106,13 +124,91 @@ class MockRefinement:
     def generate_refinement_question(self, context: dict) -> "str | None":
         if not context:
             return "Wat is je budget?"
-        if "budget" not in context:
-            return "Wat is je budget?"
-        if "budget" in context and "brand" not in context:
-            return "Heb je een voorkeur voor een merk?"
-        if "budget" in context and "brand" in context and "technology" not in context:
-            return "Welke technologie heeft je voorkeur (inkjet/laser)?"
-        return None
+
+        collected = set(context.get("collected_attributes", []))
+        category = context.get("category", "printers")
+
+        # Get the appropriate attribute sequence based on category
+        if category == "printers":
+            attr_sequence = [
+                "budget",
+                "brand",
+                "technology",
+                "color",
+                "pages_per_minute",
+            ]
+        elif category == "mixer":
+            attr_sequence = [
+                "budget",
+                "type",
+                "brand",
+                "power",
+                "bowl_capacity",
+                "attachments",
+            ]
+        else:
+            # Default sequence for other categories
+            attr_sequence = ["budget", "brand"]
+
+        # Find next uncollected attribute
+        for attr in attr_sequence:
+            if attr not in collected:
+                return self._get_mock_question_for_attribute(attr, category)
+
+        return None  # All attributes collected
+
+    def _get_mock_question_for_attribute(
+        self, attr_name: str, category: str = "printers"
+    ) -> str:
+        """Get mock question for an attribute."""
+        questions = {
+            "budget": "Wat is je budget?",
+            "brand": "Heb je een voorkeur voor een merk?",
+            "technology": "Welke technologie heeft je voorkeur (inkjet/laser)?",
+            "color": "Wil je een kleurenprinter of is zwart-wit voldoende?",
+            "pages_per_minute": "Hoeveel pagina's per minuut moet de printer "
+            "minimaal kunnen printen?",
+            "screen_size": "Welke schermgrootte heb je in gedachten?",
+            "processor": "Heb je voorkeur voor een bepaalde processor?",
+            "ram": "Hoeveel RAM heb je minimaal nodig?",
+            "storage": "Hoeveel opslagruimte heb je nodig?",
+            "camera": "Hoe belangrijk is de camera kwaliteit?",
+            "battery_life": "Hoe belangrijk is de batterijduur?",
+            "usage_type": "Waar ga je het apparaat voor gebruiken?",
+            "operating_system": "Welk besturingssysteem heeft je voorkeur?",
+            # Mixer-specific questions
+            "type": (
+                "Welk type mixer heb je in gedachten? Handmixer, staafmixer, "
+                "planetmixer, blender of keukenmachine?"
+            ),
+            "power": (
+                "Hoeveel vermogen heeft je voorkeur "
+                "(200-400W, 400-600W, 600-800W, 800-1000W, of 1000W+)?"
+            ),
+            "bowl_capacity": "Welke komgrootte heb je nodig (1-2L, 3-4L, 5-6L, of 7L+)?",
+            "attachments": (
+                "Welke hulpstukken zijn belangrijk voor je "
+                "(deeghaak, garde, platte beater, blender attachment, "
+                "vleesmolen, pasta roller)?"
+            ),
+        }
+
+        # For brand questions, make them category-specific
+        if attr_name == "brand":
+            if category == "mixer":
+                return (
+                    "Heb je een voorkeur voor een merk, zoals KitchenAid, Bosch, "
+                    "Philips, Braun, Kenwood, Smeg of Sage?"
+                )
+            elif category == "printers":
+                return (
+                    "Heb je een voorkeur voor een merk zoals HP, Brother, "
+                    "Canon, Epson of Samsung?"
+                )
+            else:
+                return "Heb je een voorkeur voor een merk?"
+
+        return questions.get(attr_name, f"Wat zijn je voorkeuren voor {attr_name}?")
 
 
 def create_mock_llm_set() -> Tuple[Any, Any, Any]:

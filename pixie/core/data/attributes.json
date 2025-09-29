@@ -1,93 +1,245 @@
 {
+  "laptop": {
+    "attributes": [
+      {
+        "name": "budget",
+        "question": "Wat is je budget voor de laptop?",
+        "type": "number",
+        "required": true
+      },
+      {
+        "name": "brand",
+        "question": "Heb je een voorkeur voor een merk zoals Apple, Dell, HP, Lenovo of Asus?",
+        "type": "string",
+        "required": false
+      },
+      {
+        "name": "screen_size",
+        "question": "Welke schermgrootte heb je in gedachten (bijv. 13\", 15\" of 17\")?",
+        "type": "string",
+        "required": false
+      },
+      {
+        "name": "processor",
+        "question": "Heb je voorkeur voor een bepaalde processor zoals Intel i5/i7/i9 of Apple M1/M2/M3?",
+        "type": "string",
+        "required": false
+      },
+      {
+        "name": "ram",
+        "question": "Hoeveel RAM heb je minimaal nodig (bijv. 8GB, 16GB, 32GB)?",
+        "type": "string",
+        "required": false
+      }
+    ]
+  },
+  "smartphone": {
+    "attributes": [
+      {
+        "name": "budget",
+        "question": "Wat is je budget voor de smartphone?",
+        "type": "number",
+        "required": true
+      },
+      {
+        "name": "brand",
+        "question": "Heb je een voorkeur voor Apple, Samsung, Google of een ander merk?",
+        "type": "string",
+        "required": false
+      },
+      {
+        "name": "screen_size",
+        "question": "Welke schermgrootte vind je prettig (bijv. 6.1\", 6.7\")?",
+        "type": "string",
+        "required": false
+      },
+      {
+        "name": "storage",
+        "question": "Hoeveel opslagruimte heb je nodig (bijv. 128GB, 256GB, 512GB)?",
+        "type": "string",
+        "required": false
+      },
+      {
+        "name": "camera",
+        "question": "Is camera kwaliteit belangrijk voor je?",
+        "type": "boolean",
+        "required": false
+      }
+    ]
+  },
+  "headphones": {
+    "attributes": [
+      {
+        "name": "budget",
+        "question": "Wat is je budget voor de headphones?",
+        "type": "number",
+        "required": true
+      },
+      {
+        "name": "brand",
+        "question": "Heb je een voorkeur voor een merk zoals Sony, Bose, Sennheiser of JBL?",
+        "type": "string",
+        "required": false
+      },
+      {
+        "name": "type",
+        "question": "Wil je over-ear, on-ear of in-ear headphones?",
+        "type": "string",
+        "required": false
+      },
+      {
+        "name": "wireless",
+        "question": "Wil je draadloze headphones?",
+        "type": "boolean",
+        "required": false
+      },
+      {
+        "name": "noise_cancelling",
+        "question": "Is noise cancelling belangrijk voor je?",
+        "type": "boolean",
+        "required": false
+      }
+    ]
+  },
+  "monitor": {
+    "attributes": [
+      {
+        "name": "budget",
+        "question": "Wat is je budget voor de monitor?",
+        "type": "number",
+        "required": true
+      },
+      {
+        "name": "brand",
+        "question": "Heb je een voorkeur voor een merk zoals LG, Dell, Samsung of Asus?",
+        "type": "string",
+        "required": false
+      },
+      {
+        "name": "screen_size",
+        "question": "Welke schermgrootte heb je in gedachten (bijv. 24\", 27\", 32\")?",
+        "type": "string",
+        "required": false
+      },
+      {
+        "name": "resolution",
+        "question": "Welke resolutie heb je nodig (bijv. 1080p, 1440p, 4K)?",
+        "type": "string",
+        "required": false
+      },
+      {
+        "name": "refresh_rate",
+        "question": "Heb je een minimum refresh rate nodig (bijv. 60Hz, 144Hz)?",
+        "type": "string",
+        "required": false
+      }
+    ]
+  },
+  "tablet": {
+    "attributes": [
+      {
+        "name": "budget",
+        "question": "Wat is je budget voor de tablet?",
+        "type": "number",
+        "required": true
+      },
+      {
+        "name": "brand",
+        "question": "Heb je een voorkeur voor Apple, Samsung, Lenovo of Microsoft?",
+        "type": "string",
+        "required": false
+      },
+      {
+        "name": "screen_size",
+        "question": "Welke schermgrootte vind je prettig (bijv. 10\", 11\", 12.9\")?",
+        "type": "string",
+        "required": false
+      },
+      {
+        "name": "storage",
+        "question": "Hoeveel opslagruimte heb je nodig (bijv. 64GB, 128GB, 256GB)?",
+        "type": "string",
+        "required": false
+      },
+      {
+        "name": "cellular",
+        "question": "Wil je een tablet met cellular connectiviteit?",
+        "type": "boolean",
+        "required": false
+      }
+    ]
+  },
   "printers": {
     "attributes": [
       {
         "name": "budget",
-        "type": "range",
-        "question": "Wat is je budget voor een printer?",
-        "description": "Price range the user is willing to spend"
+        "question": "Wat is je budget voor de printer?",
+        "type": "number",
+        "required": true
       },
       {
         "name": "brand",
-        "type": "choice",
-        "question": "Heb je een voorkeur voor een bepaald merk?",
-        "description": "Preferred printer brand"
+        "question": "Heb je een voorkeur voor een merk zoals HP, Brother, Canon, Epson of Samsung?",
+        "type": "string",
+        "required": false
       },
       {
         "name": "technology",
-        "type": "choice",
-        "question": "Welke printtechnologie heeft je voorkeur?",
-        "description": "Inkjet vs laser printing technology",
-        "options": ["inkjet", "laser"]
+        "question": "Welke technologie heeft je voorkeur (inkjet, laser, of dot-matrix)?",
+        "type": "string",
+        "required": false
+      },
+      {
+        "name": "color",
+        "question": "Wil je een kleurenprinter of is zwart-wit voldoende?",
+        "type": "string",
+        "required": false
+      },
+      {
+        "name": "pages_per_minute",
+        "question": "Hoeveel pagina's per minuut moet de printer minimaal kunnen printen?",
+        "type": "number",
+        "required": false
       }
     ]
   },
-  "laptops": {
+  "mixer": {
     "attributes": [
       {
         "name": "budget",
-        "type": "range",
-        "question": "Wat is je budget voor een laptop?",
-        "description": "Price range the user is willing to spend"
+        "question": "Wat is je budget voor de mixer?",
+        "type": "number",
+        "required": true
+      },
+      {
+        "name": "type",
+        "question": "Welk type mixer zoek je (handmixer, staafmixer, planetmixer, blender, of keukenmachine)?",
+        "type": "string",
+        "required": false
       },
       {
         "name": "brand",
-        "type": "choice",
-        "question": "Heb je een voorkeur voor een bepaald merk?",
-        "description": "Preferred laptop brand"
+        "question": "Heb je een voorkeur voor een merk zoals KitchenAid, Bosch, Philips, Braun, Kenwood, Smeg of Sage?",
+        "type": "string",
+        "required": false
       },
       {
-        "name": "screen_size",
-        "type": "choice",
-        "question": "Welke schermgrootte heeft je voorkeur?",
-        "description": "Preferred screen size",
-        "options": ["13 inch", "14 inch", "15 inch", "16 inch", "17 inch"]
-      }
-    ]
-  },
-  "computers": {
-    "attributes": [
-      {
-        "name": "budget",
-        "type": "range",
-        "question": "Wat is je budget voor een computer?",
-        "description": "Price range the user is willing to spend"
+        "name": "power",
+        "question": "Hoeveel vermogen heeft je voorkeur (200-400W, 400-600W, 600-800W, 800-1000W, of 1000W+)?",
+        "type": "string",
+        "required": false
       },
       {
-        "name": "brand",
-        "type": "choice",
-        "question": "Heb je een voorkeur voor een bepaald merk?",
-        "description": "Preferred computer brand"
+        "name": "bowl_capacity",
+        "question": "Welke komgrootte heb je nodig (1-2L, 3-4L, 5-6L, of 7L+)?",
+        "type": "string",
+        "required": false
       },
       {
-        "name": "processor",
-        "type": "choice",
-        "question": "Welke processor heeft je voorkeur?",
-        "description": "Preferred processor type",
-        "options": ["Intel Core i3", "Intel Core i5", "Intel Core i7", "Intel Core i9", "AMD Ryzen 3", "AMD Ryzen 5", "AMD Ryzen 7", "AMD Ryzen 9"]
-      }
-    ]
-  },
-  "smartphones": {
-    "attributes": [
-      {
-        "name": "budget",
-        "type": "range",
-        "question": "Wat is je budget voor een smartphone?",
-        "description": "Price range the user is willing to spend"
-      },
-      {
-        "name": "brand",
-        "type": "choice",
-        "question": "Heb je een voorkeur voor een bepaald merk?",
-        "description": "Preferred smartphone brand"
-      },
-      {
-        "name": "screen_size",
-        "type": "choice",
-        "question": "Welke schermgrootte heeft je voorkeur?",
-        "description": "Preferred screen size",
-        "options": ["5 inch", "6 inch", "6.5 inch", "7 inch"]
+        "name": "attachments",
+        "question": "Welke hulpstukken zijn belangrijk voor je (deeghaak, garde, platte beater, blender attachment, vleesmolen, pasta roller)?",
+        "type": "string",
+        "required": false
       }
     ]
   }

@@ -2,6 +2,10 @@
 
 [![Container smoke test](https://github.com/pxl-research/pixie-core/actions/workflows/container-smoke-test.yml/badge.svg)](https://github.com/pxl-research/pixie-core/actions/workflows/container-smoke-test.yml)
 
+> **🚨 FOR COPILOT/AI AGENTS:** This is a CONTAINER-FIRST project. NEVER run tests locally!  
+> **✅ ONLY use:** `./scripts/dev_test.sh pytest`  
+> **See:** `.github/workflows/copilot-instructions.md` for full details.
+
 AI-powered product recommendation system supporting multiple categories: printers, laptops, computers, and smartphones. Uses Azure OpenAI LLMs for intelligent conversation flows and category-aware product recommendations.
 
 ## Quick Start
