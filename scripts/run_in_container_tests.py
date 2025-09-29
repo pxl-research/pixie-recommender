@@ -8,12 +8,13 @@ Checks:
 On any assertion failure the script exits non‑zero so CI can fail fast.
 """
 
+import http.client as http_client
 import json
 import os
 import socket
 import sys
 import time
-import http.client as http_client
+
 
 # Determine API host/port. Allow explicit overrides via env vars for CI flexibility.
 def _probe(host: str, port: int, timeout: float = 0.8) -> bool:

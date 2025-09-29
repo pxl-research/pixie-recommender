@@ -102,4 +102,3 @@ class TestAzureSQLLLMSimple:
         self.sql_llm.reset_context()
 
         assert len(self.sql_llm.context) == 0
-
