@@ -84,7 +84,8 @@ while retry_count < max_retries:
         if db_status == 200 and isinstance(db_resp, dict):
             if db_resp.get("seeding_complete"):
                 print(
-                    f"✅ Database verification passed - found {db_resp.get('product_count', 0)} products"
+                    f"✅ Database verification passed - "
+                    f"found {db_resp.get('product_count', 0)} products"
                 )
                 break
             else:
@@ -96,7 +97,8 @@ while retry_count < max_retries:
                 )
         else:
             print(
-                f"⚠️  Debug endpoint error: {db_status} {db_resp} (attempt {retry_count + 1}/{max_retries})"
+                f"⚠️  Debug endpoint error: {db_status} {db_resp} "
+                f"(attempt {retry_count + 1}/{max_retries})"
             )
 
     except Exception as e:
@@ -118,7 +120,7 @@ if retry_count >= max_retries:
         try:
             get("/health")
             time.sleep(1)
-        except:
+        except Exception:
             pass
 
     # One final check
@@ -131,7 +133,7 @@ if retry_count >= max_retries:
         else:
             print("❌ Forced seeding failed - this will likely cause test failure")
             print(f"   Final DB state: {db_resp}")
-    except:
+    except Exception:
         print("❌ Could not check final database state")
 else:
     print("   Database verification completed successfully")
@@ -190,7 +192,7 @@ if status != 200 or r4.get("type") != "answer":
     except Exception as e:
         print(f"Could not get database status: {e}")
 
-    print(f"Conversation flow so far:")
+    print("Conversation flow so far:")
     for i, step in enumerate(out["flow"], 1):
         resp_type = step["resp"].get("type", "unknown")
         pending_id = step["resp"].get("pending_id", "none")
