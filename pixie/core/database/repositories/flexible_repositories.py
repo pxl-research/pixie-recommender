@@ -142,7 +142,7 @@ class DynamicRepository:
     def create(self, data: Dict[str, Any]) -> Dict[str, Any]:
         """Create a new record."""
         from datetime import datetime, timezone
-        
+
         # Validate columns exist
         all_columns = [col["name"] for col in self._get_columns()]
         invalid_columns = [col for col in data.keys() if col not in all_columns]
@@ -154,7 +154,7 @@ class DynamicRepository:
         # Add timestamps if columns exist and not provided
         data_with_timestamps = data.copy()
         current_time = datetime.now(timezone.utc)
-        
+
         if "created_at" in all_columns and "created_at" not in data_with_timestamps:
             data_with_timestamps["created_at"] = current_time
         if "updated_at" in all_columns and "updated_at" not in data_with_timestamps:
@@ -179,7 +179,7 @@ class DynamicRepository:
     def update(self, id_value: Any, data: Dict[str, Any]) -> Optional[Dict[str, Any]]:
         """Update a record."""
         from datetime import datetime, timezone
-        
+
         # Validate columns exist
         all_columns = [col["name"] for col in self._get_columns()]
         invalid_columns = [col for col in data.keys() if col not in all_columns]

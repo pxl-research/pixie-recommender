@@ -87,7 +87,7 @@ def get_db_session() -> Generator[Session, None, None]:
 
 def reset_engine() -> None:
     """Reset cached engine and session factory.
-    
+
     Useful for testing or when configuration changes.
     """
     global _engine, _SessionLocal

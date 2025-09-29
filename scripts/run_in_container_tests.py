@@ -137,7 +137,7 @@ if retry_count >= max_retries:
     try:
         reset_status, reset_resp = post_to_endpoint("/debug/reset-db-connection", {})
         if reset_status == 200 and isinstance(reset_resp, dict):
-            new_url = reset_resp.get('new_database_url', 'unknown')
+            new_url = reset_resp.get("new_database_url", "unknown")
             print(f"✅ Configuration reset successful: {new_url}")
         else:
             print(f"⚠️  Configuration reset failed: {reset_status} {reset_resp}")
