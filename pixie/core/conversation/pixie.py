@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import logging
 
-from ..search.unified_search_engine import SearchEngine
+from ..search.search_engine import SearchEngine
 from ..storage.pending_store import InMemoryPendingStore
 from ..utils.contracts import AskResponse
 from .simplified_conversation_manager import SimplifiedConversationManager

@@ -5,7 +5,7 @@ from typing import Any, Callable, Tuple
 from uuid import uuid4
 
 from ..llms import azure_llm_set
-from ..search.unified_search_engine import SearchEngine
+from ..search.search_engine import SearchEngine
 from ..storage.pending_store import InMemoryPendingStore
 from ..utils.attributes import get_attribute_manager
 from ..utils.contracts import AskResponse
