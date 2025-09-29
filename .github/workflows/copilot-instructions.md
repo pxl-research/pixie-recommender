@@ -1,5 +1,29 @@
 # PiXie Agent - Copilot Instructions
 
+## 🚨🚨🚨 LEES DIT EERST - VOOR ELKE COPILOT SESSIE 🚨🚨🚨
+
+### ⚡ SNELLE REFERENTIE VOOR COPILOT:
+```bash
+# TESTS UITVOEREN - ENIGE JUISTE MANIER:
+./scripts/dev_test.sh pytest
+
+# DOCKER PROBLEMEN? Probeer eerst:
+export PATH="/usr/local/bin:$PATH"
+```
+
+## ⛔ ABSOLUTE VERBODEN ACTIES:
+- ❌ **NOOIT** `pytest` lokaal uitvoeren  
+- ❌ **NOOIT** `.venv/bin/python -m pytest` proberen
+- ❌ **NOOIT** lokale Python omgeving opzetten
+- ❌ **NOOIT** `pip install` of `uv sync` lokaal doen
+
+## ✅ ENIGE TOEGESTANE TEST METHODE:
+```bash
+./scripts/dev_test.sh pytest  # Dit is de ENIGE manier
+```
+
+---
+
 ## CONTAINER-FIRST ONTWIKKELING — Nooit lokaal testen
 
 **BELANGRIJK:** Deze repository werkt uitsluitend container-first. Alle ontwikkel-activiteiten (testen, linting, formattering) gebeuren binnen de dev-container.
