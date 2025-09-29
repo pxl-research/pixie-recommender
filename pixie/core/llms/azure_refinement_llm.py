@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from typing import Optional
 
-from ..utils.attributes import get_attribute_manager
+from ..utils.database_attributes import get_database_attribute_manager
 from .azure_openai_llm import AzureOpenAILLM
 
 
@@ -39,7 +39,7 @@ class AzureRefinementLLM(AzureOpenAILLM):
 
         try:
             # Use attribute manager to get the next missing attribute
-            attr_manager = get_attribute_manager()
+            attr_manager = get_database_attribute_manager()
             next_attr = attr_manager.get_next_missing_attribute(category, ctx)
 
             if not next_attr:

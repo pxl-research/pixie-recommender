@@ -7,6 +7,8 @@ factory using a clearer module name.
 import logging
 from typing import Any, Dict, Optional
 
+from sqlalchemy import text
+
 from ..database.connection import get_db_session
 from ..database.repositories.flexible_repositories import (
     get_dynamic_repository,
@@ -60,84 +62,112 @@ class SearchEngine:
 
         with get_db_session() as session:
             try:
-                import re
-
-                # Attempt to detect naive queries referencing category-named tables
-                m = re.search(r"from\s+([a-zA-Z_][\w]*)", sql, re.IGNORECASE)
-                if m:
-                    referenced = m.group(1).lower()
-
-                    try:
-                        discovery = get_table_discovery(session)
-                        if hasattr(discovery, "get_all_tables"):
-                            discovered_iter = discovery.get_all_tables()
-                        elif hasattr(discovery, "get_product_tables"):
-                            discovered_iter = discovery.get_product_tables()
-                        elif isinstance(discovery, (list, tuple, set)):
-                            discovered_iter = discovery
-                        else:
-                            discovered_iter = []
-
-                        discovered_names = set(str(t).lower() for t in discovered_iter)
-                    except Exception:
-                        discovered_names = set()
-
-                    if referenced not in discovered_names:
-                        try:
-                            type_repo = get_dynamic_repository(session, "product_types")
-                            product_types = type_repo.filter_by_attributes(
-                                {"name": referenced}
-                            )
-                            if product_types:
-                                logger.info(
-                                    "Rewriting SQL: referenced table '%s' is a product_type; using products join instead",
-                                    referenced,
-                                )
-                                where_match = re.search(
-                                    r"where\s+(.*)$", sql, re.IGNORECASE | re.DOTALL
-                                )
-                                original_where = None
-                                if where_match:
-                                    original_where = where_match.group(1).strip()
-                                    if original_where.endswith(";"):
-                                        original_where = original_where[:-1].strip()
-
-                                base_sql = (
-                                    "SELECT p.* FROM products p "
-                                    "JOIN product_types pt ON p.product_type_id = pt.id "
-                                    f"WHERE pt.name = '{referenced}'"
-                                )
-
-                                if original_where:
-                                    sql = f"{base_sql} AND ({original_where})"
-                                else:
-                                    sql = base_sql
-                        except Exception:
-                            pass
-
-                from sqlalchemy import text
-
-                result = session.execute(text(sql))
-                rows = result.fetchall()
-
-                if rows:
-                    columns = result.keys()
-                    results = []
-                    for row in rows:
-                        row_dict = {
-                            col_name: row[i] for i, col_name in enumerate(columns)
-                        }
-                        results.append(self._map_product(row_dict))
-
-                    logger.info(f"SQL query returned {len(results)} results")
-                    return results
-                else:
-                    logger.info("SQL query returned no results")
-                    return []
+                # Attempt to rewrite naive queries that reference product types as tables
+                rewritten_sql = self._rewrite_product_type_queries(session, sql)
+                
+                # Execute the (possibly rewritten) SQL query
+                return self._execute_and_map_sql(session, rewritten_sql)
 
             except Exception as e:
                 logger.error(f"Error executing SQL query: {e}")
                 raise
+
+    def _rewrite_product_type_queries(self, session, sql: str) -> str:
+        """Rewrite queries that reference product types as table names."""
+        import re
+        
+        # Check if query references a table name that might be a product type
+        table_match = re.search(r"from\s+([a-zA-Z_][\w]*)", sql, re.IGNORECASE)
+        if not table_match:
+            return sql
+            
+        referenced_table = table_match.group(1).lower()
+        
+        # Check if this table actually exists in the database
+        if self._table_exists(session, referenced_table):
+            return sql
+            
+        # Check if it's a product type instead
+        if self._is_product_type(session, referenced_table):
+            return self._rewrite_as_product_type_query(sql, referenced_table)
+            
+        return sql
+
+    def _table_exists(self, session, table_name: str) -> bool:
+        """Check if a table exists in the database."""
+        try:
+            discovery = get_table_discovery(session)
+            if hasattr(discovery, "get_all_tables"):
+                discovered_iter = discovery.get_all_tables()
+            elif hasattr(discovery, "get_product_tables"):
+                discovered_iter = discovery.get_product_tables()
+            elif isinstance(discovery, (list, tuple, set)):
+                discovered_iter = discovery
+            else:
+                return False
+
+            discovered_names = {str(t).lower() for t in discovered_iter}
+            return table_name in discovered_names
+            
+        except Exception:
+            return False
+
+    def _is_product_type(self, session, type_name: str) -> bool:
+        """Check if a name corresponds to a product type."""
+        try:
+            type_repo = get_dynamic_repository(session, "product_types")
+            product_types = type_repo.filter_by_attributes({"name": type_name})
+            return len(product_types) > 0
+        except Exception:
+            return False
+
+    def _rewrite_as_product_type_query(self, sql: str, product_type: str) -> str:
+        """Rewrite SQL to use products table with product type join."""
+        import re
+        
+        logger.info(
+            f"Rewriting SQL: referenced table '{product_type}' is a "
+            "product_type; using products join instead"
+        )
+        
+        # Extract WHERE clause if present
+        where_match = re.search(r"where\s+(.*)$", sql, re.IGNORECASE | re.DOTALL)
+        original_where = None
+        if where_match:
+            original_where = where_match.group(1).strip()
+            if original_where.endswith(";"):
+                original_where = original_where[:-1].strip()
+
+        # Build new query with product type join
+        base_sql = (
+            "SELECT p.* FROM products p "
+            "JOIN product_types pt ON p.product_type_id = pt.id "
+            f"WHERE pt.name = '{product_type}'"
+        )
+
+        if original_where:
+            return f"{base_sql} AND ({original_where})"
+        else:
+            return base_sql
+
+    def _execute_and_map_sql(self, session, sql: str) -> list:
+        """Execute SQL and map results to product format."""
+        result = session.execute(text(sql))
+        rows = result.fetchall()
+
+        if not rows:
+            logger.info("SQL query returned no results")
+            return []
+
+        # Map rows to product dictionaries
+        columns = result.keys()
+        results = []
+        for row in rows:
+            row_dict = {col_name: row[i] for i, col_name in enumerate(columns)}
+            results.append(self._map_product(row_dict))
+
+        logger.info(f"SQL query returned {len(results)} results")
+        return results
 
     def _get_default_results(self, category: Optional[str]) -> list:
         """Get default results when no attributes are provided."""
@@ -257,87 +287,25 @@ class SearchEngine:
         logger.info(f"Applying attribute filters: {filter_attributes}")
 
         try:
-            attr_def_repo = get_dynamic_repository(session, "attribute_definitions")
-            attr_val_repo = get_dynamic_repository(session, "product_attribute_values")
-
             base_product_ids = [p["id"] for p in base_products]
             if not base_product_ids:
                 return []
 
             filtered_product_ids = set(base_product_ids)
 
+            # Apply each filter sequentially
             for attr_name, attr_value in filter_attributes.items():
                 if attr_value is None:
                     continue
 
-                if attr_name == "budget":
-                    filtered_product_ids = self._apply_budget_filter(
-                        session, filtered_product_ids, attr_value
-                    )
-                    if not filtered_product_ids:
-                        return []
-                    continue
-
-                try:
-                    from sqlalchemy import inspect, text
-
-                    inspector = inspect(session.bind)
-                    prod_cols = {c["name"] for c in inspector.get_columns("products")}
-                except Exception:
-                    prod_cols = set()
-
-                if attr_name in prod_cols:
-                    try:
-                        if isinstance(attr_value, str):
-                            query = f"SELECT id FROM products WHERE LOWER({attr_name}) = :val"
-                            params = {"val": attr_value.lower()}
-                        else:
-                            query = f"SELECT id FROM products WHERE {attr_name} = :val"
-                            params = {"val": attr_value}
-
-                        if filtered_product_ids:
-                            ids_list = list(filtered_product_ids)
-                            placeholders = ", ".join(
-                                [f":id_{i}" for i in range(len(ids_list))]
-                            )
-                            query += f" AND id IN ({placeholders})"
-                            for i, pid in enumerate(ids_list):
-                                params[f"id_{i}"] = pid
-
-                        result = session.execute(text(query), params)
-                        matching_ids = {row[0] for row in result.fetchall()}
-                        filtered_product_ids = filtered_product_ids.intersection(
-                            matching_ids
-                        )
-                        if not filtered_product_ids:
-                            return []
-                        continue
-                    except Exception:
-                        logger.warning(
-                            f"Failed to apply product-column filter for {attr_name}"
-                        )
-
-                attr_defs = attr_def_repo.filter_by_attributes({"name": attr_name})
-                if not attr_defs:
-                    logger.warning(f"Attribute definition not found for: {attr_name}")
-                    continue
-
-                attr_def = attr_defs[0]
-                attr_def_id = attr_def["id"]
-
-                matching_attr_vals = attr_val_repo.filter_by_attributes(
-                    {"attribute_definition_id": attr_def_id, "value": str(attr_value)}
+                filtered_product_ids = self._apply_single_attribute_filter(
+                    session, filtered_product_ids, attr_name, attr_value
                 )
-
-                matching_product_ids = {val["product_id"] for val in matching_attr_vals}
-
-                filtered_product_ids = filtered_product_ids.intersection(
-                    matching_product_ids
-                )
-
+                
                 if not filtered_product_ids:
                     return []
 
+            # Return filtered products
             filtered_products = [
                 p for p in base_products if p["id"] in filtered_product_ids
             ]
@@ -351,6 +319,93 @@ class SearchEngine:
         except Exception as e:
             logger.error(f"Error applying attribute filters: {e}")
             return base_products
+
+    def _apply_single_attribute_filter(
+        self, session, current_product_ids: set, attr_name: str, attr_value: Any
+    ) -> set:
+        """Apply a single attribute filter and return matching product IDs."""
+        # Special handling for budget
+        if attr_name == "budget":
+            return self._apply_budget_filter(session, current_product_ids, attr_value)
+
+        # Check if it's a product column filter
+        if self._is_product_column(session, attr_name):
+            return self._apply_product_column_filter(
+                session, current_product_ids, attr_name, attr_value
+            )
+
+        # Otherwise, it's a custom attribute filter
+        return self._apply_custom_attribute_filter(
+            session, current_product_ids, attr_name, attr_value
+        )
+
+    def _is_product_column(self, session, attr_name: str) -> bool:
+        """Check if an attribute name corresponds to a product table column."""
+        try:
+            from sqlalchemy import inspect
+
+            inspector = inspect(session.bind)
+            prod_cols = {c["name"] for c in inspector.get_columns("products")}
+            return attr_name in prod_cols
+        except Exception:
+            return False
+
+    def _apply_product_column_filter(
+        self, session, current_product_ids: set, attr_name: str, attr_value: Any
+    ) -> set:
+        """Apply filter for product table column."""
+        try:
+            if isinstance(attr_value, str):
+                query = f"SELECT id FROM products WHERE LOWER({attr_name}) = :val"
+                params = {"val": attr_value.lower()}
+            else:
+                query = f"SELECT id FROM products WHERE {attr_name} = :val"
+                params = {"val": attr_value}
+
+            # Add current product ID constraints
+            if current_product_ids:
+                ids_list = list(current_product_ids)
+                placeholders = ", ".join([f":id_{i}" for i in range(len(ids_list))])
+                query += f" AND id IN ({placeholders})"
+                for i, pid in enumerate(ids_list):
+                    params[f"id_{i}"] = pid
+
+            result = session.execute(text(query), params)
+            matching_ids = {row[0] for row in result.fetchall()}
+            return current_product_ids.intersection(matching_ids)
+
+        except Exception:
+            logger.warning(f"Failed to apply product-column filter for {attr_name}")
+            return current_product_ids
+
+    def _apply_custom_attribute_filter(
+        self, session, current_product_ids: set, attr_name: str, attr_value: Any
+    ) -> set:
+        """Apply filter for custom product attributes."""
+        try:
+            attr_def_repo = get_dynamic_repository(session, "attribute_definitions")
+            attr_val_repo = get_dynamic_repository(session, "product_attribute_values")
+
+            # Find attribute definition
+            attr_defs = attr_def_repo.filter_by_attributes({"name": attr_name})
+            if not attr_defs:
+                logger.warning(f"Attribute definition not found for: {attr_name}")
+                return current_product_ids
+
+            attr_def = attr_defs[0]
+            attr_def_id = attr_def["id"]
+
+            # Find matching attribute values
+            matching_attr_vals = attr_val_repo.filter_by_attributes(
+                {"attribute_definition_id": attr_def_id, "value": str(attr_value)}
+            )
+
+            matching_product_ids = {val["product_id"] for val in matching_attr_vals}
+            return current_product_ids.intersection(matching_product_ids)
+
+        except Exception as e:
+            logger.error(f"Error applying custom attribute filter for {attr_name}: {e}")
+            return current_product_ids
 
     def _apply_budget_filter(
         self, session, current_product_ids: set, budget_value: str
@@ -389,8 +444,6 @@ class SearchEngine:
 
             if max_price_euros is not None:
                 logger.info(f"Parsed budget as: €{max_price_euros}")
-
-                from sqlalchemy import text
 
                 query = "SELECT id FROM products WHERE price_cents <= :max_price_cents"
                 if current_product_ids:

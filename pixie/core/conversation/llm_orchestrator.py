@@ -16,11 +16,11 @@ logger = logging.getLogger(__name__)
 class RelevanceLLM(Protocol):
     """Protocol for relevance checking LLM."""
 
-    def is_relevant(self, question: str) -> bool:
+    def is_relevant(self, question: Optional[str]) -> bool:
         """Check if question is product-related."""
         ...
 
-    def detect_category(self, question: str) -> Optional[str]:
+    def detect_category(self, question: Optional[str]) -> Optional[str]:
         """Detect product category from question."""
         ...
 
@@ -157,14 +157,16 @@ class LLMOrchestrator:
 
         except Exception as e:
             logger.error(f"Failed SQL generation: {e}")
-            # Fallback to simple query
-            fallback_sql = f"SELECT * FROM products WHERE product_type_id = \
-              (SELECT id FROM product_types WHERE name = '{category}')"
+            # Fallback to simple parameterized query
+            fallback_sql = (
+                "SELECT * FROM products WHERE product_type_id = "
+                "(SELECT id FROM product_types WHERE name = %s)"
+            )
 
             return LLMResponse(
                 success=False,
                 error="sql_generation_failed",
-                result={"sql": fallback_sql, "table": "products"},
+                result={"sql": fallback_sql, "table": "products", "params": [category]},
             )
 
     def generate_attribute_question(
@@ -243,10 +245,15 @@ class MockLLMOrchestrator(LLMOrchestrator):
         self, question: str, context: Dict[str, Any], category: str
     ) -> LLMResponse:
         """Mock SQL generation."""
-        sql = f"SELECT * FROM products WHERE product_type_id = \
-          (SELECT id FROM product_types WHERE name = '{category}')"
+        sql = (
+            "SELECT * FROM products WHERE product_type_id = "
+            "(SELECT id FROM product_types WHERE name = %s)"
+        )
 
-        return LLMResponse(success=True, result={"sql": sql, "table": "products"})
+        return LLMResponse(
+            success=True, 
+            result={"sql": sql, "table": "products", "params": [category]}
+        )
 
 
 def create_llm_orchestrator(use_mocks: bool = False) -> LLMOrchestrator:
