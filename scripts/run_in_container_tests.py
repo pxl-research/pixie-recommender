@@ -15,13 +15,13 @@ import sys
 
 
 # Detect if running inside container vs locally
-if os.path.exists('/app') and os.environ.get('DOCKER_CONTAINER') != 'false':
+if os.path.exists("/app") and os.environ.get("DOCKER_CONTAINER") != "false":
     # Running inside container - connect to API service via Docker network
     API_HOST = "api"
     API_PORT = 8000
 else:
     # Running locally - connect to localhost with mapped port
-    API_HOST = "localhost" 
+    API_HOST = "localhost"
     API_PORT = 8012
 
 
