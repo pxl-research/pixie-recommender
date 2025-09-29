@@ -171,6 +171,238 @@ def init_database_simple():
                 conn.commit()
                 logger.info("Added printer products successfully")
 
+            # Create attribute definitions for printers
+            result = conn.execute(
+                text(
+                    """
+                SELECT COUNT(*) as attr_count 
+                FROM attribute_definitions ad 
+                JOIN product_types pt ON ad.product_type_id = pt.id 
+                WHERE pt.name = 'printers'
+                """
+                )
+            )
+            attr_count = result.scalar()
+
+            if attr_count == 0:
+                logger.info("Adding attribute definitions for printers...")
+                conn.execute(
+                    text(
+                        """
+                    INSERT INTO attribute_definitions (
+                        id, product_type_id, name, display_name, data_type, 
+                        is_required, validation_rules, options, display_order, 
+                        canonical_name, is_searchable, is_filterable, created_at, updated_at
+                    )
+                    SELECT 
+                        gen_random_uuid(),
+                        pt.id,
+                        'budget',
+                        'Budget',
+                        'number',
+                        true,
+                        NULL::json,
+                        NULL::json,
+                        1,
+                        'budget',
+                        true,
+                        true,
+                        NOW(),
+                        NOW()
+                    FROM product_types pt WHERE pt.name = 'printers'
+                    
+                    UNION ALL
+                    
+                    SELECT 
+                        gen_random_uuid(),
+                        pt.id,
+                        'brand',
+                        'Brand',
+                        'choice',
+                        false,
+                        NULL::json,
+                        NULL::json,
+                        2,
+                        'brand',
+                        true,
+                        true,
+                        NOW(),
+                        NOW()
+                    FROM product_types pt WHERE pt.name = 'printers'
+                    
+                    UNION ALL
+                    
+                    SELECT 
+                        gen_random_uuid(),
+                        pt.id,
+                        'technology',
+                        'Technology',
+                        'choice',
+                        false,
+                        NULL::json,
+                        '["inkjet", "laser"]'::json,
+                        3,
+                        'technology',
+                        true,
+                        true,
+                        NOW(),
+                        NOW()
+                    FROM product_types pt WHERE pt.name = 'printers'
+                """
+                    )
+                )
+                conn.commit()
+                logger.info("Added attribute definitions successfully")
+
+            # Create product attribute values
+            result = conn.execute(
+                text(
+                    """
+                SELECT COUNT(*) as attr_value_count 
+                FROM product_attribute_values pav 
+                JOIN products p ON pav.product_id = p.id 
+                JOIN product_types pt ON p.product_type_id = pt.id 
+                WHERE pt.name = 'printers'
+                """
+                )
+            )
+            attr_value_count = result.scalar()
+
+            if attr_value_count == 0:
+                logger.info("Adding product attribute values for printers...")
+                conn.execute(
+                    text(
+                        """
+                    -- Brother XC 2570 attributes
+                    INSERT INTO product_attribute_values (
+                        product_id, attribute_definition_id, string_value, created_at, updated_at
+                    )
+                    SELECT 
+                        p.id,
+                        ad.id,
+                        'Brother',
+                        NOW(),
+                        NOW()
+                    FROM products p
+                    JOIN product_types pt ON p.product_type_id = pt.id
+                    JOIN attribute_definitions ad ON ad.product_type_id = pt.id
+                    WHERE pt.name = 'printers' 
+                    AND p.name = 'Brother XC 2570' 
+                    AND ad.name = 'brand'
+                    
+                    UNION ALL
+                    
+                    SELECT 
+                        p.id,
+                        ad.id,
+                        'laser',
+                        NOW(),
+                        NOW()
+                    FROM products p
+                    JOIN product_types pt ON p.product_type_id = pt.id
+                    JOIN attribute_definitions ad ON ad.product_type_id = pt.id
+                    WHERE pt.name = 'printers' 
+                    AND p.name = 'Brother XC 2570' 
+                    AND ad.name = 'technology'
+                    
+                    UNION ALL
+                    
+                    -- Brother XT 3560 attributes
+                    SELECT 
+                        p.id,
+                        ad.id,
+                        'Brother',
+                        NOW(),
+                        NOW()
+                    FROM products p
+                    JOIN product_types pt ON p.product_type_id = pt.id
+                    JOIN attribute_definitions ad ON ad.product_type_id = pt.id
+                    WHERE pt.name = 'printers' 
+                    AND p.name = 'Brother XT 3560' 
+                    AND ad.name = 'brand'
+                    
+                    UNION ALL
+                    
+                    SELECT 
+                        p.id,
+                        ad.id,
+                        'laser',
+                        NOW(),
+                        NOW()
+                    FROM products p
+                    JOIN product_types pt ON p.product_type_id = pt.id
+                    JOIN attribute_definitions ad ON ad.product_type_id = pt.id
+                    WHERE pt.name = 'printers' 
+                    AND p.name = 'Brother XT 3560' 
+                    AND ad.name = 'technology'
+                    
+                    UNION ALL
+                    
+                    -- HP LaserJet attributes
+                    SELECT 
+                        p.id,
+                        ad.id,
+                        'HP',
+                        NOW(),
+                        NOW()
+                    FROM products p
+                    JOIN product_types pt ON p.product_type_id = pt.id
+                    JOIN attribute_definitions ad ON ad.product_type_id = pt.id
+                    WHERE pt.name = 'printers' 
+                    AND p.name = 'HP LaserJet Pro M404n' 
+                    AND ad.name = 'brand'
+                    
+                    UNION ALL
+                    
+                    SELECT 
+                        p.id,
+                        ad.id,
+                        'laser',
+                        NOW(),
+                        NOW()
+                    FROM products p
+                    JOIN product_types pt ON p.product_type_id = pt.id
+                    JOIN attribute_definitions ad ON ad.product_type_id = pt.id
+                    WHERE pt.name = 'printers' 
+                    AND p.name = 'HP LaserJet Pro M404n' 
+                    AND ad.name = 'technology'
+                    
+                    UNION ALL
+                    
+                    -- Canon PIXMA attributes
+                    SELECT 
+                        p.id,
+                        ad.id,
+                        'Canon',
+                        NOW(),
+                        NOW()
+                    FROM products p
+                    JOIN product_types pt ON p.product_type_id = pt.id
+                    JOIN attribute_definitions ad ON ad.product_type_id = pt.id
+                    WHERE pt.name = 'printers' 
+                    AND p.name = 'Canon PIXMA TS3350' 
+                    AND ad.name = 'brand'
+                    
+                    UNION ALL
+                    
+                    SELECT 
+                        p.id,
+                        ad.id,
+                        'inkjet',
+                        NOW(),
+                        NOW()
+                    FROM products p
+                    JOIN product_types pt ON p.product_type_id = pt.id
+                    JOIN attribute_definitions ad ON ad.product_type_id = pt.id
+                    WHERE pt.name = 'printers' 
+                    AND p.name = 'Canon PIXMA TS3350' 
+                    AND ad.name = 'technology'
+                """
+                    )
+                )
+                conn.commit()
+                logger.info("Added product attribute values successfully")
+
             logger.info("Database initialization completed")
             return True
 

@@ -1,7 +1,7 @@
 """Database seeding script for flexible product system."""
 
 import logging
-from typing import Dict, List
+from typing import Any, Dict, List
 from uuid import UUID
 
 from .connection import get_db_session
@@ -258,6 +258,16 @@ def seed_attribute_definitions_with_session(
                 "data_type": "choice",
                 "is_required": False,
                 "display_order": 3,
+                "options": ["inkjet", "laser"],
+                "canonical_name": "technology",
+            },
+            {
+                "name": "technology",
+                "display_name": "Technology",
+                "data_type": "choice",
+                "is_required": False,
+                "display_order": 3,
+                "options": ["inkjet", "laser"],
                 "canonical_name": "technology",
             },
             {
@@ -314,7 +324,7 @@ def seed_attribute_definitions_with_session(
                     attr_data_copy["canonical_name"] = attr_data["canonical_name"]
                 attr = attr_repo.create(attr_data_copy)
                 pt_attributes.append(attr)
-                logger.info(f"Created attribute '{attr.name}' for {pt_name}")
+                logger.info(f"Created attribute '{attr['name']}' for {pt_name}")
 
         created_attributes[pt_name] = pt_attributes
 
@@ -436,11 +446,9 @@ def seed_sample_products_with_session(
                 "model": "XC 2570",
                 "price_cents": 19900,  # €199.00
                 "attributes": {
-                    "print_type": "laser",
+                    "technology": "laser",  # Changed from print_type to technology
                     "color_support": "monochrome",
                     "pages_per_minute": 28,
-                    "brand": "Brother",
-                    "budget": 19900,
                 },
             },
             {
@@ -451,11 +459,9 @@ def seed_sample_products_with_session(
                 "model": "XT 3560",
                 "price_cents": 15900,  # €159.00
                 "attributes": {
-                    "print_type": "laser",
+                    "technology": "laser",  # Changed from print_type to technology
                     "color_support": "monochrome",
                     "pages_per_minute": 32,
-                    "brand": "Brother",
-                    "budget": 15900,
                 },
             },
             {
@@ -466,11 +472,9 @@ def seed_sample_products_with_session(
                 "model": "LaserJet Pro M404n",
                 "price_cents": 17900,  # €179.00
                 "attributes": {
-                    "print_type": "laser",
+                    "technology": "laser",  # Changed from print_type to technology
                     "color_support": "monochrome",
                     "pages_per_minute": 40,
-                    "brand": "HP",
-                    "budget": 17900,
                 },
             },
             {
@@ -481,11 +485,9 @@ def seed_sample_products_with_session(
                 "model": "PIXMA TS3350",
                 "price_cents": 8900,  # €89.00
                 "attributes": {
-                    "print_type": "inkjet",
+                    "technology": "inkjet",  # Changed from print_type to technology
                     "color_support": "color",
                     "pages_per_minute": 15,
-                    "brand": "Canon",
-                    "budget": 8900,
                 },
             },
         ],
@@ -525,11 +527,30 @@ def seed_sample_products_with_session(
                         if attr_name in attr_lookup:
                             attr_def = attr_lookup[attr_name]
                             try:
-                                attr_value_repo.set_value(
-                                    UUID(str(product["id"])),
-                                    UUID(str(attr_def["id"])),
-                                    value,
-                                )
+                                # Determine which value column to use based on attribute type
+                                attr_value_data: Dict[str, Any] = {
+                                    "product_id": UUID(str(product["id"])),
+                                    "attribute_definition_id": UUID(
+                                        str(attr_def["id"])
+                                    ),
+                                }
+
+                                # Set the appropriate value column based on data type
+                                data_type = attr_def.get("data_type", "string")
+                                if data_type == "number" and isinstance(
+                                    value, (int, float)
+                                ):
+                                    attr_value_data["number_value"] = float(value)
+                                elif data_type == "boolean":
+                                    attr_value_data["boolean_value"] = bool(value)
+                                elif data_type in ["choice", "string"] or isinstance(
+                                    value, str
+                                ):
+                                    attr_value_data["string_value"] = str(value)
+                                else:
+                                    attr_value_data["string_value"] = str(value)
+
+                                attr_value_repo.create(attr_value_data)
                                 logger.info(
                                     f"Set {attr_name} = {value} for {product_data['name']}"
                                 )

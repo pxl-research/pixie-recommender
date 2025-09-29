@@ -14,7 +14,7 @@ import sys
 
 
 def get(path):
-    conn = http.client.HTTPConnection("localhost", 8000)
+    conn = http.client.HTTPConnection("localhost", 8012)
     conn.request("GET", path)
     r = conn.getresponse()
     data = r.read().decode()
@@ -26,7 +26,7 @@ def get(path):
 
 
 def post(body):
-    conn = http.client.HTTPConnection("localhost", 8000)
+    conn = http.client.HTTPConnection("localhost", 8012)
     conn.request(
         "POST",
         "/ask",
@@ -100,8 +100,8 @@ if status != 200 or r4.get("type") != "answer":
         f.write(json.dumps(out, ensure_ascii=False, indent=2))
     sys.exit(7)
 
-with open("/app/pixie_test_output.json", "w", encoding="utf-8") as f:
+with open("pixie_test_output.json", "w", encoding="utf-8") as f:
     f.write(json.dumps(out, ensure_ascii=False, indent=2))
 
-print("Smoke test succeeded; wrote /app/pixie_test_output.json")
+print("Smoke test succeeded; wrote pixie_test_output.json")
 sys.exit(0)

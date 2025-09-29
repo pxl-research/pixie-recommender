@@ -52,7 +52,7 @@ class AzureSQLLLM(AzureOpenAILLM):
                 f"User Question: {q}\n"
                 f"User Attributes: {attrs}\n\n"
                 "IMPORTANT RULES:\n"
-                "1. Always use 'price' column for price comparisons (not price_cents)\n"
+                "1. Always use 'price_cents' column for price comparisons (price in cents)\n"
                 "2. For budget constraints, use <= for maximum budget\n"
                 "3. Use exact string matching for brands and technology\n"
                 "4. Convert technology to lowercase for comparison: LOWER(technology) = 'inkjet'\n"
@@ -60,8 +60,8 @@ class AzureSQLLLM(AzureOpenAILLM):
                 '6. IGNORE vague responses like "weet ik niet", "geen idee", '
                 '"maakt niet uit" - no WHERE clause\n\n'
                 "Examples:\n"
-                '- Budget "200 euro" → WHERE price <= 200\n'
-                '- Budget "maximaal 150" → WHERE price <= 150\n'
+                '- Budget "200 euro" → WHERE price_cents <= 20000\n'
+                '- Budget "maximaal 150" → WHERE price_cents <= 15000\n'
                 '- Budget "weet ik niet" → IGNORE (no budget filter)\n'
                 "- Brand \"HP\" → WHERE brand = 'HP'\n"
                 '- Brand "geen voorkeur" → IGNORE (no brand filter)\n'
@@ -95,7 +95,26 @@ class AzureSQLLLM(AzureOpenAILLM):
                 price_val = float(
                     attributes["price"].replace("€", "").replace("euro", "").strip()
                 )
-                conditions.append(f"price <= {price_val}")
+                price_cents = int(price_val * 100)  # Convert euros to cents
+                conditions.append(f"price_cents <= {price_cents}")
+            except (ValueError, AttributeError):
+                pass
+
+        if "budget" in attributes and attributes["budget"]:
+            try:
+                # Handle budget strings like "200" or "200 euro" or "maximaal 150"
+                budget_str = (
+                    attributes["budget"]
+                    .replace("€", "")
+                    .replace("euro", "")
+                    .replace("maximaal", "")
+                    .strip()
+                )
+                vague_responses = ["geen voorkeur", "maakt niet uit", "weet ik niet"]
+                if budget_str and budget_str.lower() not in vague_responses:
+                    budget_val = float(budget_str)
+                    budget_cents = int(budget_val * 100)  # Convert euros to cents
+                    conditions.append(f"price_cents <= {budget_cents}")
             except (ValueError, AttributeError):
                 pass
 
