@@ -27,7 +27,7 @@ class TestSimplifiedConversationManager:
         # Create a mock LLM orchestrator with proper interface
         self.llm_orchestrator = Mock(spec=LLMOrchestrator)
         self.llm_orchestrator.check_relevance_and_category.return_value = LLMResponse(
-            success=True, result={"relevant": True, "category": "laptops"}
+            success=True, result={"relevant": True, "category": "printers"}
         )
         self.llm_orchestrator.should_collect_attributes.return_value = LLMResponse(
             success=True, result={"should_collect": True}
@@ -36,6 +36,7 @@ class TestSimplifiedConversationManager:
             success=True, result={"sql": "SELECT * FROM products", "table": "products"}
         )
 
+        # flow_manager is now optional for backward compatibility
         self.flow_manager = ConversationFlowManager()
 
         self.manager = SimplifiedConversationManager(
@@ -83,7 +84,9 @@ class TestSimplifiedConversationManager:
         # Should ask next question (brand)
         assert reply_response.type == "ask_user"
         assert reply_response.prompt is not None
-        assert "merk" in reply_response.prompt.lower()
+        # Check for brand-related keywords in Dutch (either "merk" or "brand")
+        prompt_lower = reply_response.prompt.lower()
+        assert "merk" in prompt_lower or "brand" in prompt_lower
 
     def test_handle_reply_completion_flow(self):
         """Test complete conversation flow to results."""

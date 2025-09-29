@@ -43,7 +43,8 @@ class SimplifiedConversationManager:
         self.search_fn = search_fn
         self.pending_store = pending_store or InMemoryPendingStore()
         self.llm_orchestrator = llm_orchestrator or create_llm_orchestrator()
-        self.flow_manager = flow_manager or ConversationFlowManager()
+        # Keep flow_manager for backward compatibility, but it's optional now
+        self.flow_manager = flow_manager
         self.max_iterations = max_iterations
 
     def handle_new_question(self, question: str) -> AskResponse:
@@ -221,9 +222,19 @@ class SimplifiedConversationManager:
         sql_result = self.llm_orchestrator.generate_search_query(question, {}, category)
 
         if not sql_result.success:
-            # Fallback to category-based search
-            flow = self.flow_manager.get_flow(category)
-            sql_query = flow.fallback_sql_template if flow else "SELECT * FROM products"
+            # Use database-driven search via search engine with category context
+            try:
+                search_context = {"category": category}
+                results = self.search_fn(None, search_context, category)
+                if results:
+                    return AskResponse(type="answer", text=str(results))
+                else:
+                    return AskResponse(
+                        type="no_results", text="No matching products found"
+                    )
+            except Exception as e:
+                logger.error(f"Database-driven search failed: {e}")
+                return AskResponse(type="error", reason="search_failed")
         else:
             sql_query = sql_result.result["sql"]
 

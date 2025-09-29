@@ -50,33 +50,37 @@ class AttributeCollector:
         self.attribute_definitions = self._load_attribute_definitions(category)
 
     def _load_attribute_definitions(self, category: str) -> List[AttributeRequest]:
-        """Load attribute definitions for category - centralized configuration."""
-        definitions = {
-            "printers": [
-                AttributeRequest("budget", "Wat is je budget voor een printer?"),
-                AttributeRequest("brand", "Heb je een voorkeur voor een bepaald merk?"),
-                AttributeRequest(
-                    "technology", "Welke printtechnologie prefereer je (inkjet/laser)?"
-                ),
-                AttributeRequest("connectivity", "Welke verbindingsopties wil je?"),
-            ],
-            "laptops": [
-                AttributeRequest("budget", "Wat is je budget voor een laptop?"),
-                AttributeRequest("brand", "Heb je een voorkeur voor een bepaald merk?"),
-                AttributeRequest("screen_size", "Welke schermgrootte zoek je?"),
-            ],
-            "smartphones": [
-                AttributeRequest("budget", "Wat is je budget voor een smartphone?"),
-                AttributeRequest("brand", "Welk merk prefereer je?"),
-                AttributeRequest("screen_size", "Welke schermgrootte wil je?"),
-            ],
-            "computers": [
-                AttributeRequest("budget", "Wat is je budget voor een computer?"),
-                AttributeRequest("brand", "Heb je een voorkeur voor een bepaald merk?"),
-                AttributeRequest("processor", "Welke processor prefereer je?"),
-            ],
-        }
-        return definitions.get(category, [])
+        """Load attribute definitions from database - unified configuration source."""
+        try:
+            from ..utils.database_attributes import get_database_attribute_manager
+
+            attr_manager = get_database_attribute_manager()
+            db_attributes = attr_manager.get_attributes_for_category(category)
+
+            attribute_requests = []
+            for attr in db_attributes:
+                attribute_requests.append(
+                    AttributeRequest(
+                        name=attr["name"],
+                        question=attr["question"],
+                        required=attr.get("required", False),
+                    )
+                )
+
+            logger.info(
+                f"Loaded {len(attribute_requests)} attribute definitions "
+                f"for {category} from database"
+            )
+            return attribute_requests
+
+        except Exception as e:
+            logger.error(f"Failed to load attributes from database for {category}: {e}")
+            # Return empty list - let the system handle gracefully without attributes
+            logger.warning(
+                f"No attribute definitions available for {category}, "
+                f"proceeding without collection"
+            )
+            return []
 
     def get_next_question(self) -> Optional[AttributeRequest]:
         """
@@ -176,16 +180,32 @@ class AttributeCollector:
 
         Replaces complex iteration and completion logic.
         """
-        # Must have at least budget (most important)
-        if "budget" not in self.collected_attributes:
-            return False
+        # If no attribute definitions are loaded, collection is complete
+        # (proceed directly to search without attribute collection)
+        if not self.attribute_definitions:
+            return True
 
-        # Must have minimum number of attributes. The threshold should respect
-        # the configured max_attributes (set by the conversation manager) and
-        # the total number of defined attributes for the category.
+        # Check if we have collected any required attributes
+        required_attrs = [attr for attr in self.attribute_definitions if attr.required]
+        if required_attrs:
+            # We need at least one required attribute
+            collected_required = [
+                attr_name
+                for attr_name, attr_value in self.collected_attributes.items()
+                if any(req.name == attr_name for req in required_attrs)
+                and not attr_value.is_skipped
+            ]
+            if not collected_required:
+                return False
+
+        # Count non-skipped collected attributes
         collected_count = len(
             [attr for attr in self.collected_attributes.values() if not attr.is_skipped]
         )
+
+        # Determine minimum threshold based on available definitions and max_attributes
+        if len(self.attribute_definitions) == 0:
+            return True
 
         required_min = min(self.max_attributes, len(self.attribute_definitions))
         return collected_count >= required_min
