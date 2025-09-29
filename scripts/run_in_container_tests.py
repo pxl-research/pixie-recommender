@@ -8,27 +8,92 @@ Checks:
 On any assertion failure the script exits non‑zero so CI can fail fast.
 """
 
-import http.client
 import json
 import os
+import socket
 import sys
 import time
+import http.client as http_client
 
-# Detect if running inside container vs locally
-if os.path.exists("/app") and os.environ.get("DOCKER_CONTAINER") != "false":
-    # Running inside container - connect to API service via Docker network
-    API_HOST = "api"
-    API_PORT = 8000
-    OUTPUT_FILE = "/app/pixie_test_output.json"
+# Determine API host/port. Allow explicit overrides via env vars for CI flexibility.
+def _probe(host: str, port: int, timeout: float = 0.8) -> bool:
+    try:
+        with socket.create_connection((host, port), timeout=timeout):
+            return True
+    except Exception:
+        return False
+
+
+OUTPUT_FILE = "pixie_test_output.json"
+
+# Default API endpoint values (typed) so static checkers don't see None
+API_HOST: str = "localhost"
+API_PORT: int = 8012
+
+# Respect explicit environment overrides first
+env_host = os.environ.get("API_HOST")
+env_port = os.environ.get("API_PORT")
+env_url = os.environ.get("API_URL")
+if env_url and ":" in env_url:
+    try:
+        h, p = env_url.split(":")
+        API_HOST = h
+        API_PORT = int(p)
+    except Exception:
+        API_HOST = env_host or "localhost"
+        API_PORT = int(env_port) if env_port else 8012
+elif env_host or env_port:
+    API_HOST = env_host or "localhost"
+    API_PORT = int(env_port) if env_port else 8012
 else:
-    # Running locally - connect to localhost with mapped port
-    API_HOST = "localhost"
-    API_PORT = 8012
-    OUTPUT_FILE = "pixie_test_output.json"
+    # No explicit override: build a candidate list depending on runtime
+    OUTPUT_FILE = (
+        "/app/pixie_test_output.json"
+        if os.path.exists("/app")
+        else "pixie_test_output.json"
+    )
+
+    # Prefer the host/port mapping that matches a typical container-first setup,
+    # but probe a short list and pick the first reachable endpoint.
+    candidates = []
+    if os.path.exists("/app"):
+        # We're inside a container (could be the api container or a helper container).
+        candidates = [("localhost", 8000), ("api", 8000), ("localhost", 8012)]
+    else:
+        # Running on host; try host-mapped port first then internal service name.
+        candidates = [("localhost", 8012), ("api", 8000), ("localhost", 8000)]
+
+    found = False
+    for h, p in candidates:
+        if _probe(h, p):
+            API_HOST = h
+            API_PORT = p
+            found = True
+            break
+
+    # Fall back to sensible defaults if none probe succeeded
+    if not found:
+        if os.path.exists("/app"):
+            API_HOST, API_PORT = "api", 8000
+        else:
+            API_HOST, API_PORT = "localhost", 8012
+
+    # OUTPUT_FILE already set above for host/container (kept earlier as default)
+
+# If an explicit OUTPUT_PATH env var is provided, use it
+OUTPUT_FILE = os.environ.get("OUTPUT_FILE", OUTPUT_FILE)
+
+# Ensure types are correct for http client
+API_HOST = str(API_HOST)
+API_PORT = int(API_PORT)
+
+# Print chosen endpoint for debugging in CI logs (split to keep lines short)
+print("Using API endpoint:", f"{API_HOST}:{API_PORT}")
+print(f"Overrides: API_HOST={env_host}, API_PORT={env_port}, API_URL={env_url}")
 
 
 def get(path):
-    conn = http.client.HTTPConnection(API_HOST, API_PORT)
+    conn = http_client.HTTPConnection(API_HOST, API_PORT)
     conn.request("GET", path)
     r = conn.getresponse()
     data = r.read().decode()
@@ -40,7 +105,7 @@ def get(path):
 
 
 def post(body):
-    conn = http.client.HTTPConnection(API_HOST, API_PORT)
+    conn = http_client.HTTPConnection(API_HOST, API_PORT)
     conn.request(
         "POST",
         "/ask",
@@ -58,7 +123,7 @@ def post(body):
 
 def post_to_endpoint(endpoint, body):
     """POST to arbitrary endpoint."""
-    conn = http.client.HTTPConnection(API_HOST, API_PORT)
+    conn = http_client.HTTPConnection(API_HOST, API_PORT)
     conn.request(
         "POST",
         endpoint,

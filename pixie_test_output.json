@@ -13,7 +13,7 @@
         "type": "ask_user",
         "text": null,
         "prompt": "Wat is uw budget?",
-        "pending_id": "pending-42ab6735",
+        "pending_id": "pending-45e623e3",
         "reason": null
       }
     },
@@ -23,8 +23,8 @@
       "resp": {
         "type": "ask_user",
         "text": null,
-        "prompt": "Welke merk heeft dit product?",
-        "pending_id": "pending-42ab6735",
+        "prompt": "Welke brand wil je?",
+        "pending_id": "pending-45e623e3",
         "reason": null
       }
     },
@@ -34,8 +34,8 @@
       "resp": {
         "type": "ask_user",
         "text": null,
-        "prompt": "Welke printtechnologie wil je, inkjet of laser?",
-        "pending_id": "pending-42ab6735",
+        "prompt": "Welke printtechnologie wilt u: inkjet of laser?",
+        "pending_id": "pending-45e623e3",
         "reason": null
       }
     },
