@@ -9,9 +9,8 @@ from .azure_openai_llm import AzureOpenAILLM
 class AzureRefinementLLM(AzureOpenAILLM):
     """Azure-based refinement question generator.
 
-    Attempts to derive the next clarification question from context. Falls
-    back to the same static sequence used by the mock when the API is
-    unavailable.
+    Generates natural, contextual questions for collecting product attributes
+    based on database configuration and LLM intelligence.
     """
 
     def __init__(
@@ -29,139 +28,79 @@ class AzureRefinementLLM(AzureOpenAILLM):
     def generate_refinement_question(
         self, context: Optional[dict] = None
     ) -> Optional[str]:
+        """Generate the next refinement question based on missing attributes."""
         ctx = context or {}
-        category = ctx.get(
-            "category", "laptop"
-        )  # Use category from context, default to laptop
+        category = ctx.get("category", "laptop")
 
+        # Use attribute manager to get the next missing attribute
+        attr_manager = get_database_attribute_manager()
+        next_attr = attr_manager.get_next_missing_attribute(category, ctx)
+
+        if not next_attr:
+            # All attributes collected
+            return None
+
+        # Get the predefined question for this attribute
+        predefined_question = attr_manager.get_attribute_question(next_attr)
+
+        # If no LLM model available, use the predefined question directly
         if not self.model:
-            return self._fallback_refinement_question(ctx, category)
+            return predefined_question
+
+        # Collect context about already asked/collected attributes
+        collected_attrs = ctx.get("collected_attributes", [])
+        skipped_attrs = ctx.get("skipped_attributes", [])
+
+        # Build context for LLM to understand what we already know
+        context_info = ""
+        if collected_attrs or skipped_attrs:
+            all_discussed = collected_attrs + skipped_attrs
+            context_info = f"\nAlready discussed attributes: {', '.join(all_discussed)}"
+
+        # Ask the LLM to generate a natural, contextual question
+        attr_name = next_attr["name"]
+        attr_type = next_attr.get("type", "string")
+        attr_description = next_attr.get("description", "")
+
+        prompt = f"""Je bent een vriendelijke Nederlandse productadviseur. 
+Genereer een natuurlijke vraag om meer te weten te komen over de 
+'{attr_name}' eigenschap voor {category}.
+
+Basis vraag: "{predefined_question}"
+Attribuut type: {attr_type}
+Beschrijving: {attr_description}
+
+Richtlijnen:
+- Houd het kort en natuurlijk (max 15 woorden)
+- Begin met vraagwoorden zoals 'Wat', 'Welk', 'Heb je', 'Hoeveel'
+- Maak het persoonlijk en vriendelijk
+- Vermijd technisch jargon waar mogelijk
+- Pas de vraag aan voor Nederlandse context{context_info}
+
+Genereer alleen de vraag, geen uitleg."""
 
         try:
-            # Use attribute manager to get the next missing attribute
-            attr_manager = get_database_attribute_manager()
-            next_attr = attr_manager.get_next_missing_attribute(category, ctx)
-
-            if not next_attr:
-                # All attributes collected
-                return None
-
-            # Get the predefined question for this attribute
-            predefined_question = attr_manager.get_attribute_question(next_attr)
-
-            # Ask the LLM to generate a natural question for this specific attribute
-            prompt = (
-                f"Generate a natural, conversational question in Dutch to ask about "
-                f"the '{next_attr['name']}' attribute for {category}. "
-                f"The predefined question is: '{predefined_question}'. "
-                f"You can use this as-is or rephrase it naturally, but keep it concise and "
-                f"friendly."
-                f"Always start with a question word like 'Wat', 'Welk', 'Heb je', etc. "
-                f"Context: {ctx}\n\n"
-                f"Return only the question, no explanation."
-            )
-
             response = self.model.invoke(prompt)
 
             if hasattr(response, "content"):
                 answer = response.content.strip()
-                return answer if answer else predefined_question
 
-            # Fallback to predefined question
+                # Clean up the response
+                if answer:
+                    # Remove any quotation marks
+                    answer = answer.strip("\"'")
+                    # Ensure it ends with a question mark
+                    if not answer.endswith("?"):
+                        answer += "?"
+
+                    # Validate it's a reasonable question (not too short/long)
+                    if 5 <= len(answer) <= 100:
+                        return answer
+
+            # If LLM response is invalid, use predefined question
             return predefined_question
-        except Exception:
-            return self._fallback_refinement_question(ctx, category)
 
-    def _fallback_refinement_question(
-        self, context: dict, category: str
-    ) -> Optional[str]:
-        """Fallback refinement question generation when Azure LLM is not available."""
-        # Simple fallback logic based on collected attributes and category
-        collected = set(context.get("collected_attributes", []))
-
-        # Get category-specific attributes
-        category_attrs = self._get_default_category_attributes(category)
-
-        # Find next uncollected attribute
-        for attr_name in category_attrs:
-            if attr_name not in collected:
-                return self._get_question_for_attribute(attr_name, category)
-
-        return None
-
-    def _get_default_category_attributes(self, category: str) -> list[str]:
-        """Get default attribute list for a category."""
-        if category == "laptop":
-            return [
-                "budget",
-                "brand",
-                "screen_size",
-                "processor",
-                "ram",
-            ]
-        elif category == "smartphone":
-            return [
-                "budget",
-                "brand",
-                "screen_size",
-                "storage",
-                "camera",
-            ]
-        elif category == "headphones":
-            return [
-                "budget",
-                "brand",
-                "type",
-                "wireless",
-                "noise_cancelling",
-            ]
-        elif category == "monitor":
-            return [
-                "budget",
-                "brand",
-                "screen_size",
-                "resolution",
-                "refresh_rate",
-            ]
-        elif category == "tablet":
-            return [
-                "budget",
-                "brand",
-                "screen_size",
-                "storage",
-                "cellular",
-            ]
-        else:  # unknown category
-            return ["budget", "brand"]
-
-    def _get_question_for_attribute(self, attr_name: str, category: str) -> str:
-        """Get the appropriate question for an attribute based on category."""
-        # Try to get from attribute manager first
-        try:
-            # For now, use hardcoded questions as the attribute manager
-            # doesn't support getting questions by name easily
-            pass
-        except Exception:
-            pass
-
-        # Fallback to hardcoded questions
-        questions = {
-            "price": "Wat is je budget?",
-            "budget": "Wat is je budget?",
-            "brand": "Heb je een voorkeur voor een merk?",
-            "screen_size": "Welke schermgrootte heeft je voorkeur?",
-            "processor": "Welke processor heeft je voorkeur?",
-            "ram": "Hoeveel RAM heb je nodig?",
-            "storage": "Hoeveel opslagruimte heb je nodig?",
-            "battery_life": "Hoe belangrijk is de batterijduur?",
-            "usage_type": "Waar ga je het apparaat voor gebruiken?",
-            "operating_system": "Welk besturingssysteem heeft je voorkeur?",
-            "camera_megapixels": "Hoe belangrijk is de camera kwaliteit?",
-            "battery_capacity": "Hoe belangrijk is de batterij capaciteit?",
-            "form_factor": "Welke vormfactor heeft je voorkeur?",
-            "technology": "Welke technologie heeft je voorkeur?",
-            "has_color": "Heb je kleurenfunctionaliteit nodig?",
-            "is_multifunction": "Moet het apparaat multifunctioneel zijn?",
-        }
-
-        return questions.get(attr_name, f"Wat zijn je voorkeuren voor {attr_name}?")
+        except Exception as e:
+            print(f"Error generating refinement question: {e}")
+            # Use predefined question as backup
+            return predefined_question

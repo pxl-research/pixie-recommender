@@ -87,107 +87,22 @@ class DatabaseAttributeManager:
                 }
                 formatted_attributes.append(formatted_attr)
 
-            # Merge DB attributes with the bundled JSON attribute ordering.
-            # We treat DB definitions as authoritative for attributes that
-            # exist in the DB. For attributes present in the JSON but missing
-            # from the DB, create placeholder entries (so the conversation
-            # flow preserves the expected questions/order used by tests).
-            try:
-                import json
-                from pathlib import Path
-
-                data_path = Path(__file__).parents[1] / "data" / "attributes.json"
-                if data_path.exists():
-                    with data_path.open("r", encoding="utf-8") as fh:
-                        json_attrs = json.load(fh)
-
-                    # Keys in the JSON may be singular/plural; try several variants
-                    json_key_candidates = [
-                        category,
-                        category.rstrip("s"),
-                        category + "s",
-                    ]
-                    json_key = next(
-                        (k for k in json_key_candidates if k in json_attrs), None
-                    )
-                    if json_key:
-                        json_order = [
-                            a["name"] for a in json_attrs[json_key]["attributes"]
-                        ]
-
-                        # Build a map of existing formatted attributes by canonical name
-                        existing_map = {a["name"]: a for a in formatted_attributes}
-
-                        merged: List[Dict[str, Any]] = []
-
-                        # First, iterate JSON order and add DB-provided attrs when present,
-                        # otherwise append a placeholder synthesized from JSON definition.
-                        for json_name in json_order:
-                            if json_name in existing_map:
-                                merged.append(existing_map.pop(json_name))
-                            else:
-                                # Find JSON attribute def to extract display_name/type
-                                json_def = next(
-                                    (
-                                        a
-                                        for a in json_attrs[json_key]["attributes"]
-                                        if a["name"] == json_name
-                                    ),
-                                    None,
-                                )
-                                if json_def:
-                                    merged.append(
-                                        {
-                                            "name": json_def.get("name"),
-                                            "db_name": json_def.get("name"),
-                                            "display_name": json_def.get(
-                                                "display_name", json_def.get("name")
-                                            ),
-                                            "question": json_def.get("question"),
-                                            "type": self._map_data_type(
-                                                json_def.get("data_type", "string")
-                                            ),
-                                            "required": json_def.get(
-                                                "is_required", False
-                                            ),
-                                            "options": json_def.get("options"),
-                                            "description": json_def.get(
-                                                "description", ""
-                                            ),
-                                        }
-                                    )
-
-                        # Finally, append any remaining DB attributes that weren't in JSON
-                        # preserving their DB order
-                        for rem in formatted_attributes:
-                            if rem["name"] in existing_map:
-                                merged.append(existing_map.pop(rem["name"]))
-
-                        formatted_attributes = merged
-            except Exception:
-                # If anything goes wrong with JSON merging, keep DB order as-is
-                pass
-
+            # Store in cache and return
             self._attributes_cache[category] = formatted_attributes
+
+            # Debug output for development/testing
             try:
-                # Debug print to help in test runs (prints to captured stdout)
+                attr_summary = [
+                    (a.get("name"), a.get("db_name"), a.get("type"), a.get("required"))
+                    for a in formatted_attributes
+                ]
                 print(
-                    "[debug] loaded attributes for",
-                    category,
-                    [
-                        (
-                            a.get("name"),
-                            a.get("db_name"),
-                            a.get("description"),
-                            a.get("type"),
-                            a.get("required"),
-                            a.get("display_name"),
-                        )
-                        for a in formatted_attributes
-                    ],
+                    f"[debug] loaded {len(formatted_attributes)} attributes for {category}: "
+                    f"{attr_summary}"
                 )
             except Exception:
                 pass
+
             return formatted_attributes
 
         except Exception as e:

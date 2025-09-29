@@ -2,6 +2,8 @@ from __future__ import annotations
 
 from typing import Optional
 
+from ..database.connection import get_db_session
+from ..database.repositories.flexible_repositories import get_dynamic_repository
 from ..utils.schema import get_schema_manager
 from .azure_openai_llm import AzureOpenAILLM
 
@@ -26,62 +28,49 @@ class AzureSQLLLM(AzureOpenAILLM):
         super().__init__(api_version, api_endpoint, api_key, model_version, temperature)
         self.model_name = model_name
         self.default_table = default_table
+        
+        # Simple context tracking for progressive building
+        self.context = {}
 
     def generate_sql(
         self,
         question: Optional[str],
         attributes: Optional[dict] = None,
         table_name: Optional[str] = None,
+        context: Optional[dict] = None,
     ) -> str:
         q = (question or "").strip()
         attrs = attributes or {}
         table = table_name or self.default_table
+        
+        # Merge context if provided
+        if context:
+            self.context.update(context)
+            if "category" in context:
+                table = context["category"]
+            if "attributes" in context:
+                attrs.update(context["attributes"])
 
         if not self.model:
-            return self._fallback_sql_generation(q, attrs, table)
+            raise ValueError(
+                "Azure LLM model is required for SQL generation. "
+                "Please check your configuration."
+            )
 
         try:
-            # Map table parameter to actual product type name in database
-            category_to_product_type = {
-                "printers": "printers",
-                "laptops": "laptop",  # category "laptops" maps to product_type "laptop"
-                "computers": "computer",
-                "smartphones": "smartphone",
-            }
-            product_type = category_to_product_type.get(table, table)
+            # Get actual product type from database dynamically
+            product_type = self._get_product_type_from_database(table)
 
             # Generate schema information dynamically
             schema_manager = get_schema_manager()
             schema_info = schema_manager.generate_table_description("products")
+            
+            # Get available attributes for this product type
+            available_attributes = self._get_available_attributes(product_type)
 
-            # Build prompt with specific instructions for the normalized database structure
-            prompt = (
-                f"Generate a single SQL query (no explanation) that answers the user's request.\n\n"
-                f"{schema_info}\n\n"
-                f"DATABASE STRUCTURE:\n"
-                f"- Use products table with JOIN to product_types table\n"
-                f"- Product type to search: '{product_type}'\n"
-                f"- Use product_attribute_values table for brand, technology, "
-                f"and other attributes\n\n"
-                f"User Question: {q}\n"
-                f"User Attributes: {attrs}\n\n"
-                "IMPORTANT RULES:\n"
-                "1. Always use JOIN: 'FROM products p JOIN product_types pt "
-                "ON p.product_type_id = pt.id'\n"
-                "2. Filter by product type: 'WHERE pt.name = '{product_type}'\n"
-                "3. Use 'p.price_cents' for price comparisons (price in cents)\n"
-                "4. For budget constraints, use <= for maximum budget\n"
-                "5. For brand/technology/attributes, use EXISTS with product_attribute_values\n"
-                '6. IGNORE vague responses like "weet ik niet", "geen idee", "maakt niet uit"\n\n'
-                "EXAMPLES:\n"
-                f"- Basic query: SELECT p.* FROM products p JOIN product_types pt "
-                f"ON p.product_type_id = pt.id WHERE pt.name = '{product_type}'\n"
-                f"- With budget: ... AND p.price_cents <= 20000\n"
-                "- With brand: ... AND EXISTS (SELECT 1 FROM product_attribute_values pav "
-                "JOIN attribute_definitions ad ON pav.attribute_definition_id = ad.id "
-                "WHERE pav.product_id = p.id AND ad.name = 'brand' AND pav.value = 'HP')\n"
-                '- Ignore "weet ik niet" responses completely\n\n'
-                "Generate the SQL query:"
+            # Build dynamic prompt based on actual schema and attributes
+            prompt = self._build_dynamic_prompt(
+                q, attrs, product_type, schema_info, available_attributes
             )
 
             response = self.model.invoke(prompt)
@@ -94,117 +83,111 @@ class AzureSQLLLM(AzureOpenAILLM):
                 return sql
 
             raise ValueError("Invalid response format from Azure model")
+            
+        except Exception as e:
+            raise RuntimeError(f"Failed to generate SQL query: {e}")
+
+    def _get_product_type_from_database(self, category: str) -> str:
+        """Get the actual product type name from database."""
+        try:
+            with get_db_session() as session:
+                product_types_repo = get_dynamic_repository(session, "product_types")
+                
+                # Try to find exact match first
+                product_types = product_types_repo.find_by_column("name", category)
+                if product_types:
+                    return product_types[0]["name"]
+                
+                # Try to find by display_name
+                product_types = product_types_repo.find_by_column("display_name", category)
+                if product_types:
+                    return product_types[0]["name"]
+                
+                # If no match, return the category as-is and let LLM handle it
+                return category
         except Exception:
-            return self._fallback_sql_generation(q, attrs, table)
+            # If database lookup fails, return category as-is
+            return category
+    
+    def _get_available_attributes(self, product_type: str) -> list:
+        """Get available attributes for a product type from database."""
+        try:
+            with get_db_session() as session:
+                # Get product type ID
+                product_types_repo = get_dynamic_repository(session, "product_types")
+                product_types = product_types_repo.find_by_column("name", product_type)
+                
+                if not product_types:
+                    return []
+                
+                product_type_id = product_types[0]["id"]
+                
+                # Get attributes for this product type
+                attr_repo = get_dynamic_repository(session, "attribute_definitions")
+                attributes = attr_repo.filter_by_attributes({"product_type_id": product_type_id})
+                
+                return [attr["name"] for attr in attributes]
+        except Exception:
+            return []
+    
+    def _build_dynamic_prompt(self, question: str, attributes: dict, product_type: str, 
+                             schema_info: str, available_attributes: list) -> str:
+        """Build a dynamic prompt based on actual database schema."""
+        # Build attribute context
+        attr_context = ""
+        if available_attributes:
+            attr_context = (
+                f"\nAvailable attributes for {product_type}: "
+                f"{', '.join(available_attributes)}"
+            )
+        
+        # Build user attributes context
+        user_attrs = ""
+        if attributes:
+            valid_attrs = {
+                k: v for k, v in attributes.items() 
+                if v and str(v).lower() not in [
+                    "weet ik niet", "geen idee", "maakt niet uit"
+                ]
+            }
+            if valid_attrs:
+                user_attrs = f"\nUser specified attributes: {valid_attrs}"
+        
+        prompt = f"""Generate a single SQL query (no explanation) that answers the user's request.
 
-    def _fallback_sql_generation(
-        self, question: str, attributes: dict, table: str
-    ) -> str:
-        """Fallback SQL generation when Azure LLM is not available."""
-        # Map category table names to actual product type names in database
-        category_to_product_type = {
-            "printers": "printers",
-            "laptops": "laptop",  # category "laptops" maps to product_type "laptop"
-            "computers": "computer",
-            "smartphones": "smartphone",
-        }
+{schema_info}
 
-        product_type = category_to_product_type.get(table, table)
+DATABASE STRUCTURE:
+- Use products table with JOIN to product_types table
+- Product type to search: '{product_type}'
+- Use product_attribute_values table for specific attributes
+- Join with attribute_definitions to match attribute names{attr_context}
 
-        # Generate conditions for filtering
-        conditions = []
+User Question: {question}{user_attrs}
 
-        if "price" in attributes and attributes["price"]:
-            try:
-                price_val = float(
-                    attributes["price"].replace("€", "").replace("euro", "").strip()
-                )
-                price_cents = int(price_val * 100)  # Convert euros to cents
-                conditions.append(f"p.price_cents <= {price_cents}")
-            except (ValueError, AttributeError):
-                pass
+RULES:
+1. Always JOIN products with product_types: 
+   'FROM products p JOIN product_types pt ON p.product_type_id = pt.id'
+2. Filter by product type: 'WHERE pt.name = \'{product_type}\''
+3. Use 'p.price_cents' for price (convert euros to cents: €100 = 10000 cents)
+4. For attributes, use EXISTS with product_attribute_values and attribute_definitions
+5. Ignore vague responses completely
+6. Return only the SQL query, no explanations
 
-        if "budget" in attributes and attributes["budget"]:
-            try:
-                # Handle budget strings like "200" or "200 euro" or "maximaal 150"
-                budget_str = (
-                    attributes["budget"]
-                    .replace("€", "")
-                    .replace("euro", "")
-                    .replace("maximaal", "")
-                    .strip()
-                )
-                vague_responses = ["geen voorkeur", "maakt niet uit", "weet ik niet"]
-                if budget_str and budget_str.lower() not in vague_responses:
-                    budget_val = float(budget_str)
-                    budget_cents = int(budget_val * 100)  # Convert euros to cents
-                    conditions.append(f"p.price_cents <= {budget_cents}")
-            except (ValueError, AttributeError):
-                pass
-
-        # Handle brand filtering using product_attribute_values
-        if "brand" in attributes and attributes["brand"]:
-            brand_val = attributes["brand"].strip()
-            if brand_val and brand_val.lower() not in [
-                "geen voorkeur",
-                "maakt niet uit",
-                "weet ik niet",
-            ]:
-                conditions.append(
-                    f"""EXISTS (
-                    SELECT 1 FROM product_attribute_values pav 
-                    JOIN attribute_definitions ad ON pav.attribute_definition_id = ad.id 
-                    WHERE pav.product_id = p.id AND ad.name = 'brand' AND pav.value = '{brand_val}'
-                )"""
-                )
-
-        # Handle technology filtering using product_attribute_values
-        if "technology" in attributes and attributes["technology"]:
-            tech_val = attributes["technology"].strip()
-            if tech_val and tech_val.lower() not in [
-                "geen voorkeur",
-                "maakt niet uit",
-                "weet ik niet",
-            ]:
-                conditions.append(
-                    f"""EXISTS (
-                    SELECT 1 FROM product_attribute_values pav 
-                    JOIN attribute_definitions ad ON pav.attribute_definition_id = ad.id 
-                    WHERE pav.product_id = p.id AND ad.name = 'technology' 
-                    AND LOWER(pav.value) = '{tech_val.lower()}'
-                )"""
-                )
-
-        # Handle other category-specific attributes using product_attribute_values
-        for attr_name, attr_value in attributes.items():
-            if (
-                attr_name not in ["budget", "price", "brand", "technology"]
-                and attr_value
-            ):
-                attr_val = str(attr_value).strip()
-                if attr_val and attr_val.lower() not in [
-                    "geen voorkeur",
-                    "maakt niet uit",
-                    "weet ik niet",
-                ]:
-                    conditions.append(
-                        f"""EXISTS (
-                        SELECT 1 FROM product_attribute_values pav 
-                        JOIN attribute_definitions ad ON pav.attribute_definition_id = ad.id 
-                        WHERE pav.product_id = p.id AND ad.name = '{attr_name}' 
-                        AND pav.value = '{attr_val}'
-                    )"""
-                    )
-
-        # Build the final SQL query using products table with JOIN
-        base_sql = f"""
-        SELECT p.* FROM products p 
-        JOIN product_types pt ON p.product_type_id = pt.id 
-        WHERE pt.name = '{product_type}'
-        """
-
-        if conditions:
-            where_clause = " AND ".join(conditions)
-            return f"{base_sql} AND ({where_clause}) LIMIT 10"
-        else:
-            return f"{base_sql} LIMIT 10"
+Generate the SQL query:"""
+        
+        return prompt
+            
+    def collect_attribute(self, name: str, value: str) -> None:
+        """Simple method to collect an attribute for progressive building."""
+        if "attributes" not in self.context:
+            self.context["attributes"] = {}
+        self.context["attributes"][name] = value
+        
+    def set_category(self, category: str) -> None:
+        """Set the detected category from azure_relevance_llm."""
+        self.context["category"] = category
+        
+    def reset_context(self) -> None:
+        """Reset context for new conversation."""
+        self.context = {}
