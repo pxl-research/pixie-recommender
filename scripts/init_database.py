@@ -11,10 +11,15 @@ logger = logging.getLogger(__name__)
 
 def get_database_url():
     """Get database URL from environment variables."""
-    return os.getenv(
-        "DATABASE_URL",
-        "postgresql://pixie_user:pixie_password@localhost:5432/pixie_dev",
-    )
+    # Check if we're running inside a Docker container
+    if os.path.exists("/app") and os.path.exists("/.dockerenv"):
+        # Inside container - use service name
+        default_url = "postgresql://pixie_user:pixie_password@postgres:5432/pixie_dev"
+    else:
+        # Outside container - use localhost
+        default_url = "postgresql://pixie_user:pixie_password@localhost:5432/pixie_dev"
+    
+    return os.getenv("DATABASE_URL", default_url)
 
 
 def init_database_simple():

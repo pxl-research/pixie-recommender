@@ -115,28 +115,28 @@ def debug_db_status():
             # Check products
             result = session.execute(text("SELECT COUNT(*) FROM products"))
             product_count = result.scalar()
-            
+
             # Check attribute definitions
             result = session.execute(text("SELECT COUNT(*) FROM attribute_definitions"))
             attr_def_count = result.scalar()
-            
+
             # Check attribute values
-            result = session.execute(text("SELECT COUNT(*) FROM product_attribute_values"))
+            result = session.execute(
+                text("SELECT COUNT(*) FROM product_attribute_values")
+            )
             attr_val_count = result.scalar()
-            
+
             return {
                 "database_status": "connected",
                 "product_count": product_count,
                 "attribute_definition_count": attr_def_count,
                 "product_attribute_value_count": attr_val_count,
-                "seeding_complete": (product_count or 0) > 0 and (attr_def_count or 0) > 0 and (attr_val_count or 0) > 0
+                "seeding_complete": (product_count or 0) > 0
+                and (attr_def_count or 0) > 0
+                and (attr_val_count or 0) > 0,
             }
     except Exception as e:
-        return {
-            "database_status": "error",
-            "error": str(e),
-            "seeding_complete": False
-        }
+        return {"database_status": "error", "error": str(e), "seeding_complete": False}
 
 
 @app.post("/ask")

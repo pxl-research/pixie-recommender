@@ -72,11 +72,16 @@ class Config:
             default_page_size=int(os.getenv("PIXIE_DEFAULT_PAGE_SIZE", "10")),
         )
 
+        # Auto-detect database URL based on environment
+        if os.path.exists("/app") and os.path.exists("/.dockerenv"):
+            # Inside container - use service name
+            default_db_url = "postgresql://pixie_user:pixie_password@postgres:5432/pixie_dev"
+        else:
+            # Outside container - use localhost
+            default_db_url = "postgresql://pixie_user:pixie_password@localhost:5432/pixie_dev"
+
         database_config = DatabaseConfig(
-            url=os.getenv(
-                "DATABASE_URL",
-                "postgresql://pixie_user:pixie_password@localhost:5432/pixie_dev",
-            ),
+            url=os.getenv("DATABASE_URL", default_db_url),
             pool_size=int(os.getenv("DATABASE_POOL_SIZE", "10")),
             max_overflow=int(os.getenv("DATABASE_MAX_OVERFLOW", "20")),
             pool_timeout=int(os.getenv("DATABASE_POOL_TIMEOUT", "30")),
