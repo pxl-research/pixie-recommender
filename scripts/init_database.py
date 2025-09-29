@@ -6,6 +6,8 @@ import os
 
 from sqlalchemy import create_engine, text
 
+from pixie.core.database.models import Base
+
 logger = logging.getLogger(__name__)
 
 
@@ -27,6 +29,11 @@ def init_database_simple():
     engine = create_engine(get_database_url())
 
     try:
+        # Ensure tables exist before performing verification/seeding. SQLAlchemy's
+        # Base.metadata.create_all mirrors MetaData.create_all behaviour and is
+        # therefore safe to run repeatedly (see SQLAlchemy docs on MetaData.create_all).
+        Base.metadata.create_all(bind=engine)
+
         with engine.connect() as conn:
             # Create tables if they don't exist (using the model definitions would be better)
             logger.info("Checking database initialization...")
@@ -42,7 +49,7 @@ def init_database_simple():
             """
                 )
             )
-            table_count = result.scalar()
+            table_count = result.scalar() or 0
 
             if table_count < 2:
                 logger.info("Tables don't exist, they will be created by the ORM")
@@ -58,7 +65,7 @@ def init_database_simple():
             """
                 )
             )
-            printer_type_count = result.scalar()
+            printer_type_count = result.scalar() or 0
 
             if printer_type_count == 0:
                 logger.info("Adding printers product type...")
@@ -89,7 +96,7 @@ def init_database_simple():
             """
                 )
             )
-            printer_count = result.scalar()
+            printer_count = result.scalar() or 0
 
             if printer_count == 0:
                 logger.info("Adding printer products...")
@@ -187,7 +194,7 @@ def init_database_simple():
                 """
                 )
             )
-            attr_count = result.scalar()
+            attr_count = result.scalar() or 0
 
             if attr_count == 0:
                 logger.info("Adding attribute definitions for printers...")
@@ -271,7 +278,7 @@ def init_database_simple():
                 """
                 )
             )
-            attr_value_count = result.scalar()
+            attr_value_count = result.scalar() or 0
 
             if attr_value_count == 0:
                 logger.info("Adding product attribute values for printers...")

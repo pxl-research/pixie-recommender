@@ -13,7 +13,7 @@
         "type": "ask_user",
         "text": null,
         "prompt": "Wat is je budget voor een printer?",
-        "pending_id": "pending-4753de2b",
+        "pending_id": "pending-6199bc51",
         "reason": null
       }
     },
@@ -24,7 +24,7 @@
         "type": "ask_user",
         "text": null,
         "prompt": "Heb je een voorkeur voor een bepaald merk?",
-        "pending_id": "pending-4753de2b",
+        "pending_id": "pending-6199bc51",
         "reason": null
       }
     },
@@ -35,7 +35,7 @@
         "type": "ask_user",
         "text": null,
         "prompt": "Welke printtechnologie prefereer je (inkjet/laser)?",
-        "pending_id": "pending-4753de2b",
+        "pending_id": "pending-6199bc51",
         "reason": null
       }
     },
@@ -43,8 +43,8 @@
       "step": 4,
       "status": 200,
       "resp": {
-        "type": "answer",
-        "text": "[{'id': '840dee70-7ad7-4f6c-a3ea-477bbe71cdda', 'external_id': 'BROTHER-XC-2570-1', 'name': 'Brother XC 2570', 'description': 'Reliable laser printer for home and office use', 'brand': 'Brother', 'model': 'XC 2570', 'price': 199.0, 'product_type': None, 'created_at': datetime.datetime(2025, 9, 29, 10, 41, 25, 103200)}, {'id': '5c44d90d-7fef-42f7-9e15-6a8de1390e20', 'external_id': 'BROTHER-XT-3560-1', 'name': 'Brother XT 3560', 'description': 'Compact laser printer with wireless connectivity', 'brand': 'Brother', 'model': 'XT 3560', 'price': 159.0, 'product_type': None, 'created_at': datetime.datetime(2025, 9, 29, 10, 41, 25, 103200)}, {'id': '447158d8-fa46-4e09-a4b3-2af6380ac986', 'external_id': 'HP-LASERJET-PRO-1', 'name': 'HP LaserJet Pro M404n', 'description': 'Professional laser printer with fast printing speeds', 'brand': 'HP', 'model': 'LaserJet Pro M404n', 'price': 179.0, 'product_type': None, 'created_at': datetime.datetime(2025, 9, 29, 10, 41, 25, 103200)}, {'id': 'a3f95201-2a32-4f35-a3a0-1f1fdcf59150', 'external_id': 'CANON-INKJET-1', 'name': 'Canon PIXMA TS3350', 'description': 'All-in-one inkjet printer for home use', 'brand': 'Canon', 'model': 'PIXMA TS3350', 'price': 89.0, 'product_type': None, 'created_at': datetime.datetime(2025, 9, 29, 10, 41, 25, 103200)}]",
+        "type": "no_results",
+        "text": "No matching products found",
         "prompt": null,
         "pending_id": null,
         "reason": null

@@ -170,7 +170,9 @@ class DynamicRepository:
             RETURNING *
         """
 
-        result = self.session.execute(text(query), data_with_timestamps)
+        query_params = self._adapt_outbound_data(data_with_timestamps)
+
+        result = self.session.execute(text(query), query_params)
         self.session.commit()
 
         row = result.fetchone()
@@ -204,7 +206,7 @@ class DynamicRepository:
             RETURNING *
         """
 
-        params = data_with_timestamps.copy()
+        params = self._adapt_outbound_data(data_with_timestamps)
         params["id"] = id_value
 
         result = self.session.execute(text(query), params)
@@ -239,6 +241,55 @@ class DynamicRepository:
         result = self.session.execute(text(query))
         count = result.scalar()
         return count if count is not None else 0
+
+    def _adapt_outbound_data(self, data: Dict[str, Any]) -> Dict[str, Any]:
+        """Prepare data payloads for dialect-specific requirements (e.g. JSON adaptation)."""
+        if not data:
+            return data
+
+        bind = getattr(self.session, "bind", None)
+        dialect_name = getattr(getattr(bind, "dialect", None), "name", "")
+        if dialect_name != "postgresql":
+            return data
+
+        try:
+            from psycopg2.extras import Json  # type: ignore
+        except (
+            ImportError
+        ):  # pragma: no cover - defensive guard for alternative drivers
+            return data
+
+        adapted = data.copy()
+        for column in self._get_columns():
+            column_name = column["name"]
+            if column_name not in adapted:
+                continue
+
+            value = adapted[column_name]
+            if value is None or isinstance(value, Json):
+                continue
+
+            if self._is_json_type(column["type"]):
+                adapted[column_name] = Json(value)
+
+        return adapted
+
+    @staticmethod
+    def _is_json_type(column_type: Any) -> bool:
+        """Return True when the SQLAlchemy column type represents JSON/JSONB."""
+        try:
+            from sqlalchemy.types import JSON as SQLAlchemyJSON  # type: ignore
+        except (
+            ImportError
+        ):  # pragma: no cover - SQLAlchemy always provides JSON, but guard anyway
+            SQLAlchemyJSON = ()  # type: ignore
+
+        if isinstance(column_type, SQLAlchemyJSON):
+            return True
+
+        # Fallback: inspect the SQLAlchemy type name to cover dialect-specific subclasses
+        type_name = column_type.__class__.__name__.lower()
+        return type_name in {"json", "jsonb"}
 
 
 class TableDiscovery:

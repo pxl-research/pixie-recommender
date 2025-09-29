@@ -1,16 +1,54 @@
 """Database seeding script for flexible product system."""
 
 import logging
-from typing import Any, Dict, List
+from typing import Any, Dict, List, Set
 from uuid import UUID
 
 from .connection import get_db_session
+from .init import create_tables
 from .models.base import AttributeDefinition, ProductType
 from .repositories.flexible_repositories import (
     get_dynamic_repository,
 )
 
 logger = logging.getLogger(__name__)
+
+
+def _get_field(record: Any, key: str) -> Any:
+    """Safely retrieve a field from either an object or dictionary."""
+    if isinstance(record, dict):
+        return record.get(key)
+    return getattr(record, key, None)
+
+
+REQUIRED_PRODUCT_DEFAULTS: Dict[str, Any] = {
+    "currency": "EUR",
+    "availability_status": "in_stock",
+    "stock_level": 0,
+    "is_active": True,
+}
+
+
+def _apply_product_defaults(
+    product_attrs: Dict[str, Any], available_columns: Set[str]
+) -> Dict[str, Any]:
+    """Apply required defaults for product inserts when values are missing.
+
+    The dynamic repository issues raw INSERT statements, so server defaults
+    declared on the SQLAlchemy models aren't invoked automatically. This helper
+    ensures mandatory columns are populated to prevent NOT NULL violations when
+    the seeding script runs against a fresh database.
+    """
+
+    updated = product_attrs.copy()
+    for column_name, default_value in REQUIRED_PRODUCT_DEFAULTS.items():
+        if column_name not in available_columns:
+            continue
+
+        if column_name not in updated or updated[column_name] is None:
+            updated[column_name] = default_value
+
+    return updated
 
 
 def seed_product_types_with_session(session) -> List[ProductType]:
@@ -63,7 +101,9 @@ def seed_product_types_with_session(session) -> List[ProductType]:
         try:
             pt = repo.create(pt_data)
             created_types.append(pt)
-            logger.info(f"Created product type: {pt.name}")
+            logger.info(
+                "Created product type: %s", _get_field(pt, "name") or "<unknown>"
+            )
         except Exception as e:
             logger.warning(f"Failed to create product type '{pt_data['name']}': {e}")
             # Try to find it again in case it was created by another process
@@ -302,12 +342,28 @@ def seed_attribute_definitions_with_session(
 
     for pt in product_types:
         pt_attributes = []
-        pt_name = str(pt.name)  # Convert to string
+        pt_name_value = _get_field(pt, "name")
+        if pt_name_value is None:
+            logger.warning("Skipping product type with missing name: %s", pt)
+            continue
+
+        pt_name = str(pt_name_value)
         if pt_name in attributes_data:
             for attr_data in attributes_data[pt_name]:
                 # Check if already exists
+                pt_id_value = _get_field(pt, "id")
+                if pt_id_value is None:
+                    logger.warning(
+                        "Skipping attribute '%s' for product type without id",
+                        attr_data["name"],
+                    )
+                    continue
+
                 existing_list = attr_repo.filter_by_attributes(
-                    {"name": attr_data["name"], "product_type_id": str(pt.id)}
+                    {
+                        "name": attr_data["name"],
+                        "product_type_id": str(pt_id_value),
+                    }
                 )
                 existing = existing_list[0] if existing_list else None
                 if existing:
@@ -318,10 +374,13 @@ def seed_attribute_definitions_with_session(
                     continue
 
                 attr_data_copy = attr_data.copy()
-                attr_data_copy["product_type_id"] = UUID(str(pt.id))
+                attr_data_copy["product_type_id"] = UUID(str(pt_id_value))
                 # Preserve optional canonical_name when present
                 if "canonical_name" in attr_data:
                     attr_data_copy["canonical_name"] = attr_data["canonical_name"]
+                # Ensure required boolean defaults align with schema constraints
+                attr_data_copy.setdefault("is_searchable", True)
+                attr_data_copy.setdefault("is_filterable", True)
                 attr = attr_repo.create(attr_data_copy)
                 pt_attributes.append(attr)
                 logger.info(f"Created attribute '{attr['name']}' for {pt_name}")
@@ -494,15 +553,36 @@ def seed_sample_products_with_session(
     }
 
     product_repo = get_dynamic_repository(session, "products")
+    product_columns = {
+        column_info.get("name")
+        for column_info in product_repo.get_table_info().get("columns", [])
+        if column_info.get("name")
+    }
     attr_value_repo = get_dynamic_repository(session, "product_attribute_values")
 
     for pt in product_types:
-        pt_name = str(pt.name)  # Explicit string conversion
+        pt_name_value = _get_field(pt, "name")
+        if pt_name_value is None:
+            logger.warning("Skipping product seeding for unnamed product type: %s", pt)
+            continue
+
+        pt_name = str(pt_name_value)
         if pt_name in products_data:
             pt_attributes = attributes.get(pt_name, [])
+            pt_id_value = _get_field(pt, "id")
+            if pt_id_value is None:
+                logger.warning(
+                    "Skipping product seeding for product type '%s' without id",
+                    pt_name,
+                )
+                continue
 
             # Create attribute definition lookup
-            attr_lookup = {str(attr.name): attr for attr in pt_attributes}
+            attr_lookup = {
+                str(_get_field(attr, "name")): attr
+                for attr in pt_attributes
+                if _get_field(attr, "name") is not None
+            }
 
             for product_data in products_data[pt_name]:
                 # Check if product already exists
@@ -516,27 +596,39 @@ def seed_sample_products_with_session(
                 # Create product
                 try:
                     product_attrs = product_data.copy()
-                    product_attrs["product_type_id"] = UUID(str(pt.id))
-                    del product_attrs["attributes"]
+                    product_attrs["product_type_id"] = UUID(str(pt_id_value))
+                    attributes_payload = product_attrs.pop("attributes", {})
+                    product_attrs = _apply_product_defaults(
+                        product_attrs, product_columns
+                    )
 
                     product = product_repo.create(product_attrs)
                     logger.info(f"Created product: {product_data['name']}")
 
                     # Create attribute values
-                    for attr_name, value in product_data["attributes"].items():
+                    for attr_name, value in attributes_payload.items():
                         if attr_name in attr_lookup:
                             attr_def = attr_lookup[attr_name]
                             try:
                                 # Determine which value column to use based on attribute type
+                                attr_def_id = _get_field(attr_def, "id")
+                                if attr_def_id is None:
+                                    logger.warning(
+                                        "Skipping attribute value for '%s' due to "
+                                        "missing attribute id",
+                                        attr_name,
+                                    )
+                                    continue
+
                                 attr_value_data: Dict[str, Any] = {
                                     "product_id": UUID(str(product["id"])),
-                                    "attribute_definition_id": UUID(
-                                        str(attr_def["id"])
-                                    ),
+                                    "attribute_definition_id": UUID(str(attr_def_id)),
                                 }
 
                                 # Set the appropriate value column based on data type
-                                data_type = attr_def.get("data_type", "string")
+                                data_type = (
+                                    _get_field(attr_def, "data_type") or "string"
+                                )
                                 if data_type == "number" and isinstance(
                                     value, (int, float)
                                 ):
@@ -570,6 +662,12 @@ def seed_database() -> None:
     logger.info("Starting database seeding...")
 
     try:
+        # Ensure all tables exist before attempting to seed data. SQLAlchemy's
+        # Base.metadata.create_all is idempotent (see SQLAlchemy docs on
+        # MetaData.create_all()), so this is safe to execute on every startup
+        # and guarantees the seeding routines have the necessary schema.
+        create_tables()
+
         with get_db_session() as session:
             # Seed product types
             product_types = seed_product_types_with_session(session)
