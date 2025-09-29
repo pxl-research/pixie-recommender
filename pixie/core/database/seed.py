@@ -44,7 +44,7 @@ def seed_product_types_with_session(session) -> List[ProductType]:
         },
         {
             "name": "printers",
-            "display_name": "Printers", 
+            "display_name": "Printers",
             "description": "Various types of printers including inkjet and laser",
             "is_active": True,
         },
@@ -427,23 +427,23 @@ def seed_sample_products_with_session(
                 "external_id": "BROTHER-XC-2570-1",
                 "name": "Brother XC 2570",
                 "description": "Reliable laser printer for home and office use",
-                "brand": "Brother", 
+                "brand": "Brother",
                 "model": "XC 2570",
                 "price_cents": 19900,  # €199.00
                 "attributes": {
                     "print_type": "laser",
-                    "color_support": "monochrome", 
+                    "color_support": "monochrome",
                     "pages_per_minute": 28,
                     "brand": "Brother",
                     "budget": 19900,
                 },
             },
             {
-                "external_id": "BROTHER-XT-3560-1", 
+                "external_id": "BROTHER-XT-3560-1",
                 "name": "Brother XT 3560",
                 "description": "Compact laser printer with wireless connectivity",
                 "brand": "Brother",
-                "model": "XT 3560", 
+                "model": "XT 3560",
                 "price_cents": 15900,  # €159.00
                 "attributes": {
                     "print_type": "laser",
@@ -461,7 +461,7 @@ def seed_sample_products_with_session(
                 "model": "LaserJet Pro M404n",
                 "price_cents": 17900,  # €179.00
                 "attributes": {
-                    "print_type": "laser", 
+                    "print_type": "laser",
                     "color_support": "monochrome",
                     "pages_per_minute": 40,
                     "brand": "HP",
@@ -471,7 +471,7 @@ def seed_sample_products_with_session(
             {
                 "external_id": "CANON-INKJET-1",
                 "name": "Canon PIXMA TS3350",
-                "description": "All-in-one inkjet printer for home use", 
+                "description": "All-in-one inkjet printer for home use",
                 "brand": "Canon",
                 "model": "PIXMA TS3350",
                 "price_cents": 8900,  # €89.00
@@ -479,7 +479,7 @@ def seed_sample_products_with_session(
                     "print_type": "inkjet",
                     "color_support": "color",
                     "pages_per_minute": 15,
-                    "brand": "Canon", 
+                    "brand": "Canon",
                     "budget": 8900,
                 },
             },
