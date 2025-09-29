@@ -108,8 +108,9 @@ def metrics():
 def debug_db_status():
     """Debug endpoint to check database seeding status."""
     try:
-        from pixie.core.database.connection import get_db_session
         from sqlalchemy import text
+
+        from pixie.core.database.connection import get_db_session
 
         with get_db_session() as session:
             # Check products

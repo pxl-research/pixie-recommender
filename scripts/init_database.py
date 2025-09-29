@@ -18,7 +18,7 @@ def get_database_url():
     else:
         # Outside container - use localhost
         default_url = "postgresql://pixie_user:pixie_password@localhost:5432/pixie_dev"
-    
+
     return os.getenv("DATABASE_URL", default_url)
 
 

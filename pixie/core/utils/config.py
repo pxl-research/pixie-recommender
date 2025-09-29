@@ -75,10 +75,14 @@ class Config:
         # Auto-detect database URL based on environment
         if os.path.exists("/app") and os.path.exists("/.dockerenv"):
             # Inside container - use service name
-            default_db_url = "postgresql://pixie_user:pixie_password@postgres:5432/pixie_dev"
+            default_db_url = (
+                "postgresql://pixie_user:pixie_password@postgres:5432/pixie_dev"
+            )
         else:
             # Outside container - use localhost
-            default_db_url = "postgresql://pixie_user:pixie_password@localhost:5432/pixie_dev"
+            default_db_url = (
+                "postgresql://pixie_user:pixie_password@localhost:5432/pixie_dev"
+            )
 
         database_config = DatabaseConfig(
             url=os.getenv("DATABASE_URL", default_db_url),
