@@ -28,7 +28,7 @@ class AzureSQLLLM(AzureOpenAILLM):
         super().__init__(api_version, api_endpoint, api_key, model_version, temperature)
         self.model_name = model_name
         self.default_table = default_table
-        
+
         # Simple context tracking for progressive building
         self.context = {}
 
@@ -42,7 +42,7 @@ class AzureSQLLLM(AzureOpenAILLM):
         q = (question or "").strip()
         attrs = attributes or {}
         table = table_name or self.default_table
-        
+
         # Merge context if provided
         if context:
             self.context.update(context)
@@ -64,7 +64,7 @@ class AzureSQLLLM(AzureOpenAILLM):
             # Generate schema information dynamically
             schema_manager = get_schema_manager()
             schema_info = schema_manager.generate_table_description("products")
-            
+
             # Get available attributes for this product type
             available_attributes = self._get_available_attributes(product_type)
 
@@ -83,7 +83,7 @@ class AzureSQLLLM(AzureOpenAILLM):
                 return sql
 
             raise ValueError("Invalid response format from Azure model")
-            
+
         except Exception as e:
             raise RuntimeError(f"Failed to generate SQL query: {e}")
 
@@ -92,23 +92,25 @@ class AzureSQLLLM(AzureOpenAILLM):
         try:
             with get_db_session() as session:
                 product_types_repo = get_dynamic_repository(session, "product_types")
-                
+
                 # Try to find exact match first
                 product_types = product_types_repo.find_by_column("name", category)
                 if product_types:
                     return product_types[0]["name"]
-                
+
                 # Try to find by display_name
-                product_types = product_types_repo.find_by_column("display_name", category)
+                product_types = product_types_repo.find_by_column(
+                    "display_name", category
+                )
                 if product_types:
                     return product_types[0]["name"]
-                
+
                 # If no match, return the category as-is and let LLM handle it
                 return category
         except Exception:
             # If database lookup fails, return category as-is
             return category
-    
+
     def _get_available_attributes(self, product_type: str) -> list:
         """Get available attributes for a product type from database."""
         try:
@@ -116,22 +118,30 @@ class AzureSQLLLM(AzureOpenAILLM):
                 # Get product type ID
                 product_types_repo = get_dynamic_repository(session, "product_types")
                 product_types = product_types_repo.find_by_column("name", product_type)
-                
+
                 if not product_types:
                     return []
-                
+
                 product_type_id = product_types[0]["id"]
-                
+
                 # Get attributes for this product type
                 attr_repo = get_dynamic_repository(session, "attribute_definitions")
-                attributes = attr_repo.filter_by_attributes({"product_type_id": product_type_id})
-                
+                attributes = attr_repo.filter_by_attributes(
+                    {"product_type_id": product_type_id}
+                )
+
                 return [attr["name"] for attr in attributes]
         except Exception:
             return []
-    
-    def _build_dynamic_prompt(self, question: str, attributes: dict, product_type: str, 
-                             schema_info: str, available_attributes: list) -> str:
+
+    def _build_dynamic_prompt(
+        self,
+        question: str,
+        attributes: dict,
+        product_type: str,
+        schema_info: str,
+        available_attributes: list,
+    ) -> str:
         """Build a dynamic prompt based on actual database schema."""
         # Build attribute context
         attr_context = ""
@@ -140,19 +150,20 @@ class AzureSQLLLM(AzureOpenAILLM):
                 f"\nAvailable attributes for {product_type}: "
                 f"{', '.join(available_attributes)}"
             )
-        
+
         # Build user attributes context
         user_attrs = ""
         if attributes:
             valid_attrs = {
-                k: v for k, v in attributes.items() 
-                if v and str(v).lower() not in [
-                    "weet ik niet", "geen idee", "maakt niet uit"
-                ]
+                k: v
+                for k, v in attributes.items()
+                if v
+                and str(v).lower()
+                not in ["weet ik niet", "geen idee", "maakt niet uit"]
             }
             if valid_attrs:
                 user_attrs = f"\nUser specified attributes: {valid_attrs}"
-        
+
         prompt = f"""Generate a single SQL query (no explanation) that answers the user's request.
 
 {schema_info}
@@ -175,19 +186,19 @@ RULES:
 6. Return only the SQL query, no explanations
 
 Generate the SQL query:"""
-        
+
         return prompt
-            
+
     def collect_attribute(self, name: str, value: str) -> None:
         """Simple method to collect an attribute for progressive building."""
         if "attributes" not in self.context:
             self.context["attributes"] = {}
         self.context["attributes"][name] = value
-        
+
     def set_category(self, category: str) -> None:
         """Set the detected category from azure_relevance_llm."""
         self.context["category"] = category
-        
+
     def reset_context(self) -> None:
         """Reset context for new conversation."""
         self.context = {}

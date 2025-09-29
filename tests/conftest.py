@@ -10,7 +10,7 @@ from pixie.core.llms import azure_llm_set
 def azure_llm_set_fixture() -> Tuple[Any, Any, Any]:
     """
     Fixture that provides Azure LLM instances for testing.
-    
+
     Requires proper Azure OpenAI configuration to run tests.
     """
     # Check if Azure is properly configured
@@ -21,13 +21,17 @@ def azure_llm_set_fixture() -> Tuple[Any, Any, Any]:
 
     azure_configured = (
         azure_endpoint
-        and azure_endpoint not in ["https://example.openai.azure.com/", "https://your-resource.openai.azure.com/"]
+        and azure_endpoint
+        not in [
+            "https://example.openai.azure.com/",
+            "https://your-resource.openai.azure.com/",
+        ]
         and azure_key
         and azure_key not in ["dummy-key-for-development", "your-api-key-here"]
         and azure_api_version
         and azure_model
     )
-    
+
     if not azure_configured:
         pytest.skip(
             "Azure OpenAI configuration is required for tests. "
@@ -45,7 +49,7 @@ def azure_llm_set_fixture() -> Tuple[Any, Any, Any]:
 
 
 # Legacy compatibility - can be removed once all tests are updated
-@pytest.fixture(scope="session")  
+@pytest.fixture(scope="session")
 def llm_set(azure_llm_set_fixture):
     """Legacy fixture name for backward compatibility."""
     return azure_llm_set_fixture
