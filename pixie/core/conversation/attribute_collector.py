@@ -62,7 +62,7 @@ class AttributeCollector:
                 attribute_requests.append(
                     AttributeRequest(
                         name=attr["name"],
-                        question=attr["question"],
+                        question=attr.get("question") or attr.get("display_name", ""),
                         required=attr.get("required", False),
                     )
                 )
@@ -71,7 +71,8 @@ class AttributeCollector:
                 f"Loaded {len(attribute_requests)} attribute definitions "
                 f"for {category} from database"
             )
-            return attribute_requests
+            if attribute_requests:
+                return attribute_requests
 
         except Exception as e:
             logger.error(f"Failed to load attributes from database for {category}: {e}")
@@ -79,6 +80,41 @@ class AttributeCollector:
             logger.warning(
                 f"No attribute definitions available for {category}, "
                 f"proceeding without collection"
+            )
+        fallback_defs = self._load_fallback_attribute_definitions(category)
+        if fallback_defs:
+            logger.info(
+                "Using fallback attribute definitions from flow configuration "
+                f"for category {category}"
+            )
+        return fallback_defs
+
+    def _load_fallback_attribute_definitions(
+        self, category: str
+    ) -> List[AttributeRequest]:
+        """Load fallback attribute definitions from flow configuration."""
+        try:
+            from .flow_config import CONVERSATION_FLOWS
+
+            flow_config = CONVERSATION_FLOWS.get(category)
+            if not flow_config:
+                return []
+
+            requests: List[AttributeRequest] = []
+            for question in flow_config.questions:
+                requests.append(
+                    AttributeRequest(
+                        name=question.attribute_name,
+                        question=question.text,
+                        required=question.required,
+                    )
+                )
+            return requests
+        except Exception as flow_error:
+            logger.warning(
+                "Failed to build fallback attribute definitions for %s: %s",
+                category,
+                flow_error,
             )
             return []
 
