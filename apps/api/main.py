@@ -6,6 +6,7 @@ from uuid import uuid4
 from fastapi import Body, FastAPI
 
 from pixie.core.conversation.pixie import Pixie
+from pixie.core.database.init import create_tables
 from pixie.core.utils import logging as pixie_logging
 from pixie.core.utils.contracts import AskResponse
 from pixie.core.utils.logging import configure_logging, trace_id_ctx
@@ -29,21 +30,21 @@ async def lifespan(app: FastAPI):
 
     for attempt in range(max_retries):
         try:
-            from pixie.core.database.seed import seed_database
+            logging.info(
+                f"Database schema initialization attempt {attempt + 1}/{max_retries}"
+            )
 
-            logging.info(f"Database initialization attempt {attempt + 1}/{max_retries}")
-
-            # Seed database (migrations are handled by init.sql in Docker)
-            seed_database()
-            logging.info("Database seeding completed")
+            # Ensure the database schema exists (init.sql handles Docker migrations)
+            create_tables()
+            logging.info("Database tables ready")
             break
 
         except Exception as e:
             logging.warning(
-                f"Database initialization attempt {attempt + 1} failed: {e}"
+                f"Database schema initialization attempt {attempt + 1} failed: {e}"
             )
             if attempt == max_retries - 1:
-                logging.error("Database initialization failed after all retries")
+                logging.error("Database schema initialization failed after all retries")
                 # Continue anyway - the app might still work with existing data
                 break
             else:

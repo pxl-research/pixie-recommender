@@ -1,7 +1,9 @@
 """Database seeding script for flexible product system."""
 
+import argparse
 import logging
-from typing import Any, Dict, List, Set
+import os
+from typing import Any, Dict, List, Optional, Set
 from uuid import UUID
 
 from .connection import get_db_session
@@ -12,6 +14,18 @@ from .repositories.flexible_repositories import (
 )
 
 logger = logging.getLogger(__name__)
+
+SAMPLE_DATA_ENV_VAR = "PIXIE_SEED_SAMPLE_DATA"
+
+
+def _parse_bool_flag(value: Optional[str], default: bool = False) -> bool:
+    """Parse a boolean-ish string into a bool."""
+
+    if value is None:
+        return default
+
+    normalized = value.strip().lower()
+    return normalized in {"1", "true", "yes", "y", "on"}
 
 
 def _get_field(record: Any, key: str) -> Any:
@@ -390,6 +404,14 @@ def seed_attribute_definitions_with_session(
     return created_attributes
 
 
+def seed_sample_dataset_with_session(session) -> None:
+    """Seed the example dataset used for demos and local development."""
+
+    product_types = seed_product_types_with_session(session)
+    attributes = seed_attribute_definitions_with_session(session, product_types)
+    seed_sample_products_with_session(session, product_types, attributes)
+
+
 def seed_sample_products_with_session(
     session,
     product_types: List[ProductType],
@@ -657,9 +679,10 @@ def seed_sample_products_with_session(
                     )
 
 
-def seed_database() -> None:
-    """Main function to seed the database with initial data."""
-    logger.info("Starting database seeding...")
+def seed_database(seed_sample_data: Optional[bool] = None) -> None:
+    """Ensure schema exists and optionally load the demo dataset."""
+
+    logger.info("Ensuring database schema is ready...")
 
     try:
         # Ensure all tables exist before attempting to seed data. SQLAlchemy's
@@ -667,18 +690,24 @@ def seed_database() -> None:
         # MetaData.create_all()), so this is safe to execute on every startup
         # and guarantees the seeding routines have the necessary schema.
         create_tables()
+        logger.info("Database tables verified.")
+
+        if seed_sample_data is None:
+            seed_sample_data = _parse_bool_flag(
+                os.getenv(SAMPLE_DATA_ENV_VAR), default=False
+            )
+
+        if not seed_sample_data:
+            logger.info(
+                "Skipping optional sample dataset seeding. Set %s=true to enable.",
+                SAMPLE_DATA_ENV_VAR,
+            )
+            return
 
         with get_db_session() as session:
-            # Seed product types
-            product_types = seed_product_types_with_session(session)
+            seed_sample_dataset_with_session(session)
 
-            # Seed attribute definitions
-            attributes = seed_attribute_definitions_with_session(session, product_types)
-
-            # Seed sample products
-            seed_sample_products_with_session(session, product_types, attributes)
-
-        logger.info("Database seeding completed successfully!")
+        logger.info("Sample dataset seeding completed successfully!")
 
     except Exception as e:
         logger.error(f"Database seeding failed: {e}")
@@ -686,5 +715,14 @@ def seed_database() -> None:
 
 
 if __name__ == "__main__":
-    # Run seeding when script is executed directly
-    seed_database()
+    parser = argparse.ArgumentParser(
+        description="Ensure Pixie Core tables exist and optionally load demo data."
+    )
+    parser.add_argument(
+        "--sample-data",
+        action="store_true",
+        help="Also seed the small demo dataset used for development demos.",
+    )
+    cli_args = parser.parse_args()
+
+    seed_database(seed_sample_data=cli_args.sample_data)

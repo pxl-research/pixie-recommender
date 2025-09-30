@@ -22,6 +22,9 @@ docker compose -f docker-compose.dev.yml up --build
 
 API is beschikbaar op `http://localhost:8000`
 
+> ℹ️ De applicatie maakt uitsluitend de database-tabellen aan bij het opstarten.
+> Lever je eigen productbestand of ETL aan om data te importeren.
+
 Note on checks:
 
 - `CI` (github) runs lint and unit tests in the runner.
