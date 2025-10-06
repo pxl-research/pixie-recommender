@@ -26,32 +26,11 @@ class AzureConfig:
 
 
 @dataclass
-class SearchConfig:
-    """Search configuration."""
-
-    data_file_path: str
-    default_page_size: int
-
-
-@dataclass
-class DatabaseConfig:
-    """Database configuration."""
-
-    url: str
-    pool_size: int
-    max_overflow: int
-    pool_timeout: int
-    pool_recycle: int
-    echo: bool
-
-
-@dataclass
 class Config:
     """Main configuration."""
 
     azure: AzureConfig
-    search: SearchConfig
-    database: DatabaseConfig
+    default_page_size: int
 
     @classmethod
     def from_env(cls) -> Config:
@@ -65,35 +44,9 @@ class Config:
             model_version=os.getenv("AZURE_OPENAI_MODEL", "gpt-4"),
         )
 
-        search_config = SearchConfig(
-            data_file_path=os.getenv(
-                "PIXIE_PRINTER_DATA", "pixie/core/data/printers.json"
-            ),
-            default_page_size=int(os.getenv("PIXIE_DEFAULT_PAGE_SIZE", "10")),
-        )
+        page_size = int(os.getenv("PIXIE_DEFAULT_PAGE_SIZE", "10"))
 
-        # Auto-detect database URL based on environment
-        if os.path.exists("/app") and os.path.exists("/.dockerenv"):
-            # Inside container - use service name
-            default_db_url = (
-                "postgresql://pixie_user:pixie_password@postgres:5432/pixie_dev"
-            )
-        else:
-            # Outside container - use localhost
-            default_db_url = (
-                "postgresql://pixie_user:pixie_password@localhost:5432/pixie_dev"
-            )
-
-        database_config = DatabaseConfig(
-            url=os.getenv("DATABASE_URL", default_db_url),
-            pool_size=int(os.getenv("DATABASE_POOL_SIZE", "10")),
-            max_overflow=int(os.getenv("DATABASE_MAX_OVERFLOW", "20")),
-            pool_timeout=int(os.getenv("DATABASE_POOL_TIMEOUT", "30")),
-            pool_recycle=int(os.getenv("DATABASE_POOL_RECYCLE", "3600")),
-            echo=os.getenv("DATABASE_ECHO", "false").lower() == "true",
-        )
-
-        return cls(azure=azure_config, search=search_config, database=database_config)
+        return cls(azure=azure_config, default_page_size=page_size)
 
 
 # Global config instance

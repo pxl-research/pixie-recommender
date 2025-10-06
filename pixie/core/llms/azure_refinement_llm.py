@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from typing import Optional
 
-from ..utils.database_attributes import get_database_attribute_manager
+from ..utils.attribute_catalog import get_attribute_definitions
 from .azure_openai_llm import AzureOpenAILLM
 
 
@@ -10,7 +10,7 @@ class AzureRefinementLLM(AzureOpenAILLM):
     """Azure-based refinement question generator.
 
     Generates natural, contextual questions for collecting product attributes
-    based on database configuration and LLM intelligence.
+    based on the static attribute catalog and LLM intelligence.
     """
 
     def __init__(
@@ -32,16 +32,20 @@ class AzureRefinementLLM(AzureOpenAILLM):
         ctx = context or {}
         category = ctx.get("category", "laptop")
 
-        # Use attribute manager to get the next missing attribute
-        attr_manager = get_database_attribute_manager()
-        next_attr = attr_manager.get_next_missing_attribute(category, ctx)
+        collected = set(ctx.get("collected_attributes", []))
+        skipped = set(ctx.get("skipped_attributes", []))
+        next_attr = None
+        for attr in get_attribute_definitions(category):
+            if attr.name not in collected and attr.name not in skipped:
+                next_attr = attr
+                break
 
-        if not next_attr:
+        if next_attr is None:
             # All attributes collected
             return None
 
         # Get the predefined question for this attribute
-        predefined_question = attr_manager.get_attribute_question(next_attr)
+        predefined_question = next_attr.question
 
         # If no LLM model available, use the predefined question directly
         if not self.model:
@@ -58,9 +62,9 @@ class AzureRefinementLLM(AzureOpenAILLM):
             context_info = f"\nAlready discussed attributes: {', '.join(all_discussed)}"
 
         # Ask the LLM to generate a natural, contextual question
-        attr_name = next_attr["name"]
-        attr_type = next_attr.get("type", "string")
-        attr_description = next_attr.get("description", "")
+        attr_name = next_attr.name
+        attr_type = next_attr.type
+        attr_description = next_attr.description
 
         prompt = f"""Je bent een vriendelijke Nederlandse productadviseur. 
 Genereer een natuurlijke vraag om meer te weten te komen over de 

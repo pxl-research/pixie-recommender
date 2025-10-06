@@ -221,22 +221,13 @@ class SimplifiedConversationManager:
         # Generate SQL for direct search
         sql_result = self.llm_orchestrator.generate_search_query(question, {}, category)
 
-        if not sql_result.success:
-            # Use database-driven search via search engine with category context
-            try:
-                search_context = {"category": category}
-                results = self.search_fn(None, search_context, category)
-                if results:
-                    return AskResponse(type="answer", text=str(results))
-                else:
-                    return AskResponse(
-                        type="no_results", text="No matching products found"
-                    )
-            except Exception as e:
-                logger.error(f"Database-driven search failed: {e}")
-                return AskResponse(type="error", reason="search_failed")
-        else:
+        sql_query = None
+        if sql_result.result and "sql" in sql_result.result:
             sql_query = sql_result.result["sql"]
+
+        if not sql_query:
+            logger.warning("SQL generation failed and no fallback query available")
+            return AskResponse(type="error", reason="search_failed")
 
         try:
             # Pass context with category information to search function

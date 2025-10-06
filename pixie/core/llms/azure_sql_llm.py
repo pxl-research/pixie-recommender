@@ -2,17 +2,20 @@ from __future__ import annotations
 
 from typing import Optional
 
-from ..database.connection import get_db_session
-from ..database.repositories.flexible_repositories import get_dynamic_repository
-from ..utils.schema import get_schema_manager
+from ..utils.attribute_catalog import (
+    get_attribute_definitions,
+    get_product_type,
+    get_schema_description,
+    list_attribute_names,
+)
 from .azure_openai_llm import AzureOpenAILLM
 
 
 class AzureSQLLLM(AzureOpenAILLM):
     """Azure-based SQL generator for database queries.
 
-    The generate_sql method uses dynamic schema loading to produce SQL queries
-    based on the actual database schema definition rather than hard-coded information.
+    The generate_sql method uses a static schema description to produce SQL
+    queries that are compatible with the externally managed database.
     """
 
     def __init__(
@@ -58,15 +61,11 @@ class AzureSQLLLM(AzureOpenAILLM):
             )
 
         try:
-            # Get actual product type from database dynamically
-            product_type = self._get_product_type_from_database(table)
+            product_type = self._resolve_product_type(table)
 
-            # Generate schema information dynamically
-            schema_manager = get_schema_manager()
-            schema_info = schema_manager.generate_table_description("products")
+            schema_info = get_schema_description()
 
-            # Get available attributes for this product type
-            available_attributes = self._get_available_attributes(product_type)
+            available_attributes = list_attribute_names(product_type)
 
             # Build dynamic prompt based on actual schema and attributes
             prompt = self._build_dynamic_prompt(
@@ -87,52 +86,19 @@ class AzureSQLLLM(AzureOpenAILLM):
         except Exception as e:
             raise RuntimeError(f"Failed to generate SQL query: {e}")
 
-    def _get_product_type_from_database(self, category: str) -> str:
-        """Get the actual product type name from database."""
-        try:
-            with get_db_session() as session:
-                product_types_repo = get_dynamic_repository(session, "product_types")
+    def _resolve_product_type(self, category: str) -> str:
+        """Map a detected category to the canonical product type name."""
+        product_type = get_product_type(category)
+        if product_type:
+            return product_type.name
 
-                # Try to find exact match first
-                product_types = product_types_repo.find_by_column("name", category)
-                if product_types:
-                    return product_types[0]["name"]
+        # Try simple plural to singular mapping using the catalog keys
+        for candidate in [category.rstrip("s"), category.lower()]:
+            product_type = get_product_type(candidate)
+            if product_type:
+                return product_type.name
 
-                # Try to find by display_name
-                product_types = product_types_repo.find_by_column(
-                    "display_name", category
-                )
-                if product_types:
-                    return product_types[0]["name"]
-
-                # If no match, return the category as-is and let LLM handle it
-                return category
-        except Exception:
-            # If database lookup fails, return category as-is
-            return category
-
-    def _get_available_attributes(self, product_type: str) -> list:
-        """Get available attributes for a product type from database."""
-        try:
-            with get_db_session() as session:
-                # Get product type ID
-                product_types_repo = get_dynamic_repository(session, "product_types")
-                product_types = product_types_repo.find_by_column("name", product_type)
-
-                if not product_types:
-                    return []
-
-                product_type_id = product_types[0]["id"]
-
-                # Get attributes for this product type
-                attr_repo = get_dynamic_repository(session, "attribute_definitions")
-                attributes = attr_repo.filter_by_attributes(
-                    {"product_type_id": product_type_id}
-                )
-
-                return [attr["name"] for attr in attributes]
-        except Exception:
-            return []
+        return category
 
     def _build_dynamic_prompt(
         self,

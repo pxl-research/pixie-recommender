@@ -139,7 +139,7 @@ class LLMOrchestrator:
         Centralizes SQL generation with proper error handling.
         """
         try:
-            # Map category to actual product type name in database
+            # Map category to the canonical product type name used by the catalog
             category_to_product_type = {
                 "printers": "printers",
                 "laptops": "laptop",  # category "laptops" maps to product_type "laptop"

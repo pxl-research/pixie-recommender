@@ -16,9 +16,6 @@ docker compose -f docker-compose.dev.yml up --build
 
 API is beschikbaar op `http://localhost:8000`
 
-> ℹ️ De applicatie maakt uitsluitend de database-tabellen aan bij het opstarten.
-> Lever je eigen productbestand of ETL aan om data te importeren.
-
 ### 2. Stel vragen
 
 **Nieuwe vraag (verschillende categorieën):**
@@ -102,19 +99,19 @@ Each product category has tailored attributes for precise recommendations:
 
 | Category | Key Attributes |
 |----------|----------------|
-| Printers | budget, brand, technology, has_color, is_multifunction |
-| Laptops | budget, brand, screen_size, processor, ram, storage |
-| Smartphones | budget, brand, screen_size, storage, operating_system |
-| Computers | budget, brand, processor, ram, storage, form_factor |
+| Printers | budget, brand, technology |
+| Laptops | budget, brand, screen_size |
+| Smartphones | budget, brand, screen_size |
+| Computers | budget, brand, processor |
 
 ### Intelligent SQL Generation
 
 The system generates category-aware SQL queries with:
 
-- Proper table selection based on detected category
-- Category-specific filtering logic
-- Fallback mechanisms for robust operation
-- Support for both Azure OpenAI and mock LLM implementations
+- Proper table selection hints based on the embedded static schema
+- Category-specific filtering logic derived from de attribute catalogus
+- Fallback mechanism wanneer de LLM geen sluitende query kan genereren
+- Ondersteuning voor zowel echte Azure OpenAI modellen als lokale mocks
 
 ### Conversation Flow
 
@@ -136,8 +133,8 @@ The system generates category-aware SQL queries with:
          │                       │                       │
          ▼                       ▼                       ▼
 ┌─────────────────┐    ┌──────────────────┐    ┌─────────────────┐
-│  Data Access    │    │   Attribute       │    │   Schema        │
-│   (JSON/SQL)    │◄──►│   Management      │◄──►│   Management    │
+│ External Data   │    │   Attribute       │    │  Static Schema  │
+│ Service (HTTP)  │◄──►│   Catalog         │◄──►│   Descriptions  │
 └─────────────────┘    └──────────────────┘    └─────────────────┘
 ```
 
@@ -147,6 +144,7 @@ The system generates category-aware SQL queries with:
 - **💬 Dynamic Conversation Flows**: Category-specific question sequences
 - **⚡ High Performance**: Sub-second response times with robust fallbacks
 - **🔧 Flexible Configuration**: Environment-based configuration for different deployments
+- **🌐 Externe data**: Data queries worden doorgegeven aan een beheerde Postgres-container
 - **📊 Multi-Category Support**: Unified system handling printers, laptops, computers, smartphones
 
 ### Data Flow
@@ -156,9 +154,9 @@ The system generates category-aware SQL queries with:
 3. Category detection LLM identifies specific product category
 4. Attribute manager loads category-specific question flow
 5. Conversation loop collects user preferences through targeted questions
-6. SQL generation LLM creates category-aware database queries
-7. Search engine applies category-specific filtering and ranking
-8. Results are returned with personalized recommendations
+6. SQL generation LLM creëert een categorie-specifieke SQL-query voor de externe data-service
+7. De externe Postgres-container verwerkt de query en levert resultaten terug aan Pixie Core
+8. De conversatieflow vertaalt de resultaten naar een helder antwoord of vervolgvraag
 
 ### Azure OpenAI Configuration
 
@@ -167,13 +165,9 @@ The system generates category-aware SQL queries with:
 - `AZURE_OPENAI_KEY`: Azure OpenAI API key (default: "dummy-key-for-development")
 - `AZURE_OPENAI_MODEL`: Azure OpenAI model deployment name (default: "gpt-4")
 
-### Search Configuration
+### Conversatie-instellingen
 
-- `PIXIE_PRINTER_DATA`: Path to printer data JSON file (default: "pixie/core/data/printers.json")
-- `PIXIE_LAPTOP_DATA`: Path to laptop data JSON file (default: "pixie/core/data/laptops.json")
-- `PIXIE_SMARTPHONE_DATA`: Path to smartphone data JSON file (default: "pixie/core/data/smartphones.json")
-- `PIXIE_COMPUTER_DATA`: Path to computer data JSON file (default: "pixie/core/data/computers.json")
-- `PIXIE_DEFAULT_PAGE_SIZE`: Default page size for search results (default: 10)
+- `PIXIE_DEFAULT_PAGE_SIZE`: Optionele paginagrootte die bepaalt hoeveel resultaten per antwoord worden samengevat (default: 10)
 
 ### Configuration Examples
 

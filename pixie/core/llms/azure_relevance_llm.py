@@ -2,8 +2,12 @@ from __future__ import annotations
 
 from typing import Dict, List, Optional
 
-from ..database.connection import get_db_session
-from ..database.repositories.flexible_repositories import get_dynamic_repository
+from ..utils.attribute_catalog import (
+    ProductType,
+    get_attribute_definitions,
+    get_product_type,
+    list_product_types,
+)
 from .azure_openai_llm import AzureOpenAILLM
 
 
@@ -21,18 +25,14 @@ class AzureRelevanceLLM(AzureOpenAILLM):
     ):
         super().__init__(api_version, api_endpoint, api_key, model_version, temperature)
         self.model_name = model_name
-        self._product_types_cache: Optional[List[Dict]] = None
-        self._attributes_cache: Optional[Dict[str, List[Dict]]] = None
+        self._product_types_cache: Optional[List[ProductType]] = None
+        self._attributes_cache: Optional[Dict[str, List[str]]] = None
 
     def _get_product_types(self) -> List[Dict]:
-        """Get all active product types from database with caching."""
+        """Get all supported product types from the static catalog."""
         if self._product_types_cache is None:
-            with get_db_session() as session:
-                product_types_repo = get_dynamic_repository(session, "product_types")
-                self._product_types_cache = product_types_repo.find_by_column(
-                    "is_active", True
-                )
-        return self._product_types_cache or []
+            self._product_types_cache = list(list_product_types())
+        return self._product_types_cache
 
     def _get_attributes_for_product_type(self, product_type_name: str) -> List[Dict]:
         """Get all attributes for a specific product type with caching."""
@@ -40,47 +40,35 @@ class AzureRelevanceLLM(AzureOpenAILLM):
             self._attributes_cache = {}
 
         if product_type_name not in self._attributes_cache:
-            with get_db_session() as session:
-                # Get product type ID first
-                product_types_repo = get_dynamic_repository(session, "product_types")
-                product_types = product_types_repo.find_by_column(
-                    "name", product_type_name
-                )
+            attributes = get_attribute_definitions(product_type_name)
+            if not attributes:
+                product_type = get_product_type(product_type_name)
+                attributes = product_type.attributes if product_type else []
+            self._attributes_cache[product_type_name] = attributes
 
-                if not product_types:
-                    self._attributes_cache[product_type_name] = []
-                    return []
-
-                product_type_id = product_types[0]["id"]
-
-                # Get attributes for this product type
-                attributes_repo = get_dynamic_repository(
-                    session, "attribute_definitions"
-                )
-                attributes = attributes_repo.find_by_column(
-                    "product_type_id", product_type_id
-                )
-                self._attributes_cache[product_type_name] = attributes
-
-        return self._attributes_cache[product_type_name]
+        return [
+            {
+                "name": attr.name,
+                "display_name": attr.display_name,
+            }
+            for attr in self._attributes_cache[product_type_name]
+        ]
 
     def _build_relevance_prompt(self, question: str) -> str:
-        """Build a dynamic prompt based on current database content."""
+        """Build a dynamic prompt based on the static product catalog."""
         product_types = self._get_product_types()
 
         # Build product type list
         product_list = []
         for pt in product_types:
-            attributes = self._get_attributes_for_product_type(pt["name"])
-            attr_names = [
-                attr["display_name"] for attr in attributes[:5]
-            ]  # Limit to first 5
+            attributes = self._get_attributes_for_product_type(pt.name)
+            attr_names = [attr["display_name"] for attr in attributes[:5]]
             if attr_names:
                 product_list.append(
-                    f"{pt['display_name']} (with attributes like: {', '.join(attr_names)})"
+                    f"{pt.display_name} (with attributes like: {', '.join(attr_names)})"
                 )
             else:
-                product_list.append(pt["display_name"])
+                product_list.append(pt.display_name)
 
         prompt = (
             "Is the following question related to buying, searching for, "
@@ -94,15 +82,14 @@ class AzureRelevanceLLM(AzureOpenAILLM):
         return prompt
 
     def _build_category_prompt(self, question: str) -> str:
-        """Build a dynamic category detection prompt based on current database content."""
+        """Build a dynamic category detection prompt using the static catalog."""
         product_types = self._get_product_types()
-        product_names = [pt["name"] for pt in product_types]
+        product_names = [pt.name for pt in product_types]
 
         context_lines = []
         for pt in product_types:
-            description = pt.get("description", "")
             context_lines.append(
-                f"- {pt['name']}: {pt['display_name']} - {description}"
+                f"- {pt.name}: {pt.display_name} - {pt.description}"
             )
 
         prompt = (
@@ -135,7 +122,7 @@ class AzureRelevanceLLM(AzureOpenAILLM):
     def detect_category(self, question: Optional[str]) -> Optional[str]:
         """Detect the product category from the question.
 
-        Returns one of the product type names from the database, or None.
+        Returns one of the product type names from the catalog, or None.
         """
         text = (question or "").strip()
 
@@ -149,7 +136,7 @@ class AzureRelevanceLLM(AzureOpenAILLM):
             answer = response.content.lower().strip()
 
             # Check if answer is a valid product type
-            valid_categories = {pt["name"] for pt in self._get_product_types()}
+            valid_categories = {pt.name for pt in self._get_product_types()}
             if answer in valid_categories:
                 return answer
             elif answer == "none":
@@ -158,6 +145,6 @@ class AzureRelevanceLLM(AzureOpenAILLM):
         raise ValueError("Invalid response format from Azure model")
 
     def clear_cache(self) -> None:
-        """Clear the internal cache to force reload from database."""
+        """Clear the internal cache to force a reload from the static catalog."""
         self._product_types_cache = None
         self._attributes_cache = None

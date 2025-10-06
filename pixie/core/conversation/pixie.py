@@ -2,7 +2,6 @@ from __future__ import annotations
 
 import logging
 
-from ..search.search_engine import SearchEngine
 from ..storage.pending_store import InMemoryPendingStore
 from ..utils.contracts import AskResponse
 from .simplified_conversation_manager import SimplifiedConversationManager
@@ -26,25 +25,18 @@ class Pixie:
         if conversation_manager is not None:
             self._conversation_manager = conversation_manager
         else:
-            # Provide a default search function that will be used by the
-            # SimplifiedConversationManager.
-            engine = SearchEngine()
-
-            # Create a wrapper function that extracts category from context
             def search_with_category(
                 sql: str, context: dict | None = None
             ) -> list[dict]:
-                category = None
-                if context and isinstance(context, dict):
-                    category = context.get("category")
-                result = engine.search(sql, context, category)
-                # Handle both old dict format and new list format
-                if isinstance(result, dict):
-                    return result.get("results", [])
-                elif isinstance(result, list):
-                    return result
-                else:
-                    return []
+                logger = logging.getLogger(__name__)
+                logger.info(
+                    "search.forward_to_external",
+                    extra={"sql": sql, "context": context},
+                )
+                # The actual product lookup happens in the separate data service.
+                # Returning an empty list keeps the flow intact while we wait for
+                # that service to respond asynchronously.
+                return []
 
             self._conversation_manager = SimplifiedConversationManager(
                 search_with_category,

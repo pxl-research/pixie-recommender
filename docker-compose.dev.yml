@@ -1,21 +1,4 @@
 services:
-  postgres:
-    image: postgres:17-alpine
-    environment:
-      POSTGRES_DB: pixie_dev
-      POSTGRES_USER: pixie_user
-      POSTGRES_PASSWORD: pixie_password
-    ports:
-      - "5432:5432"
-    volumes:
-      - postgres_data:/var/lib/postgresql/data
-      - ./scripts/init.sql:/docker-entrypoint-initdb.d/init.sql
-    healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U pixie_user -d pixie_dev"]
-      interval: 5s
-      timeout: 5s
-      retries: 5
-
   api:
     build:
       context: .
@@ -26,9 +9,6 @@ services:
     env_file: .env.dev
     volumes:
       - .:/app   # hot reload
-    depends_on:
-      postgres:
-        condition: service_healthy
     healthcheck:
       test: ["CMD", "python", "/app/scripts/wait_for_health_container.py"]
       interval: 10s
@@ -46,9 +26,3 @@ services:
     environment:
       - ENV=dev
     command: ["bash"]
-    depends_on:
-      postgres:
-        condition: service_healthy
-
-volumes:
-  postgres_data:

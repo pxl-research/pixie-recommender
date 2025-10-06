@@ -50,42 +50,36 @@ class AttributeCollector:
         self.attribute_definitions = self._load_attribute_definitions(category)
 
     def _load_attribute_definitions(self, category: str) -> List[AttributeRequest]:
-        """Load attribute definitions from database - unified configuration source."""
-        try:
-            from ..utils.database_attributes import get_database_attribute_manager
+        """Load attribute definitions from the static catalog."""
+        from ..utils.attribute_catalog import get_attribute_definitions
 
-            attr_manager = get_database_attribute_manager()
-            db_attributes = attr_manager.get_attributes_for_category(category)
-
-            attribute_requests = []
-            for attr in db_attributes:
-                attribute_requests.append(
-                    AttributeRequest(
-                        name=attr["name"],
-                        question=attr.get("question") or attr.get("display_name", ""),
-                        required=attr.get("required", False),
-                    )
+        catalog_attributes = get_attribute_definitions(category)
+        if catalog_attributes:
+            requests = [
+                AttributeRequest(
+                    name=attr.name,
+                    question=attr.question,
+                    required=attr.required,
                 )
-
+                for attr in catalog_attributes
+            ]
             logger.info(
-                f"Loaded {len(attribute_requests)} attribute definitions "
-                f"for {category} from database"
+                "Loaded %d attribute definitions for %s from static catalog",
+                len(requests),
+                category,
             )
-            if attribute_requests:
-                return attribute_requests
+            return requests
 
-        except Exception as e:
-            logger.error(f"Failed to load attributes from database for {category}: {e}")
-            # Return empty list - let the system handle gracefully without attributes
-            logger.warning(
-                f"No attribute definitions available for {category}, "
-                f"proceeding without collection"
-            )
         fallback_defs = self._load_fallback_attribute_definitions(category)
         if fallback_defs:
             logger.info(
-                "Using fallback attribute definitions from flow configuration "
-                f"for category {category}"
+                "Using fallback attribute definitions from flow configuration for %s",
+                category,
+            )
+        else:
+            logger.warning(
+                "No attribute definitions available for %s; continuing without collection",
+                category,
             )
         return fallback_defs
 
