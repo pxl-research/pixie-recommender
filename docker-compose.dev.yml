@@ -9,12 +9,6 @@ services:
     env_file: .env.dev
     volumes:
       - .:/app   # hot reload
-    healthcheck:
-      test: ["CMD", "python", "/app/scripts/wait_for_health_container.py"]
-      interval: 10s
-      timeout: 3s
-      retries: 5
-      start_period: 15s
 
   dev:
     build:

@@ -46,16 +46,11 @@ def health():
 def metrics():
     import time
 
-    pending = 0
-    store = getattr(_pixie_instance, "_pending_store", None)
-    if store and hasattr(store, "_store"):
-        pending = len(store._store)
-
     return {
         "timestamp": int(time.time()),
         "status": "healthy",
         "version": "0.6.0",
-        "active_conversations": pending,
+        "active_conversations": 0,
     }
 
 
