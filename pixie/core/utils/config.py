@@ -1,5 +1,3 @@
-"""Simple configuration for Pixie Core development."""
-
 from __future__ import annotations
 
 import os
@@ -17,8 +15,6 @@ if env_dev_path.exists():
 
 @dataclass
 class AzureConfig:
-    """Azure OpenAI configuration."""
-
     api_version: str
     api_endpoint: str
     api_key: str
@@ -27,14 +23,11 @@ class AzureConfig:
 
 @dataclass
 class Config:
-    """Main configuration."""
-
     azure: AzureConfig
     default_page_size: int
 
     @classmethod
     def from_env(cls) -> Config:
-        """Load config from environment variables."""
         azure_config = AzureConfig(
             api_version=os.getenv("AZURE_OPENAI_API_VERSION", "2024-02-01"),
             api_endpoint=os.getenv(
@@ -54,7 +47,6 @@ _config: Config | None = None
 
 
 def get_config() -> Config:
-    """Get the configuration instance."""
     global _config
     if _config is None:
         _config = Config.from_env()
@@ -62,6 +54,5 @@ def get_config() -> Config:
 
 
 def reset_config() -> None:
-    """Reset cached configuration - useful for testing or when environment changes."""
     global _config
     _config = None

@@ -1,10 +1,3 @@
-"""
-Simplified Attribute Collection Logic
-
-Extracts the complex attribute gathering from conversation_loop.py
-Into a clean, testable, single-responsibility class.
-"""
-
 import logging
 from dataclasses import dataclass
 from typing import Any, Dict, List, Optional
@@ -14,8 +7,6 @@ logger = logging.getLogger(__name__)
 
 @dataclass
 class AttributeValue:
-    """Represents a collected attribute value."""
-
     name: str
     value: str
     is_skipped: bool = False
@@ -24,8 +15,6 @@ class AttributeValue:
 
 @dataclass
 class AttributeRequest:
-    """Represents a request for an attribute."""
-
     name: str
     question: str
     required: bool = True
@@ -33,29 +22,18 @@ class AttributeRequest:
 
 
 class AttributeCollector:
-    """
-    Simplified attribute collection with clear responsibilities:
-    - Track collected vs missing attributes
-    - Generate appropriate questions
-    - Validate responses
-    - Determine when collection is complete
-
-    Replaces complex scattered logic from conversation_loop.py
-    """
-
-    def __init__(self, category: str, max_attributes: int = 3):
+    def __init__(self, category: str, max_attributes: int = 3) -> None:
         self.category = category
         self.max_attributes = max_attributes
         self.collected_attributes: Dict[str, AttributeValue] = {}
         self.attribute_definitions = self._load_attribute_definitions(category)
 
     def _load_attribute_definitions(self, category: str) -> List[AttributeRequest]:
-        """Load attribute definitions from the static catalog."""
         from ..utils.attribute_catalog import get_attribute_definitions
 
         catalog_attributes = get_attribute_definitions(category)
         if catalog_attributes:
-            requests = [
+            return [
                 AttributeRequest(
                     name=attr.name,
                     question=attr.question,
@@ -63,240 +41,94 @@ class AttributeCollector:
                 )
                 for attr in catalog_attributes
             ]
-            logger.info(
-                "Loaded %d attribute definitions for %s from static catalog",
-                len(requests),
-                category,
-            )
-            return requests
-
-        fallback_defs = self._load_fallback_attribute_definitions(category)
-        if fallback_defs:
-            logger.info(
-                "Using fallback attribute definitions from flow configuration for %s",
-                category,
-            )
-        else:
-            logger.warning(
-                "No attribute definitions available for %s; continuing without collection",
-                category,
-            )
-        return fallback_defs
+        fallback = self._load_fallback_attribute_definitions(category)
+        if not fallback:
+            logger.warning("no attribute definitions", extra={"category": category})
+        return fallback
 
     def _load_fallback_attribute_definitions(
         self, category: str
     ) -> List[AttributeRequest]:
-        """Load fallback attribute definitions from flow configuration."""
         try:
             from .flow_config import CONVERSATION_FLOWS
 
-            flow_config = CONVERSATION_FLOWS.get(category)
-            if not flow_config:
+            flow = CONVERSATION_FLOWS.get(category)
+            if not flow:
                 return []
-
-            requests: List[AttributeRequest] = []
-            for question in flow_config.questions:
-                requests.append(
-                    AttributeRequest(
-                        name=question.attribute_name,
-                        question=question.text,
-                        required=question.required,
-                    )
+            return [
+                AttributeRequest(
+                    name=q.attribute_name,
+                    question=q.text,
+                    required=q.required,
                 )
-            return requests
-        except Exception as flow_error:
-            logger.warning(
-                "Failed to build fallback attribute definitions for %s: %s",
-                category,
-                flow_error,
-            )
+                for q in flow.questions
+            ]
+        except Exception as exc:  # pragma: no cover - defensive
+            logger.warning("flow_config_error", exc_info=exc)
             return []
 
     def get_next_question(self) -> Optional[AttributeRequest]:
-        """
-        Get the next attribute question to ask.
-
-        Replaces complex _get_next_stage logic from conversation_loop.py
-        """
-        # Find first non-collected required attribute
-        for attr_def in self.attribute_definitions:
-            if attr_def.name not in self.collected_attributes:
-                if (
-                    attr_def.required
-                    or len(self.collected_attributes) < self.max_attributes
-                ):
-                    return attr_def
-
-        return None  # All required attributes collected
+        for definition in self.attribute_definitions:
+            if definition.name not in self.collected_attributes:
+                if definition.required or len(self.collected_attributes) < self.max_attributes:
+                    return definition
+        return None
 
     def collect_attribute(self, attribute_name: str, response: str) -> AttributeValue:
-        """
-        Process and store an attribute response.
-
-        Replaces complex reply processing from conversation_loop.py
-        """
-        # Handle "don't know" responses
-        skip_responses = [
+        skip_responses = {
             "weet ik niet",
             "geen idee",
             "whatever",
             "maakt niet uit",
             "geen voorkeur",
             "doet er niet toe",
-        ]
-
-        is_skipped = response.lower().strip() in skip_responses
-
-        # Validate response if not skipped
+        }
+        normalized = response.strip()
+        is_skipped = normalized.lower() in skip_responses
         if not is_skipped:
-            response = self._validate_response(attribute_name, response)
-
-        # Store the attribute
-        attr_value = AttributeValue(
+            normalized = self._validate_response(attribute_name, normalized)
+        value = AttributeValue(
             name=attribute_name,
-            value=response,
+            value=normalized,
             is_skipped=is_skipped,
             confidence=0.5 if is_skipped else 1.0,
         )
-
-        self.collected_attributes[attribute_name] = attr_value
-
-        logger.info(
-            f"Collected attribute: {attribute_name} = {response} (skipped: {is_skipped})"
-        )
-
-        return attr_value
+        self.collected_attributes[attribute_name] = value
+        return value
 
     def _validate_response(self, attribute_name: str, response: str) -> str:
-        """Validate and normalize attribute responses."""
-        response = response.strip()
-
-        # Budget validation and normalization
         if attribute_name == "budget":
             return self._normalize_budget(response)
-
-        # Brand validation - capitalize first letter
         if attribute_name == "brand":
             return response.title()
-
-        # Technology validation for printers
         if attribute_name == "technology":
-            response_lower = response.lower()
-            if "laser" in response_lower:
+            lowered = response.lower()
+            if "laser" in lowered:
                 return "laser"
-            elif "inkjet" in response_lower or "inkt" in response_lower:
+            if "ink" in lowered or "inkt" in lowered:
                 return "inkjet"
-
         return response
 
-    def _normalize_budget(self, budget_str: str) -> str:
-        """Normalize budget input to consistent format."""
-        budget_lower = budget_str.lower().strip()
-
-        # Handle "minder dan X" format
-        if "minder dan" in budget_lower:
-            return budget_str  # Keep original format
-
-        # Add euro symbol if missing
-        if "€" not in budget_str and "euro" not in budget_lower:
-            if budget_str.isdigit():
-                return f"€{budget_str}"
-
-        return budget_str
+    def _normalize_budget(self, budget: str) -> str:
+        text = budget.lower().replace("€", "").strip()
+        if text.startswith("minder dan"):
+            number = text.replace("minder dan", "").strip()
+            return f"< {number}"
+        if text.endswith("euro"):
+            return text.replace("euro", "").strip()
+        if text.endswith("euros"):
+            return text.replace("euros", "").strip()
+        return text
 
     def is_collection_complete(self) -> bool:
-        """
-        Determine if we have enough attributes to proceed.
-
-        Replaces complex iteration and completion logic.
-        """
-        # If no attribute definitions are loaded, collection is complete
-        # (proceed directly to search without attribute collection)
-        if not self.attribute_definitions:
-            return True
-
-        # Check if we have collected any required attributes
-        required_attrs = [attr for attr in self.attribute_definitions if attr.required]
-        if required_attrs:
-            # We need at least one required attribute
-            collected_required = [
-                attr_name
-                for attr_name, attr_value in self.collected_attributes.items()
-                if any(req.name == attr_name for req in required_attrs)
-                and not attr_value.is_skipped
-            ]
-            if not collected_required:
-                return False
-
-        # Count non-skipped collected attributes
-        collected_count = len(
-            [attr for attr in self.collected_attributes.values() if not attr.is_skipped]
-        )
-
-        # Determine minimum threshold based on available definitions and max_attributes
-        if len(self.attribute_definitions) == 0:
-            return True
-
-        required_min = min(self.max_attributes, len(self.attribute_definitions))
-        return collected_count >= required_min
+        required = {d.name for d in self.attribute_definitions if d.required}
+        collected = set(self.collected_attributes)
+        return required.issubset(collected)
 
     def get_collection_summary(self) -> Dict[str, Any]:
-        """Get summary of collected attributes for search/SQL generation."""
-        summary = {
-            "category": self.category,
-            "total_collected": len(self.collected_attributes),
-            "attributes": {},
-        }
-
-        for attr_name, attr_value in self.collected_attributes.items():
-            if not attr_value.is_skipped:
-                summary["attributes"][attr_name] = attr_value.value
-
+        summary: Dict[str, Any] = {}
+        for name, value in self.collected_attributes.items():
+            if value.is_skipped:
+                continue
+            summary[name] = value.value
         return summary
-
-    def get_missing_attributes(self) -> List[str]:
-        """Get list of missing required attributes."""
-        missing = []
-        for attr_def in self.attribute_definitions:
-            if attr_def.required and attr_def.name not in self.collected_attributes:
-                missing.append(attr_def.name)
-        return missing
-
-    def reset(self):
-        """Reset collection state for new conversation."""
-        self.collected_attributes.clear()
-
-
-# Usage example - clean and simple:
-"""
-collector = AttributeCollector("printers")
-
-# In conversation loop:
-next_question = collector.get_next_question()
-if next_question:
-    # Ask user the question
-    pass
-
-# When reply received:
-collector.collect_attribute("budget", "€150")
-
-# Check if done:
-if collector.is_collection_complete():
-    summary = collector.get_collection_summary()
-    # Use summary for search
-"""
-
-
-"""
-Benefits of this extraction:
-
-1. **Single Responsibility**: Only handles attribute collection
-2. **Clear Interface**: Simple methods with obvious purposes  
-3. **Testable**: Easy to unit test in isolation
-4. **Configurable**: Centralized attribute definitions
-5. **Maintainable**: Changes to attribute logic only affect this class
-6. **Reusable**: Can be used by different conversation managers
-
-Replaces ~100 lines of complex logic from conversation_loop.py
-with ~150 lines of clean, focused, testable code.
-"""

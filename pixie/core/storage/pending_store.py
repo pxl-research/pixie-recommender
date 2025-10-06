@@ -20,9 +20,7 @@ class PendingEntry:
 
 
 class InMemoryPendingStore:
-    """Simple in-memory pending store with TTL semantics."""
-
-    def __init__(self):
+    def __init__(self) -> None:
         self._store: Dict[str, PendingEntry] = {}
 
     def save_pending(
@@ -47,11 +45,9 @@ class InMemoryPendingStore:
         if not entry:
             return None
         if entry.expired():
-            # remove expired entry
             self._store.pop(pending_id, None)
             return None
         return entry
 
     def resolve_pending(self, pending_id: str) -> None:
-        """Remove pending entry."""
         self._store.pop(pending_id, None)

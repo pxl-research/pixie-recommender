@@ -6,7 +6,6 @@ from typing import Optional
 
 @dataclass
 class AskResponse:
-    """Minimal response object used by the mock Pixie service."""
 
     type: str  # answer, ask_user, not_relevant, error
     text: Optional[str] = None

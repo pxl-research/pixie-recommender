@@ -15,7 +15,6 @@ pixie_logging.configure_logging()
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    """Minimal lifespan hook that only ensures logging is ready."""
     configure_logging(level=logging.INFO)
     logging.info("Starting Pixie Core API without embedded database")
     yield
@@ -26,7 +25,6 @@ app = FastAPI(title="Pixie Core API", version="0.0.0", lifespan=lifespan)
 
 @app.middleware("http")
 async def add_trace_id(request, call_next):
-    """Attach a per-request trace identifier for log correlation."""
     token = trace_id_ctx.set(str(uuid4()))
     try:
         response = await call_next(request)
@@ -46,7 +44,6 @@ def health():
 
 @app.get("/metrics")
 def metrics():
-    """Lightweight metrics endpoint for monitoring."""
     import time
 
     pending = 0
@@ -64,7 +61,6 @@ def metrics():
 
 @app.post("/ask")
 def ask(req: dict = Body(...)):
-    """Unified endpoint for both new questions and replies to pending questions."""
     logger = logging.getLogger(__name__)
     logger.info("api.ask", extra={"payload": req})
 

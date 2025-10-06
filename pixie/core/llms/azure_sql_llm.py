@@ -12,11 +12,6 @@ from .azure_openai_llm import AzureOpenAILLM
 
 
 class AzureSQLLLM(AzureOpenAILLM):
-    """Azure-based SQL generator for database queries.
-
-    The generate_sql method uses a static schema description to produce SQL
-    queries that are compatible with the externally managed database.
-    """
 
     def __init__(
         self,
@@ -87,12 +82,10 @@ class AzureSQLLLM(AzureOpenAILLM):
             raise RuntimeError(f"Failed to generate SQL query: {e}")
 
     def _resolve_product_type(self, category: str) -> str:
-        """Map a detected category to the canonical product type name."""
         product_type = get_product_type(category)
         if product_type:
             return product_type.name
 
-        # Try simple plural to singular mapping using the catalog keys
         for candidate in [category.rstrip("s"), category.lower()]:
             product_type = get_product_type(candidate)
             if product_type:
@@ -108,8 +101,6 @@ class AzureSQLLLM(AzureOpenAILLM):
         schema_info: str,
         available_attributes: list,
     ) -> str:
-        """Build a dynamic prompt based on actual database schema."""
-        # Build attribute context
         attr_context = ""
         if available_attributes:
             attr_context = (
@@ -117,7 +108,6 @@ class AzureSQLLLM(AzureOpenAILLM):
                 f"{', '.join(available_attributes)}"
             )
 
-        # Build user attributes context
         user_attrs = ""
         if attributes:
             valid_attrs = {

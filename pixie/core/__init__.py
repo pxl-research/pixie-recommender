@@ -1,4 +1,3 @@
-# Backward compatibility imports
 from .conversation.pixie import Pixie
 from .llms.azure_llm_set import create_azure_llm_set
 from .llms.azure_refinement_llm import AzureRefinementLLM
