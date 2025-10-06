@@ -1,3 +1,5 @@
+"""SQL generation helper for the minimal Pixie pipeline."""
+
 from __future__ import annotations
 
 from typing import Optional
@@ -21,6 +23,7 @@ DEFAULT_ATTRIBUTES = {
 
 
 class AzureSQLLLM(AzureOpenAILLM):
+    """Uses Azure OpenAI to craft SQL based on a handful of known attributes."""
     def __init__(
         self,
         api_version: str,

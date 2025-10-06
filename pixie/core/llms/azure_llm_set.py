@@ -1,3 +1,5 @@
+"""Factory helpers that turn environment variables into Azure LLM instances."""
+
 from __future__ import annotations
 
 import os

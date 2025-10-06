@@ -1,3 +1,5 @@
+"""Minimal relevance + category detector backed by Azure OpenAI."""
+
 from __future__ import annotations
 
 from typing import Optional
@@ -14,6 +16,7 @@ DEFAULT_CATEGORIES = [
 
 
 class AzureRelevanceLLM(AzureOpenAILLM):
+    """Checks relevance and maps questions onto one of the known categories."""
     def __init__(
         self,
         api_version: str,

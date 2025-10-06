@@ -1,3 +1,5 @@
+"""Single-pass conversation handler that relies on the LLMs to produce SQL."""
+
 import logging
 from typing import Optional
 
@@ -7,7 +9,9 @@ from .llm_orchestrator import LLMOrchestrator, create_llm_orchestrator
 logger = logging.getLogger(__name__)
 
 
-class SimplifiedConversationManager:
+class DirectConversationManager:
+    """Minimal conversation layer that delegates everything to the LLM stack."""
+
     def __init__(
         self,
         search_fn,
@@ -17,6 +21,7 @@ class SimplifiedConversationManager:
         self.llm_orchestrator = llm_orchestrator or create_llm_orchestrator()
 
     def handle_new_question(self, question: str) -> AskResponse:
+        """Classify relevance, detect category, generate SQL, and run the search stub."""
         logger.info("question", extra={"question": question})
         relevance = self.llm_orchestrator.check_relevance_and_category(question)
         if not relevance.success:
@@ -43,6 +48,7 @@ class SimplifiedConversationManager:
             return AskResponse(type="answer", text=str(results))
         return AskResponse(type="no_results", text="No matching products found")
 
-    def handle_reply(self, pending_id: str, reply: str) -> AskResponse:
+    def handle_reply(self, pending_id: str, reply: str) -> AskResponse:  # noqa: ARG002
+        """Replies are not supported in this minimal build."""
         logger.info("reply_unsupported", extra={"pending_id": pending_id})
         return AskResponse(type="error", reason="no_pending_support")

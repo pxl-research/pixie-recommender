@@ -1,3 +1,5 @@
+"""Base wrapper that instantiates an Azure ChatCompletion client if available."""
+
 try:  # pragma: no cover - optional dependency
     from langchain_openai import AzureChatOpenAI  # type: ignore
 except Exception:  # pragma: no cover - optional dependency

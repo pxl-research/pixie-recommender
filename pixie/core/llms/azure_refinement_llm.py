@@ -6,11 +6,7 @@ from .azure_openai_llm import AzureOpenAILLM
 
 
 class AzureRefinementLLM(AzureOpenAILLM):
-    """Azure-based refinement question generator.
-
-    Generates natural, contextual questions for collecting product attributes
-    based on the static attribute catalog and LLM intelligence.
-    """
+    """Legacy helper that can generate clarifying questions (TODO: new dataset)."""
 
     def __init__(
         self,

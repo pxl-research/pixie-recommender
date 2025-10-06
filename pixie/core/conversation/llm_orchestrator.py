@@ -1,3 +1,5 @@
+"""Tiny façade that wires the individual LLMs together."""
+
 import logging
 from dataclasses import dataclass
 from typing import Any, Dict, Optional, Protocol
@@ -26,6 +28,7 @@ class LLMResponse:
 
 
 class LLMOrchestrator:
+    """Coordinates relevance and SQL LLMs for the direct conversation flow."""
     def __init__(
         self,
         relevance_llm: RelevanceLLM,
