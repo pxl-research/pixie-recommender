@@ -47,7 +47,11 @@ class LLMOrchestrator:
             )
         except Exception as exc:  # pragma: no cover - defensive
             logger.error("relevance_failed", exc_info=exc)
-            return LLMResponse(success=False, error="llm_failure", result={"relevant": False, "category": None})
+            return LLMResponse(
+                success=False,
+                error="llm_failure",
+                result={"relevant": False, "category": None},
+            )
 
     def generate_search_query(
         self, question: str, context: Dict[str, Any], category: str
