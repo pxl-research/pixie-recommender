@@ -1,11 +1,5 @@
 # pixie-core
 
-[![Container smoke test](https://github.com/pxl-research/pixie-core/actions/workflows/container-smoke-test.yml/badge.svg)](https://github.com/pxl-research/pixie-core/actions/workflows/container-smoke-test.yml)
-
-> **🚨 FOR COPILOT/AI AGENTS:** This is a CONTAINER-FIRST project. NEVER run tests locally!  
-> **✅ ONLY use:** `./scripts/dev_test.sh pytest`  
-> **See:** `.github/workflows/copilot-instructions.md` for full details.
-
 AI-powered product recommendation system supporting multiple categories: printers, laptops, computers, and smartphones. Uses Azure OpenAI LLMs for intelligent conversation flows and category-aware product recommendations.
 
 ## Quick Start
@@ -24,13 +18,6 @@ API is beschikbaar op `http://localhost:8000`
 
 > ℹ️ De applicatie maakt uitsluitend de database-tabellen aan bij het opstarten.
 > Lever je eigen productbestand of ETL aan om data te importeren.
-
-Note on checks:
-
-- `CI` (github) runs lint and unit tests in the runner.
-- `Container smoke` builds the dev image and runs integration smoke tests (PRs of manual dispatch).
-
-Recommended local test command: `./scripts/dev_test.sh pytest` (or `make dev-test`).
 
 ### 2. Stel vragen
 
@@ -96,32 +83,6 @@ Pixie Core ondersteunt intelligente productaanbevelingen voor vier categorieën:
 - **Niet relevant:** `"Waar kan ik mijn moeder vinden?"` → `{"type": "not_relevant"}`
 - **Te veel resultaten:** Vage query → vraagt om verfijning
 
-docker compose -f docker-compose.dev.yml up --build -d
-docker compose -f docker-compose.dev.yml down -v
-<!-- Tests are documented in .github/workflows/copilot-instructions.md -->
-
-Lokale en CI container-smoke tests delen nu dezelfde helper. Raadpleeg
-`.github/workflows/copilot-instructions.md` voor korte, up-to-date instructies.
-
-De CI workflow gebruikt `/app/scripts/wait_for_health_container.py` en
-`/app/scripts/run_in_container_tests.py` zodat lokale runs en CI sterk op
-elkaar lijken.
-
-## Running tests inside the dev container (recommended)
-
-Use the `dev` service to run tests from a hermetic environment that uses the
-project lockfile (`uv.lock`) and `uv` to create the venv. This is the
-recommended way to run tests locally so they mirror CI.
-
-Quick command (recommended):
-
-```bash
-./scripts/dev_test.sh pytest
-```
-
-Or use the Makefile target `make dev-test` which delegates to the canonical
-helper script `./scripts/dev_test.sh`.
-
 ## Multi-Category Product Support
 
 Pixie Core intelligently detects product categories from user questions and provides category-specific conversation flows:
@@ -186,7 +147,6 @@ The system generates category-aware SQL queries with:
 - **💬 Dynamic Conversation Flows**: Category-specific question sequences
 - **⚡ High Performance**: Sub-second response times with robust fallbacks
 - **🔧 Flexible Configuration**: Environment-based configuration for different deployments
-- **🧪 Comprehensive Testing**: Full test coverage for all components and categories
 - **📊 Multi-Category Support**: Unified system handling printers, laptops, computers, smartphones
 
 ### Data Flow

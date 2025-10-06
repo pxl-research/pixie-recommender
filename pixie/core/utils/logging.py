@@ -90,8 +90,8 @@ def configure_logging(level: int = logging.INFO) -> None:
     root.setLevel(level)
     handler = logging.StreamHandler()
     handler.setFormatter(JsonFormatter())
-    # Ensure trace_id is attached at logger level so test capture handlers
-    # (pytest caplog) and any other handlers see the attribute on the LogRecord.
+    # Ensure trace_id is attached at logger level so log capture handlers
+    # and any other handlers see the attribute on the LogRecord.
     trace_filter = TraceIdFilter()
     handler.addFilter(trace_filter)
     root.addFilter(trace_filter)
@@ -100,7 +100,7 @@ def configure_logging(level: int = logging.INFO) -> None:
     logging.getLogger("uvicorn.access").addFilter(TraceIdFilter())
 
     # Wrap the LogRecord factory so every new LogRecord contains a trace_id
-    # attribute at creation time. This ensures test capture (caplog) and
+    # attribute at creation time. This ensures log capture tooling and
     # third-party handlers receive records with the attribute already set.
     orig_factory = logging.getLogRecordFactory()
 

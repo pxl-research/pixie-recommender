@@ -1,12 +1,8 @@
 #!/usr/bin/env python3
-"""Run a single /health probe against localhost:8000 and print the
-status.
+"""Run a single /health probe against localhost:8000 and print the status.
 
-This is intended to be executed inside the api container. For example:
-`docker exec <container> python /app/scripts/wait_for_health_container.py`.
-
-The script prints the numeric status (e.g. 200) or 'err' on failure and
-exits 0 on success.
+The script is used by the development container healthcheck. It prints the
+numeric status (e.g. 200) or 'err' on failure and exits 0 on success.
 """
 
 import http.client

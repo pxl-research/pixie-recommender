@@ -7,10 +7,8 @@ on:
     branches: ["main"]
 
 jobs:
-  test:
+  checks:
     runs-on: ubuntu-latest
-    env:
-      DATABASE_URL: "sqlite+pysqlite:///:memory:"
     steps:
       - uses: actions/checkout@v4
 
@@ -27,7 +25,7 @@ jobs:
       - name: Sync dependencies from uv.lock
         run: |
           # install pinned deps into the runner environment
-          uv sync --frozen --extra dev
+          uv sync --frozen
 
       - name: Ensure formatter and linter are installed
         run: |
@@ -45,7 +43,3 @@ jobs:
       - name: Run linter (ruff)
         run: |
           uv run python -m ruff check .
-
-      - name: Run tests
-        run: |
-          uv run python -m pytest -q

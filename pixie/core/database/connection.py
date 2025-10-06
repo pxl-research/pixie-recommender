@@ -4,7 +4,7 @@ import logging
 from contextlib import contextmanager
 from typing import Generator, Optional
 
-from sqlalchemy import create_engine, event, text
+from sqlalchemy import create_engine, event
 from sqlalchemy.engine import Engine
 from sqlalchemy.orm import Session, sessionmaker
 from sqlalchemy.pool import StaticPool
@@ -26,7 +26,7 @@ def get_engine() -> Engine:
         db_config = config.database
 
         if db_config.url.startswith("sqlite"):
-            # For testing with SQLite
+            # Provide sensible defaults for SQLite, e.g., in-memory development runs
             _engine = create_engine(
                 db_config.url,
                 connect_args={"check_same_thread": False},
@@ -101,20 +101,6 @@ def get_db() -> Generator[Session, None, None]:
     """FastAPI dependency for database sessions."""
     with get_db_session() as session:
         yield session
-
-
-def test_connection() -> bool:
-    """Test database connectivity."""
-    try:
-        engine = get_engine()
-        with engine.connect() as conn:
-            conn.execute(text("SELECT 1"))
-        logger.info("Database connection test successful")
-        return True
-    except Exception as e:
-        logger.error(f"Database connection test failed: {e}")
-        return False
-
 
 def close_engine():
     """Close the database engine."""

@@ -10,7 +10,7 @@ WORKDIR /app
 # Dependency layer (maximale cache)
 COPY pyproject.toml ./
 COPY uv.lock ./
-RUN uv sync --frozen --extra dev
+RUN uv sync --frozen
 
 # Make uv venv the default python (optional - but uv run is preferred)
 ENV PATH="/app/.venv/bin:$PATH"
