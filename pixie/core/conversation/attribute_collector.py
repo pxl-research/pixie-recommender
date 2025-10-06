@@ -29,43 +29,8 @@ class AttributeCollector:
         self.attribute_definitions = self._load_attribute_definitions(category)
 
     def _load_attribute_definitions(self, category: str) -> List[AttributeRequest]:
-        from ..utils.attribute_catalog import get_attribute_definitions
-
-        catalog_attributes = get_attribute_definitions(category)
-        if catalog_attributes:
-            return [
-                AttributeRequest(
-                    name=attr.name,
-                    question=attr.question,
-                    required=attr.required,
-                )
-                for attr in catalog_attributes
-            ]
-        fallback = self._load_fallback_attribute_definitions(category)
-        if not fallback:
-            logger.warning("no attribute definitions", extra={"category": category})
-        return fallback
-
-    def _load_fallback_attribute_definitions(
-        self, category: str
-    ) -> List[AttributeRequest]:
-        try:
-            from .flow_config import CONVERSATION_FLOWS
-
-            flow = CONVERSATION_FLOWS.get(category)
-            if not flow:
-                return []
-            return [
-                AttributeRequest(
-                    name=q.attribute_name,
-                    question=q.text,
-                    required=q.required,
-                )
-                for q in flow.questions
-            ]
-        except Exception as exc:  # pragma: no cover - defensive
-            logger.warning("flow_config_error", exc_info=exc)
-            return []
+        logger.warning("TODO: load attribute definitions from dataset", extra={"category": category})
+        return []
 
     def get_next_question(self) -> Optional[AttributeRequest]:
         for definition in self.attribute_definitions:

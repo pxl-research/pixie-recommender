@@ -5,7 +5,6 @@ from uuid import uuid4
 from ..storage.pending_store import InMemoryPendingStore
 from ..utils.contracts import AskResponse
 from .attribute_collector import AttributeCollector
-from .flow_config import ConversationFlowManager
 from .llm_orchestrator import LLMOrchestrator, create_llm_orchestrator
 
 logger = logging.getLogger(__name__)
@@ -17,13 +16,11 @@ class SimplifiedConversationManager:
         search_fn,
         pending_store: Optional[InMemoryPendingStore] = None,
         llm_orchestrator: Optional[LLMOrchestrator] = None,
-        flow_manager: Optional[ConversationFlowManager] = None,
         max_iterations: int = 3,
     ) -> None:
         self.search_fn = search_fn
         self.pending_store = pending_store or InMemoryPendingStore()
         self.llm_orchestrator = llm_orchestrator or create_llm_orchestrator()
-        self.flow_manager = flow_manager
         self.max_iterations = max_iterations
 
     def handle_new_question(self, question: str) -> AskResponse:

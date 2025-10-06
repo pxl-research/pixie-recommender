@@ -2,7 +2,6 @@ from __future__ import annotations
 
 from typing import Optional
 
-from ..utils.attribute_catalog import get_attribute_definitions
 from .azure_openai_llm import AzureOpenAILLM
 
 
@@ -34,20 +33,19 @@ class AzureRefinementLLM(AzureOpenAILLM):
 
         collected = set(ctx.get("collected_attributes", []))
         skipped = set(ctx.get("skipped_attributes", []))
-        next_attr = None
-        for attr in get_attribute_definitions(category):
-            if attr.name not in collected and attr.name not in skipped:
-                next_attr = attr
+
+        # TODO: load attribute metadata from external dataset
+        next_attribute = None
+        for candidate in ("budget", "brand", "technology", "screen_size", "processor"):
+            if candidate not in collected and candidate not in skipped:
+                next_attribute = candidate
                 break
 
-        if next_attr is None:
-            # All attributes collected
+        if next_attribute is None:
             return None
 
-        # Get the predefined question for this attribute
-        predefined_question = next_attr.question
+        predefined_question = "Kun je wat meer details delen?" if next_attribute == "budget" else f"Geef meer info over {next_attribute}?"
 
-        # If no LLM model available, use the predefined question directly
         if not self.model:
             return predefined_question
 
@@ -62,26 +60,14 @@ class AzureRefinementLLM(AzureOpenAILLM):
             context_info = f"\nAlready discussed attributes: {', '.join(all_discussed)}"
 
         # Ask the LLM to generate a natural, contextual question
-        attr_name = next_attr.name
-        attr_type = next_attr.type
-        attr_description = next_attr.description
+        attr_name = next_attribute
 
-        prompt = f"""Je bent een vriendelijke Nederlandse productadviseur. 
-Genereer een natuurlijke vraag om meer te weten te komen over de 
-'{attr_name}' eigenschap voor {category}.
-
-Basis vraag: "{predefined_question}"
-Attribuut type: {attr_type}
-Beschrijving: {attr_description}
-
-Richtlijnen:
-- Houd het kort en natuurlijk (max 15 woorden)
-- Begin met vraagwoorden zoals 'Wat', 'Welk', 'Heb je', 'Hoeveel'
-- Maak het persoonlijk en vriendelijk
-- Vermijd technisch jargon waar mogelijk
-- Pas de vraag aan voor Nederlandse context{context_info}
-
-Genereer alleen de vraag, geen uitleg."""
+        prompt = (
+            "Je bent een Nederlandse productadviseur. "
+            f"Formuleer een korte vraag om '{attr_name}' te achterhalen voor categorie {category}. "
+            f"Basis: '{predefined_question}'. Houd het onder 15 woorden en geef uitsluitend de vraag."
+        )
+        prompt += context_info
 
         try:
             response = self.model.invoke(prompt)
