@@ -1,5 +1,6 @@
 """Generic repository for flexible product system that works with any table structure."""
 
+import uuid
 from typing import Any, Dict, List, Optional
 
 from sqlalchemy import text
@@ -160,6 +161,20 @@ class DynamicRepository:
         if "updated_at" in all_columns and "updated_at" not in data_with_timestamps:
             data_with_timestamps["updated_at"] = current_time
 
+        # Auto-generate primary key when missing and column expects UUID values
+        pk_column = self._get_primary_key()
+        if pk_column in all_columns and not data_with_timestamps.get(pk_column):
+            pk_column_info = next(
+                (col for col in self._get_columns() if col["name"] == pk_column),
+                None,
+            )
+            if pk_column_info:
+                generated_pk = self._generate_primary_key_value(
+                    pk_column_info.get("type")
+                )
+                if generated_pk is not None:
+                    data_with_timestamps[pk_column] = generated_pk
+
         # Build INSERT query
         columns = list(data_with_timestamps.keys())
         placeholders = [f":{col}" for col in columns]
@@ -173,9 +188,11 @@ class DynamicRepository:
         query_params = self._adapt_outbound_data(data_with_timestamps)
 
         result = self.session.execute(text(query), query_params)
+        row = result.fetchone()
+        result.close()
+
         self.session.commit()
 
-        row = result.fetchone()
         return dict(zip(all_columns, row)) if row else {}
 
     def update(self, id_value: Any, data: Dict[str, Any]) -> Optional[Dict[str, Any]]:
@@ -273,6 +290,55 @@ class DynamicRepository:
                 adapted[column_name] = Json(value)
 
         return adapted
+
+    def _generate_primary_key_value(self, column_type: Any) -> Optional[Any]:
+        """Return a generated primary key compatible with the column type."""
+        if column_type is None:
+            return None
+
+        try:
+            python_type = column_type.python_type  # type: ignore[attr-defined]
+        except (AttributeError, NotImplementedError):
+            python_type = None
+
+        if python_type is uuid.UUID or self._represents_uuid(column_type):
+            generated = uuid.uuid4()
+            dialect_name = getattr(
+                getattr(self.session.bind, "dialect", None), "name", ""
+            )
+            if dialect_name == "postgresql":
+                return generated
+            return generated.hex
+
+        if python_type is str and self._represents_string_uuid(column_type):
+            generated = uuid.uuid4()
+            length = getattr(column_type, "length", None)
+            if length == 32:
+                return generated.hex
+            return str(generated)
+
+        return None
+
+    @staticmethod
+    def _represents_uuid(column_type: Any) -> bool:
+        type_name = getattr(
+            column_type, "__class__", type(column_type)
+        ).__name__.lower()
+        return "uuid" in type_name or "guid" in type_name
+
+    @staticmethod
+    def _represents_string_uuid(column_type: Any) -> bool:
+        type_name = getattr(
+            column_type, "__class__", type(column_type)
+        ).__name__.lower()
+        if type_name not in {"char", "varchar", "string"}:
+            return False
+
+        length = getattr(column_type, "length", None)
+        if length in {32, 36}:
+            return True
+
+        return False
 
     @staticmethod
     def _is_json_type(column_type: Any) -> bool:

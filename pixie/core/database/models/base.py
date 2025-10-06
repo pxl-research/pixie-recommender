@@ -1,9 +1,11 @@
 """Flexible database models for dynamic product types with attributes."""
 
+import uuid
 from datetime import datetime
 from typing import Any
 
 from sqlalchemy import (
+    JSON,
     Boolean,
     Column,
     DateTime,
@@ -12,11 +14,10 @@ from sqlalchemy import (
     Integer,
     String,
     Text,
-    text,
 )
-from sqlalchemy.dialects.postgresql import JSON, UUID
 from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.orm import relationship
+from sqlalchemy.types import Uuid
 
 Base = declarative_base()
 
@@ -26,9 +27,7 @@ class ProductType(Base):
 
     __tablename__ = "product_types"
 
-    id = Column(
-        UUID(as_uuid=True), primary_key=True, server_default=text("uuid_generate_v4()")
-    )
+    id = Column(Uuid(as_uuid=True), primary_key=True, default=uuid.uuid4)
     name = Column(String(100), unique=True, nullable=False, index=True)
     display_name = Column(String(200), nullable=False)
     description = Column(Text, nullable=True)
@@ -53,11 +52,9 @@ class AttributeDefinition(Base):
 
     __tablename__ = "attribute_definitions"
 
-    id = Column(
-        UUID(as_uuid=True), primary_key=True, server_default=text("uuid_generate_v4()")
-    )
+    id = Column(Uuid(as_uuid=True), primary_key=True, default=uuid.uuid4)
     product_type_id = Column(
-        UUID(as_uuid=True), ForeignKey("product_types.id"), nullable=False
+        Uuid(as_uuid=True), ForeignKey("product_types.id"), nullable=False
     )
     name = Column(String(100), nullable=False)
     display_name = Column(String(200), nullable=False)
@@ -97,11 +94,9 @@ class Product(Base):
 
     __tablename__ = "products"
 
-    id = Column(
-        UUID(as_uuid=True), primary_key=True, server_default=text("uuid_generate_v4()")
-    )
+    id = Column(Uuid(as_uuid=True), primary_key=True, default=uuid.uuid4)
     product_type_id = Column(
-        UUID(as_uuid=True), ForeignKey("product_types.id"), nullable=False
+        Uuid(as_uuid=True), ForeignKey("product_types.id"), nullable=False
     )
     external_id = Column(
         String(100), nullable=True
@@ -140,12 +135,10 @@ class ProductAttributeValue(Base):
 
     __tablename__ = "product_attribute_values"
 
-    id = Column(
-        UUID(as_uuid=True), primary_key=True, server_default=text("uuid_generate_v4()")
-    )
-    product_id = Column(UUID(as_uuid=True), ForeignKey("products.id"), nullable=False)
+    id = Column(Uuid(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    product_id = Column(Uuid(as_uuid=True), ForeignKey("products.id"), nullable=False)
     attribute_definition_id = Column(
-        UUID(as_uuid=True), ForeignKey("attribute_definitions.id"), nullable=False
+        Uuid(as_uuid=True), ForeignKey("attribute_definitions.id"), nullable=False
     )
     string_value = Column(Text, nullable=True)
     number_value = Column(Float, nullable=True)

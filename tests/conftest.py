@@ -3,7 +3,22 @@ from typing import Any, Dict, List, Tuple
 
 import pytest
 
+from pixie.core.database.connection import reset_engine
 from pixie.core.llms import azure_llm_set
+from pixie.core.utils.config import reset_config
+
+DEFAULT_TEST_DB_URL = os.getenv("TEST_DATABASE_URL", "sqlite+pysqlite:///:memory:")
+
+
+def _configure_test_database() -> None:
+    if "DATABASE_URL" not in os.environ:
+        os.environ["DATABASE_URL"] = DEFAULT_TEST_DB_URL
+
+    reset_engine()
+    reset_config()
+
+
+_configure_test_database()
 
 
 def _ensure_product_type_data(session) -> None:
