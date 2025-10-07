@@ -159,9 +159,8 @@ def build_search_from_env() -> Optional[TabularDatasetSearch]:
     api_key = os.getenv("PIXIE_API_KEY", "").strip()
     collection = os.getenv("PIXIE_TABULAR_COLLECTION", "auva").strip() or "auva"
     default_limit = int(os.getenv("PIXIE_DEFAULT_PAGE_SIZE", "10"))
-    if not api_key:
-        logger.warning("tabular_search_disabled_missing_key")
-        return None
+    if not api_key or api_key.lower() == "changeme":
+        raise RuntimeError("PIXIE_API_KEY must be configured for tabular search")
 
     config = TabularAPIConfig(
         base_url=base_url,

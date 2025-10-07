@@ -1,7 +1,6 @@
 """Public entrypoint for the minimal Pixie conversation service."""
 
 import logging
-import os
 
 from ..utils.contracts import AskResponse
 from ..utils.tabular_api import build_search_from_env
@@ -32,19 +31,10 @@ class Pixie:
 
     def _build_default_search(self):
         search = build_search_from_env()
-        if search is None:
-            logger.warning("search_stub_enabled")
-
-            def search_with_category(sql: str, context: dict | None = None) -> list[dict]:
-                logger.info("search_stub", extra={"sql": sql, "context": context})
-                return []
-
-            return search_with_category
-
         logger.info(
             "tabular_search_enabled",
             extra={
-                "base_url": os.getenv("PIXIE_TABULAR_API_URL", "http://localhost:8000"),
+                "base_url": search.config.base_url,
                 "collection": search.config.collection,
                 "limit": search.config.default_limit,
             },
