@@ -34,6 +34,7 @@ def main() -> None:
 
     questions = [
         "Ik zoek een gaming console met 4 hdmi poorten",
+        "Ik zoek een nieuwe printer",
         "Wat is de weersverwachting in Brussel?",
     ]
 

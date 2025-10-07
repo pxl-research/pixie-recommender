@@ -75,7 +75,8 @@ class Pixie:
                     descriptors.items(),
                     key=lambda item: item[1].get("rank", 10_000),
                 )
-                attribute_map[name.lower()] = [column for column, _ in ranked_columns]
+                top_columns = [column for column, _ in ranked_columns[:3]]
+                attribute_map[name.lower()] = top_columns
 
         if not categories:
             raise RuntimeError("Tabular dataset returned documents without product names")
