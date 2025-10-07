@@ -5,24 +5,10 @@ from __future__ import annotations
 import json
 import logging
 import os
-from dataclasses import dataclass
 from typing import Any, Dict, List, Optional, Tuple
 from urllib import error, request
 
 logger = logging.getLogger(__name__)
-
-
-@dataclass(slots=True)
-class TabularAPIConfig:
-    """Configuration values required to talk to the tabular dataset service."""
-
-    base_url: str
-    api_key: str
-    collection: str
-    timeout: float = 10.0
-    default_limit: int = 10
-
-
 class TabularAPIClient:
     """Thin wrapper around ``urllib`` to avoid adding an HTTP dependency."""
 
@@ -114,21 +100,19 @@ class TabularAPIClient:
         }
 
 
-def build_tabular_client() -> Tuple[TabularAPIClient, TabularAPIConfig]:
-    base_url = (
-        os.getenv("PIXIE_TABULAR_API_URL", "").strip() or "http://localhost:8000"
-    ).rstrip("/")
-    api_key = os.getenv("PIXIE_API_KEY", "").strip()
-    collection = os.getenv("PIXIE_TABULAR_COLLECTION", "auva").strip() or "auva"
-    default_limit = int(os.getenv("PIXIE_DEFAULT_PAGE_SIZE", "10"))
-    if not api_key or api_key.lower() == "changeme":
-        raise RuntimeError("PIXIE_API_KEY must be configured for tabular search")
+def _require_env(name: str) -> str:
+    value = os.getenv(name, "").strip()
+    if not value:
+        raise RuntimeError(f"Environment variable {name} is required for tabular search")
+    return value
 
-    config = TabularAPIConfig(
-        base_url=base_url,
-        api_key=api_key,
-        collection=collection,
-        default_limit=default_limit,
-    )
-    client = TabularAPIClient(config.base_url, config.api_key, timeout=config.timeout)
-    return client, config
+
+def build_tabular_client() -> Tuple[TabularAPIClient, str, str, int]:
+    base_url = _require_env("PIXIE_TABULAR_API_URL").rstrip("/")
+    api_key = _require_env("PIXIE_API_KEY")
+    collection = _require_env("PIXIE_TABULAR_COLLECTION")
+    timeout = float(os.getenv("PIXIE_TABULAR_TIMEOUT", "10"))
+    default_limit = int(os.getenv("PIXIE_DEFAULT_PAGE_SIZE", "10"))
+
+    client = TabularAPIClient(base_url, api_key, timeout=timeout)
+    return client, base_url, collection, default_limit

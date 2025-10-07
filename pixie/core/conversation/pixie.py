@@ -4,11 +4,7 @@ import logging
 from typing import Any, Callable, Dict, List, Optional
 
 from ..utils.contracts import AskResponse
-from ..utils.tabular_api import (
-    TabularAPIClient,
-    TabularAPIConfig,
-    build_tabular_client,
-)
+from ..utils.tabular_api import TabularAPIClient, build_tabular_client
 from .direct_conversation_manager import DirectConversationManager
 from .llm_orchestrator import create_llm_orchestrator
 
@@ -28,18 +24,18 @@ class Pixie:
             self._conversation_manager = conversation_manager
             return
 
-        client, config = build_tabular_client()
+        client, base_url, collection, default_limit = build_tabular_client()
         logger.info(
             "tabular_search_enabled",
             extra={
-                "base_url": config.base_url,
-                "collection": config.collection,
-                "limit": config.default_limit,
+                "base_url": base_url,
+                "collection": collection,
+                "limit": default_limit,
             },
         )
-        categories = self._load_categories(client, config)
+        categories = self._load_categories(client, collection)
         orchestrator = create_llm_orchestrator(categories)
-        search_fn = self._build_search_fn(client, config)
+        search_fn = self._build_search_fn(client, collection, default_limit)
         self._conversation_manager = DirectConversationManager(search_fn, orchestrator)
 
     def answer(self, question: str) -> AskResponse:
@@ -50,22 +46,18 @@ class Pixie:
         logger.info("reply", extra={"pending_id": pending_id})
         return self._conversation_manager.handle_reply(pending_id, reply_text)
 
-    def _load_categories(
-        self, client: TabularAPIClient, config: TabularAPIConfig
-    ) -> List[str]:
+    def _load_categories(self, client: TabularAPIClient, collection: str) -> List[str]:
         try:
-            documents = client.list_documents(config.collection)
+            documents = client.list_documents(collection)
         except Exception:
             logger.exception(
                 "tabular_category_fetch_failed",
-                extra={"collection": config.collection},
+                extra={"collection": collection},
             )
             raise
 
         if not documents:
-            raise RuntimeError(
-                f"No documents found for collection '{config.collection}'"
-            )
+            raise RuntimeError(f"No documents found for collection '{collection}'")
 
         categories = []
         seen: set[str] = set()
@@ -84,12 +76,12 @@ class Pixie:
 
         logger.info(
             "tabular_categories_loaded",
-            extra={"collection": config.collection, "categories": categories},
+            extra={"collection": collection, "categories": categories},
         )
         return categories
 
     def _build_search_fn(
-        self, client: TabularAPIClient, config: TabularAPIConfig
+        self, client: TabularAPIClient, collection: str, default_limit: int
     ) -> SearchCallable:
         def run_search(sql: str, context: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
             ctx = context or {}
@@ -98,13 +90,13 @@ class Pixie:
                 category_value = str(ctx.get("category") or "").strip().lower()
                 product = self._map_category_to_product(category_value)
             filters = ctx.get("filters")
-            limit = ctx.get("limit") or config.default_limit
+            limit = ctx.get("limit") or default_limit
 
             logger.info(
                 "tabular_search_query",
                 extra={
                     "product": product,
-                    "collection": config.collection,
+                    "collection": collection,
                     "limit": limit,
                     "filters": filters,
                     "sql": sql,
@@ -112,7 +104,7 @@ class Pixie:
             )
 
             response = client.query_product_rows(
-                config.collection,
+                collection,
                 product,
                 limit=limit,
                 filters=filters,
