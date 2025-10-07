@@ -1,7 +1,7 @@
 """Single-pass conversation handler that relies on the LLMs to produce SQL."""
 
 import logging
-from typing import Optional
+from typing import Any, Dict, Optional
 
 from ..utils.contracts import AskResponse
 from .llm_orchestrator import LLMOrchestrator, create_llm_orchestrator
@@ -43,12 +43,55 @@ class DirectConversationManager:
         except Exception as exc:  # pragma: no cover - defensive
             logger.error("search_failed", exc_info=exc)
             return AskResponse(type="error", reason="search_failed")
-
-        if results:
-            return AskResponse(type="answer", text=str(results))
-        return AskResponse(type="no_results", text="No matching products found")
+        items, metadata = self._normalise_results(results, category)
+        if items:
+            return AskResponse(type="answer", text=self._format_results(items, metadata))
+        return AskResponse(type="no_results", text="Geen producten gevonden")
 
     def handle_reply(self, pending_id: str, reply: str) -> AskResponse:  # noqa: ARG002
         """Replies are not supported in this minimal build."""
         logger.info("reply_unsupported", extra={"pending_id": pending_id})
         return AskResponse(type="error", reason="no_pending_support")
+
+    def _normalise_results(
+        self, payload: Any, category: str
+    ) -> tuple[list[dict[str, Any]], dict[str, Any]]:
+        if isinstance(payload, dict):
+            metadata = {k: v for k, v in payload.items() if k != "results"}
+            items = payload.get("results") or []
+        else:
+            metadata = {"category": category}
+            items = payload or []
+        # Defensive: make sure we only pass dicts further down.
+        items = [item for item in items if isinstance(item, dict)]
+        return items, metadata
+
+    def _format_results(self, items: list[Dict[str, Any]], metadata: Dict[str, Any]) -> str:
+        header = metadata.get("product_name") or metadata.get("category") or "producten"
+        lines = [f"Resultaten voor {header}:"]
+
+        for item in items[:3]:  # keep responses compact
+            name = item.get("naam") or item.get("name") or item.get("product_name")
+            if not name:
+                name = "Onbekende naam"
+            brand = item.get("merk") or item.get("brand")
+            price = item.get("prijs") or item.get("price")
+            availability = item.get("beschikbaar")
+
+            details: list[str] = []
+            if brand:
+                details.append(str(brand))
+            if isinstance(price, (int, float)):
+                details.append(f"€{price:.2f}")
+            if availability is True:
+                details.append("op voorraad")
+            elif availability is False:
+                details.append("niet op voorraad")
+
+            suffix = f" ({', '.join(details)})" if details else ""
+            lines.append(f"- {name}{suffix}")
+
+        total = metadata.get("total")
+        if isinstance(total, int):
+            lines.append(f"Totaal gevonden: {total}")
+        return "\n".join(lines)

@@ -60,10 +60,14 @@ class LLMOrchestrator:
         self, question: str, context: Dict[str, Any], category: str
     ) -> LLMResponse:
         mapping = {
-            "printers": "printers",
+            "printers": "printer",
+            "printer": "printer",
             "laptops": "laptop",
-            "computers": "computer",
+            "laptop": "laptop",
+            "computers": "pc",
+            "computer": "pc",
             "smartphones": "smartphone",
+            "smartphone": "smartphone",
         }
         product_type = mapping.get(category, category)
         try:
