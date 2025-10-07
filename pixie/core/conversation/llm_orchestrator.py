@@ -119,9 +119,3 @@ class LLMOrchestrator:
                 error="sql_generation_failed",
                 result={"sql": fallback, "table": "products"},
             )
-
-def create_llm_orchestrator(categories: list[str]) -> LLMOrchestrator:
-    from ..llms import azure_llm_set
-
-    relevance_llm, sql_llm = azure_llm_set.create_azure_llm_set(categories=categories)
-    return LLMOrchestrator(relevance_llm, sql_llm)

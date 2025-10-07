@@ -1,10 +1,10 @@
 """Single-pass conversation handler that relies on the LLMs to produce SQL."""
 
 import logging
-from typing import Any, Dict, Optional
+from typing import Any, Dict
 
 from ..utils.contracts import AskResponse
-from .llm_orchestrator import LLMOrchestrator, create_llm_orchestrator
+from .llm_orchestrator import LLMOrchestrator
 
 logger = logging.getLogger(__name__)
 
@@ -15,10 +15,10 @@ class DirectConversationManager:
     def __init__(
         self,
         search_fn,
-        llm_orchestrator: Optional[LLMOrchestrator] = None,
+        llm_orchestrator: LLMOrchestrator,
     ) -> None:
         self.search_fn = search_fn
-        self.llm_orchestrator = llm_orchestrator or create_llm_orchestrator()
+        self.llm_orchestrator = llm_orchestrator
 
     def handle_new_question(self, question: str) -> AskResponse:
         """Classify relevance, detect category, generate SQL, and run the search stub."""

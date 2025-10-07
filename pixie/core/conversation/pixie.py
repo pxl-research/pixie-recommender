@@ -3,10 +3,11 @@
 import logging
 from typing import Any, Callable, Dict, List, Optional
 
+from ..llms.azure_llm_set import create_azure_llm_set
 from ..utils.contracts import AskResponse
 from ..utils.tabular_api import TabularAPIClient, build_tabular_client
 from .direct_conversation_manager import DirectConversationManager
-from .llm_orchestrator import create_llm_orchestrator
+from .llm_orchestrator import LLMOrchestrator
 
 logger = logging.getLogger(__name__)
 
@@ -34,7 +35,8 @@ class Pixie:
             },
         )
         categories = self._load_categories(client, collection)
-        orchestrator = create_llm_orchestrator(categories)
+        relevance_llm, sql_llm = create_azure_llm_set(categories)
+        orchestrator = LLMOrchestrator(relevance_llm, sql_llm)
         search_fn = self._build_search_fn(client, collection, default_limit)
         self._conversation_manager = DirectConversationManager(search_fn, orchestrator)
 
@@ -60,16 +62,11 @@ class Pixie:
             raise RuntimeError(f"No documents found for collection '{collection}'")
 
         categories = []
-        seen: set[str] = set()
         for doc in documents:
-            product = (doc.get("product_name") or doc.get("product") or "").strip()
-            if not product:
-                continue
-            key = product.lower()
-            if key in seen:
-                continue
-            seen.add(key)
-            categories.append(product)
+            raw_name = doc.get("product_name") or doc.get("product") or ""
+            name = str(raw_name).strip()
+            if name:
+                categories.append(name)
 
         if not categories:
             raise RuntimeError("Tabular dataset returned documents without product names")
@@ -87,8 +84,7 @@ class Pixie:
             ctx = context or {}
             product = ctx.get("product")
             if not product:
-                category_value = str(ctx.get("category") or "").strip().lower()
-                product = self._map_category_to_product(category_value)
+                product = str(ctx.get("category") or "").strip().lower() or "laptop"
             filters = ctx.get("filters")
             limit = ctx.get("limit") or default_limit
 
@@ -116,18 +112,3 @@ class Pixie:
             return response
 
         return run_search
-
-    @staticmethod
-    def _map_category_to_product(category: str) -> str:
-        mapping = {
-            "printer": "printer",
-            "printers": "printer",
-            "laptop": "laptop",
-            "laptops": "laptop",
-            "smartphone": "smartphone",
-            "smartphones": "smartphone",
-            "computer": "pc",
-            "computers": "pc",
-            "pc": "pc",
-        }
-        return mapping.get(category, category or "laptop")
