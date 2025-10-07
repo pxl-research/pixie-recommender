@@ -29,7 +29,9 @@ class DirectConversationManager:
         if not relevance.result["relevant"]:
             return AskResponse(type="not_relevant", text="Not relevant")
 
-        category = relevance.result["category"] or "laptops"
+        category = relevance.result["category"]
+        if not category:
+            return AskResponse(type="error", reason="missing_category")
         sql_result = self.llm_orchestrator.generate_search_query(question, {}, category)
         if not sql_result.success:
             return AskResponse(type="error", reason="search_failed")
@@ -45,10 +47,12 @@ class DirectConversationManager:
             return AskResponse(type="error", reason="search_failed")
         items, metadata = self._normalise_results(results, category)
         if items:
-            return AskResponse(type="answer", text=self._format_results(items, metadata))
+            return AskResponse(
+                type="answer", text=self._format_results(items, metadata)
+            )
         return AskResponse(type="no_results", text="Geen producten gevonden")
 
-    def handle_reply(self, pending_id: str, reply: str) -> AskResponse:  # noqa: ARG002
+    def handle_reply(self, pending_id: str, reply: str) -> AskResponse:
         """Replies are not supported in this minimal build."""
         logger.info("reply_unsupported", extra={"pending_id": pending_id})
         return AskResponse(type="error", reason="no_pending_support")
@@ -66,30 +70,46 @@ class DirectConversationManager:
         items = [item for item in items if isinstance(item, dict)]
         return items, metadata
 
-    def _format_results(self, items: list[Dict[str, Any]], metadata: Dict[str, Any]) -> str:
+    def _format_results(
+        self, items: list[Dict[str, Any]], metadata: Dict[str, Any]
+    ) -> str:
         header = metadata.get("product_name") or metadata.get("category") or "producten"
+        preferred_columns = metadata.get("preferred_columns") or []
         lines = [f"Resultaten voor {header}:"]
 
         for item in items[:3]:  # keep responses compact
-            name = item.get("naam") or item.get("name") or item.get("product_name")
-            if not name:
-                name = "Onbekende naam"
-            brand = item.get("merk") or item.get("brand")
-            price = item.get("prijs") or item.get("price")
-            availability = item.get("beschikbaar")
+            columns_to_show: list[tuple[str, Any]] = []
+            for column in preferred_columns:
+                value = item.get(column)
+                if value in (None, ""):
+                    continue
+                columns_to_show.append((column, value))
+                if len(columns_to_show) == 3:
+                    break
 
-            details: list[str] = []
-            if brand:
-                details.append(str(brand))
-            if isinstance(price, (int, float)):
-                details.append(f"€{price:.2f}")
-            if availability is True:
-                details.append("op voorraad")
-            elif availability is False:
-                details.append("niet op voorraad")
+            if not columns_to_show:
+                for key, value in item.items():
+                    if key in {"id", "created_at", "updated_at", "product_name"}:
+                        continue
+                    if value in (None, ""):
+                        continue
+                    columns_to_show.append((key, value))
+                    if len(columns_to_show) == 3:
+                        break
 
-            suffix = f" ({', '.join(details)})" if details else ""
-            lines.append(f"- {name}{suffix}")
+            if not columns_to_show:
+                lines.append("- (geen details)")
+                continue
+
+            formatted = []
+            for column, value in columns_to_show:
+                label = column.replace("_", " ")
+                if isinstance(value, (int, float)):
+                    formatted.append(f"{label}: {value}")
+                else:
+                    formatted.append(f"{label}: {value}")
+
+            lines.append(f"- {' | '.join(formatted)}")
 
         total = metadata.get("total")
         if isinstance(total, int):

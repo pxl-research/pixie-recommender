@@ -9,6 +9,8 @@ from typing import Any, Dict, List, Optional, Tuple
 from urllib import error, request
 
 logger = logging.getLogger(__name__)
+
+
 class TabularAPIClient:
     """Thin wrapper around ``urllib`` to avoid adding an HTTP dependency."""
 
@@ -63,6 +65,7 @@ class TabularAPIClient:
     def list_documents(self, collection: str) -> List[Dict[str, Any]]:
         data = self._request("GET", f"/collections/{collection}/documents/") or []
         if isinstance(data, list):
+            print(data)
             return data
         logger.warning(
             "tabular_api_expected_list",
@@ -103,7 +106,9 @@ class TabularAPIClient:
 def _require_env(name: str) -> str:
     value = os.getenv(name, "").strip()
     if not value:
-        raise RuntimeError(f"Environment variable {name} is required for tabular search")
+        raise RuntimeError(
+            f"Environment variable {name} is required for tabular search"
+        )
     return value
 
 
