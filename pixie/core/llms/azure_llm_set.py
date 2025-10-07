@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 import os
-from typing import Any, Tuple
+from typing import Any, Optional, Tuple
 
 from .azure_relevance_llm import AzureRelevanceLLM
 from .azure_sql_llm import AzureSQLLLM
@@ -33,9 +33,11 @@ def _load_azure_config() -> Tuple[str, str, str, str]:
     return api_version, endpoint, api_key, model
 
 
-def create_azure_llm_set() -> Tuple[Any, Any]:
+def create_azure_llm_set(categories: Optional[list[dict[str, str]]] = None) -> Tuple[Any, Any]:
     api_version, endpoint, api_key, model = _load_azure_config()
-    relevance = AzureRelevanceLLM(api_version, endpoint, api_key, model)
+    relevance = AzureRelevanceLLM(
+        api_version, endpoint, api_key, model, categories=categories
+    )
     sql = AzureSQLLLM(api_version, endpoint, api_key, model)
     try:
         relevance.is_relevant("test query")

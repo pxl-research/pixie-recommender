@@ -72,6 +72,16 @@ class TabularAPIClient:
         logger.warning("tabular_api_expected_list", extra={"payload": data})
         return []
 
+    def list_documents(self, collection: str) -> List[Dict[str, Any]]:
+        data = self._request("GET", f"/collections/{collection}/documents/") or []
+        if isinstance(data, list):
+            return data
+        logger.warning(
+            "tabular_api_expected_list",
+            extra={"collection": collection, "payload": data},
+        )
+        return []
+
     def query_product_rows(
         self,
         collection: str,
@@ -152,6 +162,9 @@ class TabularDatasetSearch:
         response.setdefault("count", len(response["results"]))
         response.setdefault("limit", limit)
         return response
+
+    def list_documents(self) -> List[Dict[str, Any]]:
+        return self.client.list_documents(self.config.collection)
 
 
 def build_search_from_env() -> Optional[TabularDatasetSearch]:

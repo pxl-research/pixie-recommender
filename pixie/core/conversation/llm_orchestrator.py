@@ -41,8 +41,24 @@ class LLMOrchestrator:
         try:
             relevant = self.relevance_llm.is_relevant(question)
             if not relevant:
+                logger.info(
+                    "relevance_decision",
+                    extra={
+                        "question": question,
+                        "relevant": False,
+                        "category": None,
+                    },
+                )
                 return LLMResponse(success=True, result={"relevant": False, "category": None})
             category = self.relevance_llm.detect_category(question)
+            logger.info(
+                "relevance_decision",
+                extra={
+                    "question": question,
+                    "relevant": True,
+                    "category": category,
+                },
+            )
             return LLMResponse(
                 success=True,
                 result={"relevant": True, "category": category},
@@ -72,6 +88,15 @@ class LLMOrchestrator:
         product_type = mapping.get(category, category)
         try:
             sql = self.sql_llm.generate_sql(question, context, product_type)
+            logger.info(
+                "sql_generation_success",
+                extra={
+                    "question": question,
+                    "category": category,
+                    "product_type": product_type,
+                    "sql": sql,
+                },
+            )
             return LLMResponse(success=True, result={"sql": sql, "table": "products"})
         except Exception as exc:  # pragma: no cover - defensive
             logger.error("sql_failed", exc_info=exc)
@@ -80,14 +105,25 @@ class LLMOrchestrator:
                 "JOIN product_types pt ON p.product_type_id = pt.id "
                 f"WHERE pt.name = '{product_type}' LIMIT 10"
             )
+            logger.info(
+                "sql_generation_fallback",
+                extra={
+                    "question": question,
+                    "category": category,
+                    "product_type": product_type,
+                    "sql": fallback,
+                },
+            )
             return LLMResponse(
                 success=False,
                 error="sql_generation_failed",
                 result={"sql": fallback, "table": "products"},
             )
 
-def create_llm_orchestrator() -> LLMOrchestrator:
+def create_llm_orchestrator(
+    categories: Optional[list[dict[str, str]]] = None,
+) -> LLMOrchestrator:
     from ..llms import azure_llm_set
 
-    relevance_llm, sql_llm = azure_llm_set.create_azure_llm_set()
+    relevance_llm, sql_llm = azure_llm_set.create_azure_llm_set(categories=categories)
     return LLMOrchestrator(relevance_llm, sql_llm)
