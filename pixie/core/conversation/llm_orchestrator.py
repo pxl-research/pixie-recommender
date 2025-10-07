@@ -120,9 +120,7 @@ class LLMOrchestrator:
                 result={"sql": fallback, "table": "products"},
             )
 
-def create_llm_orchestrator(
-    categories: Optional[list[dict[str, str]]] = None,
-) -> LLMOrchestrator:
+def create_llm_orchestrator(categories: list[str]) -> LLMOrchestrator:
     from ..llms import azure_llm_set
 
     relevance_llm, sql_llm = azure_llm_set.create_azure_llm_set(categories=categories)

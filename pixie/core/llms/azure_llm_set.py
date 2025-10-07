@@ -33,8 +33,10 @@ def _load_azure_config() -> Tuple[str, str, str, str]:
     return api_version, endpoint, api_key, model
 
 
-def create_azure_llm_set(categories: Optional[list[dict[str, str]]] = None) -> Tuple[Any, Any]:
+def create_azure_llm_set(categories: Optional[list[str]] = None) -> Tuple[Any, Any]:
     api_version, endpoint, api_key, model = _load_azure_config()
+    if not categories:
+        raise ValueError("Category metadata is required to initialise the Azure relevance model")
     relevance = AzureRelevanceLLM(
         api_version, endpoint, api_key, model, categories=categories
     )

@@ -47,7 +47,7 @@ class Pixie:
         )
         return search
 
-    def _load_categories(self, search: TabularDatasetSearch) -> List[dict]:
+    def _load_categories(self, search: TabularDatasetSearch) -> List[str]:
         try:
             documents = search.list_documents()
         except Exception:
@@ -62,33 +62,23 @@ class Pixie:
                 f"No documents found for collection '{search.config.collection}'"
             )
 
-        categories: List[dict] = []
+        categories = []
         seen: set[str] = set()
         for doc in documents:
-            product = (doc.get("product") or doc.get("product_name") or "").strip()
+            product = (doc.get("product_name") or doc.get("product") or "").strip()
             if not product:
                 continue
             key = product.lower()
             if key in seen:
                 continue
             seen.add(key)
-            label = product.replace("_", " ").title()
-            columns = doc.get("columns") or []
-            description = ""
-            if columns:
-                preview = ", ".join(str(col) for col in columns[:4])
-                description = f"Voorbeeldkolommen: {preview}"
-            categories.append({
-                "name": product,
-                "label": label,
-                "description": description,
-            })
+            categories.append(product)
 
         if not categories:
             raise RuntimeError("Tabular dataset returned documents without product names")
 
         logger.info(
             "tabular_categories_loaded",
-            extra={"collection": search.config.collection, "categories": [c["name"] for c in categories]},
+            extra={"collection": search.config.collection, "categories": categories},
         )
         return categories

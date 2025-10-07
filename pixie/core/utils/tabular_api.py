@@ -62,7 +62,9 @@ class TabularAPIClient:
         try:
             return json.loads(body.decode("utf-8"))
         except json.JSONDecodeError as exc:  # pragma: no cover - defensive
-            logger.error("tabular_api_invalid_json", extra={"url": url, "body": body[:200]})
+            logger.error(
+                "tabular_api_invalid_json", extra={"url": url, "body": body[:200]}
+            )
             raise RuntimeError("Tabular API returned invalid JSON") from exc
 
     def list_collections(self) -> List[Dict[str, Any]]:
@@ -129,9 +131,13 @@ class TabularDatasetSearch:
 
     def __init__(self, config: TabularAPIConfig) -> None:
         self.config = config
-        self.client = TabularAPIClient(config.base_url, config.api_key, timeout=config.timeout)
+        self.client = TabularAPIClient(
+            config.base_url, config.api_key, timeout=config.timeout
+        )
 
-    def search(self, sql: str, context: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
+    def search(
+        self, sql: str, context: Optional[Dict[str, Any]] = None
+    ) -> Dict[str, Any]:
         ctx = context or {}
         product = ctx.get("product")
         if not product:
@@ -168,7 +174,9 @@ class TabularDatasetSearch:
 
 
 def build_search_from_env() -> Optional[TabularDatasetSearch]:
-    base_url = (os.getenv("PIXIE_TABULAR_API_URL", "").strip() or "http://localhost:8000").rstrip("/")
+    base_url = (
+        os.getenv("PIXIE_TABULAR_API_URL", "").strip() or "http://localhost:8000"
+    ).rstrip("/")
     api_key = os.getenv("PIXIE_API_KEY", "").strip()
     collection = os.getenv("PIXIE_TABULAR_COLLECTION", "auva").strip() or "auva"
     default_limit = int(os.getenv("PIXIE_DEFAULT_PAGE_SIZE", "10"))
