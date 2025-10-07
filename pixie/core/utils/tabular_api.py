@@ -6,7 +6,7 @@ import json
 import logging
 import os
 from dataclasses import dataclass
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, List, Optional, Tuple
 from urllib import error, request
 
 logger = logging.getLogger(__name__)
@@ -114,66 +114,7 @@ class TabularAPIClient:
         }
 
 
-class TabularDatasetSearch:
-    """Translate conversation search calls into tabular dataset queries."""
-
-    CATEGORY_TO_PRODUCT = {
-        "printer": "printer",
-        "printers": "printer",
-        "laptop": "laptop",
-        "laptops": "laptop",
-        "smartphone": "smartphone",
-        "smartphones": "smartphone",
-        "computer": "pc",
-        "computers": "pc",
-        "pc": "pc",
-    }
-
-    def __init__(self, config: TabularAPIConfig) -> None:
-        self.config = config
-        self.client = TabularAPIClient(
-            config.base_url, config.api_key, timeout=config.timeout
-        )
-
-    def search(
-        self, sql: str, context: Optional[Dict[str, Any]] = None
-    ) -> Dict[str, Any]:
-        ctx = context or {}
-        product = ctx.get("product")
-        if not product:
-            category = str(ctx.get("category") or "").strip().lower()
-            product = self.CATEGORY_TO_PRODUCT.get(category, category or "laptop")
-        filters = ctx.get("filters")
-        limit = ctx.get("limit") or self.config.default_limit
-
-        logger.info(
-            "tabular_search_query",
-            extra={
-                "product": product,
-                "collection": self.config.collection,
-                "limit": limit,
-                "filters": filters,
-                "sql": sql,
-            },
-        )
-
-        response = self.client.query_product_rows(
-            self.config.collection,
-            product,
-            limit=limit,
-            filters=filters,
-        )
-        response.setdefault("product_name", product)
-        response.setdefault("results", [])
-        response.setdefault("count", len(response["results"]))
-        response.setdefault("limit", limit)
-        return response
-
-    def list_documents(self) -> List[Dict[str, Any]]:
-        return self.client.list_documents(self.config.collection)
-
-
-def build_search_from_env() -> Optional[TabularDatasetSearch]:
+def build_tabular_client() -> Tuple[TabularAPIClient, TabularAPIConfig]:
     base_url = (
         os.getenv("PIXIE_TABULAR_API_URL", "").strip() or "http://localhost:8000"
     ).rstrip("/")
@@ -189,4 +130,5 @@ def build_search_from_env() -> Optional[TabularDatasetSearch]:
         collection=collection,
         default_limit=default_limit,
     )
-    return TabularDatasetSearch(config)
+    client = TabularAPIClient(config.base_url, config.api_key, timeout=config.timeout)
+    return client, config
