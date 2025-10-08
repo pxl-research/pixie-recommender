@@ -73,15 +73,17 @@ def main() -> None:
         print(f"Antwoord: {response}")
 
         turn = 0
-        while response.type == "ask_user" and response.pending_id:
+        conversation_id = response.conversation_id or response.pending_id
+        while response.type == "ask_user" and conversation_id:
             follow_up = _craft_follow_up(response.prompt)
             turn += 1
             print(f"→ Follow-up {turn}: {follow_up}")
-            response = pixie.reply(response.pending_id, follow_up)
+            response = pixie.reply(conversation_id, follow_up)
             print(f"→ Reactie: {response}")
             if turn >= 5:
                 print("→ Conversatie gestopt na 5 reacties zonder definitief antwoord")
                 break
+            conversation_id = response.conversation_id or conversation_id
 
         print("-" * 60)
 

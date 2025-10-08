@@ -55,15 +55,8 @@ class ConversationLoopManager:
         if not category:
             return AskResponse(type="error", reason="missing_category")
 
-        sql_result = self.llm_orchestrator.generate_search_query(question, {}, category)
-        if not sql_result.success:
-            return AskResponse(type="error", reason="search_failed")
-        sql = sql_result.result.get("sql") if sql_result.result else None
-        if not sql:
-            return AskResponse(type="error", reason="search_failed")
-
         try:
-            results = self.search_fn(sql, {"category": category})
+            results = self.search_fn(None, {"category": category})
         except Exception as exc:  # pragma: no cover
             logger.error("loop.search_failed", exc_info=exc)
             return AskResponse(type="error", reason="search_failed")
@@ -80,7 +73,6 @@ class ConversationLoopManager:
         conv_id = str(uuid4())
         self._state[conv_id] = {
             "category": category,
-            "sql": sql,
             "filters": [],
             "asked": {attribute["name"].lower()},
             "question_count": 1,
@@ -95,7 +87,6 @@ class ConversationLoopManager:
             return AskResponse(type="error", reason="unknown_conversation", conversation_id=conversation_id)
 
         category: str = state["category"]
-        sql: str = state["sql"]
         filters: List[dict] = state.get("filters", [])
         asked: set[str] = set(state.get("asked", set()))
         question_count: int = int(state.get("question_count", 1))
@@ -109,7 +100,7 @@ class ConversationLoopManager:
             filters.extend(new_filters)
 
         try:
-            results = self.search_fn(sql, {"category": category, "filters": filters})
+            results = self.search_fn(None, {"category": category, "filters": filters})
         except Exception as exc:  # pragma: no cover
             logger.error("loop.search_failed", exc_info=exc)
             self._state.pop(conversation_id, None)
@@ -347,4 +338,3 @@ class ConversationLoopManager:
             if s.lower() in reply_lower:
                 return s
         return None
-
