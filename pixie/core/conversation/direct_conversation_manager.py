@@ -1,6 +1,7 @@
 """Single-pass conversation handler that relies on the LLMs to produce SQL."""
 
 import logging
+from uuid import uuid4
 from typing import Any, Dict
 
 from ..llms.azure_refinement_llm import AzureRefinementLLM
@@ -22,6 +23,7 @@ class DirectConversationManager:
         self.search_fn = search_fn
         self.llm_orchestrator = llm_orchestrator
         self.refinement_llm = refinement_llm
+        self._pending_questions: dict[str, dict[str, Any]] = {}
 
     def handle_new_question(self, question: str) -> AskResponse:
         """Classify relevance, detect category, generate SQL, and run the search stub."""
@@ -55,7 +57,13 @@ class DirectConversationManager:
 
         if total > 3:
             prompt = self._build_refinement_prompt(category, metadata, total)
-            return AskResponse(type="ask_user", prompt=prompt)
+            pending_id = str(uuid4())
+            self._pending_questions[pending_id] = {
+                "category": category,
+                "metadata": metadata,
+                "sql": sql_query,
+            }
+            return AskResponse(type="ask_user", prompt=prompt, pending_id=pending_id)
 
         if items:
             return AskResponse(
@@ -64,9 +72,15 @@ class DirectConversationManager:
         return AskResponse(type="no_results", text="Geen producten gevonden")
 
     def handle_reply(self, pending_id: str, reply: str) -> AskResponse:
-        """Replies are not supported in this minimal build."""
-        logger.info("reply_unsupported", extra={"pending_id": pending_id})
-        return AskResponse(type="error", reason="no_pending_support")
+        """Minimal acknowledgement of refinement answers."""
+        logger.info("reply", extra={"pending_id": pending_id, "reply": reply})
+        context = self._pending_questions.pop(pending_id, None)
+        if context is None:
+            return AskResponse(type="error", reason="unknown_pending_id")
+        return AskResponse(
+            type="answer",
+            text="Bedankt voor je extra informatie! Ik ga hiermee verder aan de slag.",
+        )
 
     def _normalise_results(
         self, payload: Any, category: str
