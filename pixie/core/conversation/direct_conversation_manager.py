@@ -1,4 +1,4 @@
-"""Single-pass conversation handler that relies on the LLMs to produce SQL."""
+"""Conversation manager that drives relevance checks and filter-based search."""
 
 from __future__ import annotations
 
@@ -48,16 +48,8 @@ class DirectConversationManager:
         if not category:
             return AskResponse(type="error", reason="missing_category")
 
-        sql_result = self.llm_orchestrator.generate_search_query(question, {}, category)
-        if not sql_result.success:
-            return AskResponse(type="error", reason="search_failed")
-
-        sql_query = sql_result.result.get("sql") if sql_result.result else None
-        if not sql_query:
-            return AskResponse(type="error", reason="search_failed")
-
         try:
-            results = self.search_fn(sql_query, {"category": category})
+            results = self.search_fn({"category": category})
         except Exception as exc:  # pragma: no cover - defensive
             logger.error("search_failed", exc_info=exc)
             return AskResponse(type="error", reason="search_failed")
@@ -78,7 +70,6 @@ class DirectConversationManager:
             self._pending_questions[pending_id] = {
                 "category": category,
                 "metadata": metadata,
-                "sql": sql_query,
                 "filters": [],
                 "asked": asked,
                 "question_count": 1,
@@ -97,7 +88,6 @@ class DirectConversationManager:
             return AskResponse(type="error", reason="unknown_pending_id")
 
         category = context["category"]
-        sql_query = context["sql"]
         filters: List[dict[str, Any]] = context.setdefault("filters", [])
         asked: set[str] = context.setdefault("asked", set())
         question_count = context.get("question_count", 1)
@@ -128,9 +118,7 @@ class DirectConversationManager:
                 )
 
         try:
-            results = self.search_fn(
-                sql_query, {"category": category, "filters": filters}
-            )
+            results = self.search_fn({"category": category, "filters": filters})
         except Exception as exc:  # pragma: no cover - defensive
             logger.error("search_failed", exc_info=exc)
             self._pending_questions.pop(pending_id, None)

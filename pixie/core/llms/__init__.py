@@ -3,7 +3,6 @@ from .azure_llm_set import create_azure_llm_set
 from .azure_openai_llm import AzureOpenAILLM
 from .azure_refinement_llm import AzureRefinementLLM
 from .azure_relevance_llm import AzureRelevanceLLM
-from .azure_sql_llm import AzureSQLLLM
 
 __all__ = [
     "LLM",
@@ -11,5 +10,4 @@ __all__ = [
     "AzureOpenAILLM",
     "AzureRefinementLLM",
     "AzureRelevanceLLM",
-    "AzureSQLLLM",
 ]

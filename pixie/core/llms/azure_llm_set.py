@@ -3,12 +3,11 @@
 from __future__ import annotations
 
 import os
-from typing import Any, Optional, Tuple
+from typing import Optional, Tuple
 
 from .azure_filter_llm import AzureFilterLLM
 from .azure_refinement_llm import AzureRefinementLLM
 from .azure_relevance_llm import AzureRelevanceLLM
-from .azure_sql_llm import AzureSQLLLM
 
 PLACEHOLDERS = {
     "https://example.openai.azure.com/",
@@ -37,7 +36,7 @@ def _load_azure_config() -> Tuple[str, str, str, str]:
     return api_version, endpoint, api_key, model
 
 
-def create_azure_llm_set(categories: Optional[list[str]] = None) -> Tuple[Any, Any]:
+def create_azure_llm_set(categories: Optional[list[str]] = None) -> AzureRelevanceLLM:
     api_version, endpoint, api_key, model = _load_azure_config()
     if not categories:
         raise ValueError(
@@ -46,12 +45,11 @@ def create_azure_llm_set(categories: Optional[list[str]] = None) -> Tuple[Any, A
     relevance = AzureRelevanceLLM(
         api_version, endpoint, api_key, model, categories=categories
     )
-    sql = AzureSQLLLM(api_version, endpoint, api_key, model)
     try:
         relevance.is_relevant("test query")
     except Exception as exc:  # pragma: no cover - defensive
         raise RuntimeError("Azure LLM validation failed") from exc
-    return relevance, sql
+    return relevance
 
 
 def create_azure_refinement_llm() -> AzureRefinementLLM:

@@ -1,6 +1,6 @@
 # pixie-core
 
-Minimal FastAPI service that routes product questions to Azure OpenAI. It classifies a question, asks the SQL LLM for a query, and forwards the SQL to the tabular dataset service.
+Minimal FastAPI service that routes product questions to Azure OpenAI. It classifies a question, optionally asks a refinement LLM for follow-up details, turns the answers into structured filters, and forwards those filters to the tabular dataset service.
 
 ## Run
 ```bash

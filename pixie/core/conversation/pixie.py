@@ -16,7 +16,7 @@ from .llm_orchestrator import LLMOrchestrator
 
 logger = logging.getLogger(__name__)
 
-SearchCallable = Callable[[str, Optional[Dict[str, Any]]], Dict[str, Any]]
+SearchCallable = Callable[[Optional[Dict[str, Any]]], Dict[str, Any]]
 
 
 class Pixie:
@@ -40,10 +40,10 @@ class Pixie:
             },
         )
         categories, attribute_map = self._load_categories(client, collection)
-        relevance_llm, sql_llm = create_azure_llm_set(categories)
+        relevance_llm = create_azure_llm_set(categories)
         refinement_llm = create_azure_refinement_llm()
         filter_llm = create_azure_filter_llm()
-        orchestrator = LLMOrchestrator(relevance_llm, sql_llm)
+        orchestrator = LLMOrchestrator(relevance_llm)
         search_fn = self._build_search_fn(
             client, collection, default_limit, attribute_map
         )
@@ -133,9 +133,7 @@ class Pixie:
         default_limit: int,
         attribute_map: dict[str, dict[str, Any]],
     ) -> SearchCallable:
-        def run_search(
-            sql: str, context: Optional[Dict[str, Any]] = None
-        ) -> Dict[str, Any]:
+        def run_search(context: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
             ctx = context or {}
             product = ctx.get("product")
             if not product:
@@ -150,7 +148,6 @@ class Pixie:
                     "collection": collection,
                     "limit": limit,
                     "filters": filters,
-                    "sql": sql,
                 },
             )
 

@@ -2,7 +2,7 @@
 
 import logging
 from dataclasses import dataclass
-from typing import Any, Dict, Optional, Protocol
+from typing import Any, Optional, Protocol
 
 logger = logging.getLogger(__name__)
 
@@ -11,14 +11,6 @@ class RelevanceLLM(Protocol):
     def is_relevant(self, question: Optional[str]) -> bool: ...
 
     def detect_category(self, question: Optional[str]) -> Optional[str]: ...
-
-
-class SQLLLM(Protocol):
-    def generate_sql(
-        self, question: str, context: Dict[str, Any], table_name: str
-    ) -> str: ...
-
-
 @dataclass
 class LLMResponse:
     success: bool
@@ -28,14 +20,13 @@ class LLMResponse:
 
 
 class LLMOrchestrator:
-    """Coordinates relevance and SQL LLMs for the direct conversation flow."""
+    """Coordinates relevance checks for the direct conversation flow."""
+
     def __init__(
         self,
         relevance_llm: RelevanceLLM,
-        sql_llm: SQLLLM,
     ) -> None:
         self.relevance_llm = relevance_llm
-        self.sql_llm = sql_llm
 
     def check_relevance_and_category(self, question: str) -> LLMResponse:
         try:
@@ -49,7 +40,9 @@ class LLMOrchestrator:
                         "category": None,
                     },
                 )
-                return LLMResponse(success=True, result={"relevant": False, "category": None})
+                return LLMResponse(
+                    success=True, result={"relevant": False, "category": None}
+                )
             category = self.relevance_llm.detect_category(question)
             logger.info(
                 "relevance_decision",
@@ -70,39 +63,4 @@ class LLMOrchestrator:
                 success=False,
                 error="llm_failure",
                 result={"relevant": False, "category": None},
-            )
-
-    def generate_search_query(
-        self, question: str, context: Dict[str, Any], category: str
-    ) -> LLMResponse:
-        try:
-            sql = self.sql_llm.generate_sql(question, context, category)
-            logger.info(
-                "sql_generation_success",
-                extra={
-                    "question": question,
-                    "category": category,
-                    "sql": sql,
-                },
-            )
-            return LLMResponse(success=True, result={"sql": sql, "table": "products"})
-        except Exception as exc:  # pragma: no cover - defensive
-            logger.error("sql_failed", exc_info=exc)
-            fallback = (
-                "SELECT p.* FROM products p "
-                "JOIN product_types pt ON p.product_type_id = pt.id "
-                f"WHERE pt.name = '{category}' LIMIT 10"
-            )
-            logger.info(
-                "sql_generation_fallback",
-                extra={
-                    "question": question,
-                    "category": category,
-                    "sql": fallback,
-                },
-            )
-            return LLMResponse(
-                success=False,
-                error="sql_generation_failed",
-                result={"sql": fallback, "table": "products"},
             )
