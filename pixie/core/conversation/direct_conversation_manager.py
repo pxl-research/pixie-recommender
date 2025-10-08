@@ -319,7 +319,9 @@ class DirectConversationManager:
         if not callable(generator):
             return None
 
-        category = metadata.get("product_name") or metadata.get("category") or "producten"
+        category = (
+            metadata.get("product_name") or metadata.get("category") or "producten"
+        )
         count = self._total_count(metadata, items)
         if filters:
             reason = "Gebaseerd op je voorkeuren"

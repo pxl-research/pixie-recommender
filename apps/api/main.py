@@ -85,18 +85,15 @@ async def ask(payload: AskPayload, request: Request):
                 return AskResponse(
                     type="error", reason="'message' is required when replying"
                 ).dict()
-            identifier = (
-                (payload.conversation_id or "").strip()
-                or (payload.pending_id or "").strip()
-            )
+            identifier = (payload.conversation_id or "").strip() or (
+                payload.pending_id or ""
+            ).strip()
             if not identifier:
                 return AskResponse(
                     type="error",
                     reason="'pending_id' or 'conversation_id' is required when replying",
                 ).dict()
-            pending_reference = (
-                (payload.pending_id or "").strip() or identifier
-            )
+            pending_reference = (payload.pending_id or "").strip() or identifier
             resp = pixie.reply(
                 pending_reference,
                 message,
