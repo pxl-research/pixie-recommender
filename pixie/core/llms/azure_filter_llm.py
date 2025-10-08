@@ -4,7 +4,8 @@ from __future__ import annotations
 
 import json
 import logging
-from typing import Any, Dict, List
+import re
+from typing import Any, Dict, List, Optional
 
 from .azure_openai_llm import AzureOpenAILLM
 
@@ -66,6 +67,8 @@ class AzureFilterLLM(AzureOpenAILLM):
                     content = response.content.strip()
                     filters = self._parse_llm_response(content, attr_name)
                     if filters:
+                        filters = self._normalise_filters(filters, attribute)
+                    if filters:
                         logger.info(
                             "filter_llm_success",
                             extra={"reply": reply, "filters": filters},
@@ -77,14 +80,7 @@ class AzureFilterLLM(AzureOpenAILLM):
                     extra={"reply": reply, "attribute": attr_name, "error": str(exc)},
                 )
 
-        # Fallback to simple rule-based logic
-        fallback_filters = self._fallback_filter_building(reply, attribute)
-        if fallback_filters:
-            logger.info(
-                "filter_fallback_used",
-                extra={"reply": reply, "filters": fallback_filters},
-            )
-        return fallback_filters
+        return []
 
     def _build_prompt(
         self,
@@ -240,74 +236,105 @@ OUTPUT FORMAAT (alleen JSON, geen markdown):
 
         return False
 
-    def _fallback_filter_building(
-        self, reply: str, attribute: Dict[str, Any]
+    def _normalise_filters(
+        self, filters: List[Dict[str, Any]], attribute: Dict[str, Any]
     ) -> List[Dict[str, Any]]:
-        """Simple rule-based fallback when LLM fails."""
-        reply_lower = reply.strip().lower()
-        attr_name = attribute.get("name")
+        normalised: List[Dict[str, Any]] = []
+        for filter_obj in filters:
+            cleaned = self._normalise_filter(filter_obj, attribute)
+            if cleaned:
+                normalised.append(cleaned)
+        return normalised
 
-        # Check for "don't know" type responses
-        if any(
-            phrase in reply_lower
-            for phrase in [
-                "weet niet",
-                "geen voorkeur",
-                "maakt niet uit",
-                "doet er niet toe",
-            ]
-        ):
-            return []
-
-        attr_type = (attribute.get("type") or "").lower()
+    def _normalise_filter(
+        self, filter_obj: Dict[str, Any], attribute: Dict[str, Any]
+    ) -> Optional[Dict[str, Any]]:
+        if not isinstance(filter_obj, dict):
+            return None
+        filter_type = filter_obj.get("type")
+        if filter_type not in {"exact", "range"}:
+            return None
+        cleaned = dict(filter_obj)
+        attr_kind = (attribute.get("type") or "").lower()
         values = attribute.get("values")
-
-        # Check if this is actually a numeric attribute even if marked categorical
         is_numeric_categorical = (
-            attr_type == "categorical"
+            attr_kind == "categorical"
             and isinstance(values, list)
             and values
             and all(isinstance(v, (int, float)) for v in values if v is not None)
         )
+        is_numeric = attr_kind in {"numeric", "continuous"} or is_numeric_categorical
 
-        # Simple numeric extraction for numeric/continuous attributes OR numeric categoricals
-        if attr_type in {"numeric", "continuous"} or is_numeric_categorical:
-            # Try to extract a number
-            import re
+        if filter_type == "range":
+            has_value = False
+            for key in ("min_value", "max_value"):
+                if key in cleaned:
+                    coerced = self._coerce_numeric(cleaned[key])
+                    if coerced is None:
+                        cleaned.pop(key, None)
+                    else:
+                        cleaned[key] = coerced
+                        has_value = True
+            if not has_value:
+                return None
+        else:  # exact
+            value = cleaned.get("value")
+            if is_numeric:
+                coerced = self._coerce_numeric(value)
+                if coerced is None:
+                    return None
+                cleaned["value"] = coerced
+            elif attr_kind == "boolean":
+                coerced_bool = self._coerce_boolean(value)
+                if coerced_bool is None:
+                    return None
+                cleaned["value"] = coerced_bool
+            else:
+                if value is None:
+                    return None
+                cleaned["value"] = value if isinstance(value, str) else str(value)
 
-            match = re.search(r"(\d+(?:[.,]\d+)?)", reply_lower)
-            if match:
-                try:
-                    value = float(match.group(1).replace(",", "."))
-                    # Create a range with 20% tolerance
-                    span = max(value * 0.2, 10)
-                    return [
-                        {
-                            "name": attr_name,
-                            "type": "range",
-                            "min_value": max(0, value - span),
-                            "max_value": value + span,
-                        }
-                    ]
-                except ValueError:
-                    pass
+        return cleaned
 
-        # Simple boolean detection
-        if attr_type == "boolean":
-            if any(word in reply_lower for word in ["ja", "wel", "graag", "true"]):
-                return [{"name": attr_name, "type": "exact", "value": True}]
-            elif any(word in reply_lower for word in ["nee", "niet", "geen", "false"]):
-                return [{"name": attr_name, "type": "exact", "value": False}]
+    @staticmethod
+    def _coerce_numeric(value: Any) -> Optional[float]:
+        if isinstance(value, bool):
+            return None
+        if isinstance(value, (int, float)):
+            return float(value)
+        if isinstance(value, str):
+            cleaned = value.strip().lower()
+            cleaned = cleaned.replace("€", " ")
+            cleaned = cleaned.replace("eur", " ")
+            cleaned = cleaned.replace("euro", " ")
+            match = re.search(r"-?\d+[\d.,]*", cleaned)
+            if not match:
+                return None
+            number_text = match.group(0)
+            if "," in number_text and "." in number_text:
+                number_text = number_text.replace(".", "")
+                number_text = number_text.replace(",", ".")
+            else:
+                number_text = number_text.replace(",", ".")
+            try:
+                return float(number_text)
+            except ValueError:
+                return None
+        return None
 
-        # For categorical (non-numeric), try to find a match in known values
-        if attr_type == "categorical" and not is_numeric_categorical:
-            # Try to find a match in known values
-            if isinstance(values, list):
-                for val in values:
-                    if str(val).lower() in reply_lower:
-                        return [{"name": attr_name, "type": "exact", "value": str(val)}]
-            # Fallback: use the reply directly
-            if reply.strip():
-                return [{"name": attr_name, "type": "exact", "value": reply.strip()}]
-
-        return []
+    @staticmethod
+    def _coerce_boolean(value: Any) -> Optional[bool]:
+        if isinstance(value, bool):
+            return value
+        if isinstance(value, str):
+            text = value.strip().lower()
+            if text in {"true", "ja", "yes", "y", "1"}:
+                return True
+            if text in {"false", "nee", "no", "n", "0"}:
+                return False
+        if isinstance(value, (int, float)):
+            if value == 1:
+                return True
+            if value == 0:
+                return False
+        return None
