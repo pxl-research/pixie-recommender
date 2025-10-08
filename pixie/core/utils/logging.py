@@ -4,11 +4,17 @@ from contextvars import ContextVar
 from typing import Optional
 
 trace_id_ctx: ContextVar[Optional[str]] = ContextVar("trace_id", default=None)
+conversation_id_ctx: ContextVar[Optional[str]] = ContextVar(
+    "conversation_id", default=None
+)
+turn_index_ctx: ContextVar[Optional[int]] = ContextVar("turn_index", default=None)
 
 
 class TraceIdFilter(logging.Filter):
     def filter(self, record: logging.LogRecord) -> bool:  # type: ignore[override]
         record.trace_id = trace_id_ctx.get(None)
+        record.conversation_id = conversation_id_ctx.get(None)
+        record.turn_index = turn_index_ctx.get(None)
         return True
 
 
@@ -20,6 +26,8 @@ class JsonFormatter(logging.Formatter):
             "msg": record.getMessage(),
             "logger": record.name,
             "trace_id": getattr(record, "trace_id", None),
+            "conversation_id": getattr(record, "conversation_id", None),
+            "turn_index": getattr(record, "turn_index", None),
         }
         for key, value in record.__dict__.items():
             if key in payload or key.startswith("_"):
@@ -51,6 +59,8 @@ def configure_logging(level: int = logging.INFO) -> None:
     def record_factory(*args, **kwargs):
         record = factory(*args, **kwargs)
         record.trace_id = trace_id_ctx.get(None)
+        record.conversation_id = conversation_id_ctx.get(None)
+        record.turn_index = turn_index_ctx.get(None)
         return record
 
     logging.setLogRecordFactory(record_factory)

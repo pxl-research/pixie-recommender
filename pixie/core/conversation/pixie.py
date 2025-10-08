@@ -2,6 +2,7 @@
 
 import logging
 import os
+from datetime import timedelta
 from typing import Any, Callable, Dict, List, Optional
 
 from ..llms.azure_llm_set import (
@@ -11,6 +12,8 @@ from ..llms.azure_llm_set import (
 )
 from ..utils.contracts import AskResponse
 from ..utils.tabular_api import TabularAPIClient, build_tabular_client
+from .conversation_loop_manager import ConversationLoopManager
+from .conversation_repository import ConversationRepository
 from .direct_conversation_manager import DirectConversationManager
 from .llm_orchestrator import LLMOrchestrator
 
@@ -49,21 +52,64 @@ class Pixie:
         )
         result_threshold = int(os.getenv("PIXIE_RESULT_THRESHOLD", "3"))
         max_questions = int(os.getenv("PIXIE_MAX_REFINE_QUESTIONS", "2"))
-        self._conversation_manager = DirectConversationManager(
-            search_fn,
-            orchestrator,
-            refinement_llm,
-            filter_llm,
-            result_threshold=result_threshold,
-            max_questions=max_questions,
+        ttl_minutes_env = os.getenv("PIXIE_CONVERSATION_TTL_MINUTES")
+        ttl_minutes_default = 24 * 60
+        conversation_ttl_minutes = ttl_minutes_default
+        if ttl_minutes_env:
+            try:
+                parsed = int(ttl_minutes_env)
+                conversation_ttl_minutes = parsed if parsed > 0 else ttl_minutes_default
+            except ValueError:
+                logger.warning(
+                    "conversation_ttl_invalid",
+                    extra={"value": ttl_minutes_env},
+                )
+        conversation_repository = ConversationRepository(
+            ttl=timedelta(minutes=conversation_ttl_minutes)
         )
+        flow_mode = os.getenv("PIXIE_ACTIVE_FLOW", "direct").strip().lower()
+        self._active_flow = flow_mode if flow_mode in {"direct", "loop"} else "direct"
+        logger.info("pixie_flow_selected", extra={"flow": self._active_flow})
+
+        if self._active_flow == "loop":
+            self._conversation_manager = ConversationLoopManager(
+                search_fn,
+                orchestrator,
+                refinement_llm,
+                filter_llm,
+                result_threshold=result_threshold,
+                max_questions=max_questions,
+                conversation_repository=conversation_repository,
+            )
+        else:
+            self._conversation_manager = DirectConversationManager(
+                search_fn,
+                orchestrator,
+                refinement_llm,
+                filter_llm,
+                result_threshold=result_threshold,
+                max_questions=max_questions,
+                conversation_repository=conversation_repository,
+            )
 
     def answer(self, question: str) -> AskResponse:
         logger.info("answer", extra={"question": question})
         return self._conversation_manager.handle_new_question(question)
 
-    def reply(self, pending_id: str, reply_text: str) -> AskResponse:
-        logger.info("reply", extra={"pending_id": pending_id})
+    def reply(
+        self, pending_id: str, reply_text: str, conversation_id: str | None = None
+    ) -> AskResponse:
+        logger.info(
+            "reply",
+            extra={
+                "pending_id": pending_id,
+                "conversation_id": conversation_id,
+                "flow": getattr(self, "_active_flow", "direct"),
+            },
+        )
+        if getattr(self, "_active_flow", "direct") == "loop":
+            target_id = conversation_id or pending_id
+            return self._conversation_manager.handle_reply(target_id, reply_text)
         return self._conversation_manager.handle_reply(pending_id, reply_text)
 
     def _load_categories(

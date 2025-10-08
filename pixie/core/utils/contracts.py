@@ -12,6 +12,7 @@ class AskResponse:
     prompt: Optional[str] = None
     pending_id: Optional[str] = None
     reason: Optional[str] = None
+    conversation_id: Optional[str] = None
 
     # Provide attribute-style access like Pydantic models had
     def dict(self) -> dict:
@@ -21,4 +22,5 @@ class AskResponse:
             "prompt": self.prompt,
             "pending_id": self.pending_id,
             "reason": self.reason,
+            "conversation_id": self.conversation_id,
         }

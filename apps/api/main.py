@@ -20,6 +20,7 @@ class AskPayload(BaseModel):
     question: Optional[str] = None
     pending_id: Optional[str] = None
     message: Optional[str] = None
+    conversation_id: Optional[str] = None
 
 
 @asynccontextmanager
@@ -78,13 +79,29 @@ async def ask(payload: AskPayload, request: Request):
         return AskResponse(type="error", reason="service_unavailable").dict()
 
     try:
-        if payload.pending_id:
+        if payload.pending_id or payload.conversation_id:
             message = (payload.message or "").strip()
             if not message:
                 return AskResponse(
                     type="error", reason="'message' is required when replying"
                 ).dict()
-            resp = pixie.reply(payload.pending_id.strip(), message)
+            identifier = (
+                (payload.conversation_id or "").strip()
+                or (payload.pending_id or "").strip()
+            )
+            if not identifier:
+                return AskResponse(
+                    type="error",
+                    reason="'pending_id' or 'conversation_id' is required when replying",
+                ).dict()
+            pending_reference = (
+                (payload.pending_id or "").strip() or identifier
+            )
+            resp = pixie.reply(
+                pending_reference,
+                message,
+                conversation_id=(payload.conversation_id or None),
+            )
             return resp.dict()
 
         question = (payload.question or "").strip()
