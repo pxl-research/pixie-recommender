@@ -3,7 +3,7 @@
 import logging
 from typing import Any, Callable, Dict, List, Optional
 
-from ..llms.azure_llm_set import create_azure_llm_set
+from ..llms.azure_llm_set import create_azure_llm_set, create_azure_refinement_llm
 from ..utils.contracts import AskResponse
 from ..utils.tabular_api import TabularAPIClient, build_tabular_client
 from .direct_conversation_manager import DirectConversationManager
@@ -36,9 +36,12 @@ class Pixie:
         )
         categories, attribute_map = self._load_categories(client, collection)
         relevance_llm, sql_llm = create_azure_llm_set(categories)
+        refinement_llm = create_azure_refinement_llm()
         orchestrator = LLMOrchestrator(relevance_llm, sql_llm)
         search_fn = self._build_search_fn(client, collection, default_limit, attribute_map)
-        self._conversation_manager = DirectConversationManager(search_fn, orchestrator)
+        self._conversation_manager = DirectConversationManager(
+            search_fn, orchestrator, refinement_llm
+        )
 
     def answer(self, question: str) -> AskResponse:
         logger.info("answer", extra={"question": question})
@@ -64,7 +67,7 @@ class Pixie:
             raise RuntimeError(f"No documents found for collection '{collection}'")
 
         categories = []
-        attribute_map: dict[str, list[str]] = {}
+        attribute_map: dict[str, dict[str, Any]] = {}
         for doc in documents:
             raw_name = doc.get("product_name") or doc.get("product") or ""
             name = str(raw_name).strip()
@@ -76,7 +79,24 @@ class Pixie:
                     key=lambda item: item[1].get("rank", 10_000),
                 )
                 top_columns = [column for column, _ in ranked_columns[:3]]
-                attribute_map[name.lower()] = top_columns
+                top_attribute: dict[str, Any] | None = None
+                if ranked_columns:
+                    attr_name, attr_info = ranked_columns[0]
+                    if isinstance(attr_info, dict):
+                        top_attribute = {
+                            "name": attr_name,
+                            "description": attr_info.get("description"),
+                            "type": attr_info.get("type"),
+                            "q1": attr_info.get("q1"),
+                            "q3": attr_info.get("q3"),
+                            "values": attr_info.get("values"),
+                        }
+                    else:
+                        top_attribute = {"name": attr_name}
+                attribute_map[name.lower()] = {
+                    "top_columns": top_columns,
+                    "refine_attribute": top_attribute,
+                }
 
         if not categories:
             raise RuntimeError("Tabular dataset returned documents without product names")
@@ -92,7 +112,7 @@ class Pixie:
         client: TabularAPIClient,
         collection: str,
         default_limit: int,
-        attribute_map: dict[str, list[str]],
+        attribute_map: dict[str, dict[str, Any]],
     ) -> SearchCallable:
         def run_search(sql: str, context: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
             ctx = context or {}
@@ -123,9 +143,13 @@ class Pixie:
             results = response.setdefault("results", [])
             response.setdefault("count", len(results))
             response.setdefault("limit", limit)
-            preferred = attribute_map.get(product.lower()) or []
+            metadata = attribute_map.get(product.lower()) or {}
+            preferred = metadata.get("top_columns") or []
             if preferred:
                 response.setdefault("preferred_columns", preferred)
+            refine_attr = metadata.get("refine_attribute")
+            if refine_attr:
+                response.setdefault("refine_attribute", dict(refine_attr))
             return response
 
         return run_search

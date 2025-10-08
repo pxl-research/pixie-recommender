@@ -65,7 +65,6 @@ class TabularAPIClient:
     def list_documents(self, collection: str) -> List[Dict[str, Any]]:
         data = self._request("GET", f"/collections/{collection}/documents/") or []
         if isinstance(data, list):
-            print(data)
             return data
         logger.warning(
             "tabular_api_expected_list",

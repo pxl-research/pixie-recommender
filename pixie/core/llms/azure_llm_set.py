@@ -5,6 +5,7 @@ from __future__ import annotations
 import os
 from typing import Any, Optional, Tuple
 
+from .azure_refinement_llm import AzureRefinementLLM
 from .azure_relevance_llm import AzureRelevanceLLM
 from .azure_sql_llm import AzureSQLLLM
 
@@ -46,3 +47,8 @@ def create_azure_llm_set(categories: Optional[list[str]] = None) -> Tuple[Any, A
     except Exception as exc:  # pragma: no cover - defensive
         raise RuntimeError("Azure LLM validation failed") from exc
     return relevance, sql
+
+
+def create_azure_refinement_llm() -> AzureRefinementLLM:
+    api_version, endpoint, api_key, model = _load_azure_config()
+    return AzureRefinementLLM(api_version, endpoint, api_key, model)
