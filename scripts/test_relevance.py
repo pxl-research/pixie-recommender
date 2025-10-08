@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import json
 import os
 from pathlib import Path
 
@@ -14,6 +15,33 @@ except ImportError as exc:  # pragma: no cover - sanity
     ) from exc
 
 from pixie.core.conversation.pixie import Pixie
+from pixie.core.utils.tabular_api import TabularAPIClient
+
+
+def _instrument_tabular_calls() -> None:
+    """Print each backend call performed by the tabular client."""
+
+    if getattr(TabularAPIClient, "_test_relevance_wrapped", False):
+        return
+
+    original_request = TabularAPIClient._request
+
+    def wrapped_request(
+        self,
+        method: str,
+        path: str,
+        payload: dict | None = None,
+    ):
+        try:
+            payload_repr = json.dumps(payload, ensure_ascii=False)
+        except (TypeError, ValueError):
+            payload_repr = repr(payload)
+        full_url = f"{self.base_url}{path}"
+        print(f"[TABULAR] {method} {full_url} payload={payload_repr}")
+        return original_request(self, method, path, payload)
+
+    TabularAPIClient._request = wrapped_request  # type: ignore[assignment]
+    setattr(TabularAPIClient, "_test_relevance_wrapped", True)
 
 
 def load_env() -> None:
@@ -30,6 +58,7 @@ def load_env() -> None:
 def main() -> None:
     load_env()
 
+    _instrument_tabular_calls()
     pixie = Pixie()
 
     questions = [
@@ -39,15 +68,20 @@ def main() -> None:
     ]
 
     for question in questions:
-        response = pixie.answer(question)
         print(f"Vraag: {question}")
+        response = pixie.answer(question)
         print(f"Antwoord: {response}")
 
-        if response.type == "ask_user" and response.pending_id:
+        turn = 0
+        while response.type == "ask_user" and response.pending_id:
             follow_up = _craft_follow_up(response.prompt)
-            follow_response = pixie.reply(response.pending_id, follow_up)
-            print(f"→ Follow-up: {follow_up}")
-            print(f"→ Reactie: {follow_response}")
+            turn += 1
+            print(f"→ Follow-up {turn}: {follow_up}")
+            response = pixie.reply(response.pending_id, follow_up)
+            print(f"→ Reactie: {response}")
+            if turn >= 5:
+                print("→ Conversatie gestopt na 5 reacties zonder definitief antwoord")
+                break
 
         print("-" * 60)
 
