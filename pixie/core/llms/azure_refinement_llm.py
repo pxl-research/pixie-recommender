@@ -42,10 +42,11 @@ class AzureRefinementLLM(AzureOpenAILLM):
 
         prompt = (
             "Je bent een vriendelijke Nederlandse productadviseur. "
-            "Stel één korte vraag (max 20 woorden) om de gebruiker te helpen zijn zoekopdracht te verfijnen."\
-            f"\nCategorie: {category}"\
-            f"\nAttribuut: {label}"\
-            f"\nBeschrijving: {description}"\
+            "Stel één korte vraag (max 20 woorden) om de gebruiker te helpen "
+            "zijn zoekopdracht te verfijnen."
+            f"\nCategorie: {category}"
+            f"\nAttribuut: {label}"
+            f"\nBeschrijving: {description}"
         )
         if attr_type:
             prompt += f"\nType attribuut: {attr_type}"
@@ -53,7 +54,10 @@ class AzureRefinementLLM(AzureOpenAILLM):
             prompt += f"\nTypische waarden: q1={q1}, q3={q3}"
         if isinstance(values, list) and values:
             prompt += f"\nMogelijke waardes: {values[:5]}"
-        prompt += "\nGebruik toegankelijke taal, sluit af met een vraagteken en geef uitsluitend de vraag terug."
+        prompt += (
+            "\nGebruik toegankelijke taal, sluit af met een vraagteken "
+            "en geef uitsluitend de vraag terug."
+        )
 
         try:
             response = self.model.invoke(prompt)

@@ -1,9 +1,14 @@
 """Public entrypoint for the minimal Pixie conversation service."""
 
 import logging
+import os
 from typing import Any, Callable, Dict, List, Optional
 
-from ..llms.azure_llm_set import create_azure_llm_set, create_azure_refinement_llm
+from ..llms.azure_llm_set import (
+    create_azure_filter_llm,
+    create_azure_llm_set,
+    create_azure_refinement_llm,
+)
 from ..utils.contracts import AskResponse
 from ..utils.tabular_api import TabularAPIClient, build_tabular_client
 from .direct_conversation_manager import DirectConversationManager
@@ -37,10 +42,20 @@ class Pixie:
         categories, attribute_map = self._load_categories(client, collection)
         relevance_llm, sql_llm = create_azure_llm_set(categories)
         refinement_llm = create_azure_refinement_llm()
+        filter_llm = create_azure_filter_llm()
         orchestrator = LLMOrchestrator(relevance_llm, sql_llm)
-        search_fn = self._build_search_fn(client, collection, default_limit, attribute_map)
+        search_fn = self._build_search_fn(
+            client, collection, default_limit, attribute_map
+        )
+        result_threshold = int(os.getenv("PIXIE_RESULT_THRESHOLD", "3"))
+        max_questions = int(os.getenv("PIXIE_MAX_REFINE_QUESTIONS", "2"))
         self._conversation_manager = DirectConversationManager(
-            search_fn, orchestrator, refinement_llm
+            search_fn,
+            orchestrator,
+            refinement_llm,
+            filter_llm,
+            result_threshold=result_threshold,
+            max_questions=max_questions,
         )
 
     def answer(self, question: str) -> AskResponse:
@@ -53,7 +68,7 @@ class Pixie:
 
     def _load_categories(
         self, client: TabularAPIClient, collection: str
-    ) -> tuple[List[str], dict[str, list[str]]]:
+    ) -> tuple[List[str], dict[str, Dict[str, Any]]]:
         try:
             documents = client.list_documents(collection)
         except Exception:
@@ -79,27 +94,31 @@ class Pixie:
                     key=lambda item: item[1].get("rank", 10_000),
                 )
                 top_columns = [column for column, _ in ranked_columns[:3]]
-                top_attribute: dict[str, Any] | None = None
-                if ranked_columns:
-                    attr_name, attr_info = ranked_columns[0]
+                attribute_list: List[dict[str, Any]] = []
+                for column, attr_info in ranked_columns:
+                    entry: dict[str, Any] = {"name": column}
                     if isinstance(attr_info, dict):
-                        top_attribute = {
-                            "name": attr_name,
-                            "description": attr_info.get("description"),
-                            "type": attr_info.get("type"),
-                            "q1": attr_info.get("q1"),
-                            "q3": attr_info.get("q3"),
-                            "values": attr_info.get("values"),
-                        }
-                    else:
-                        top_attribute = {"name": attr_name}
+                        entry.update(
+                            {
+                                "description": attr_info.get("description"),
+                                "type": attr_info.get("type"),
+                                "q1": attr_info.get("q1"),
+                                "q3": attr_info.get("q3"),
+                                "values": attr_info.get("values"),
+                            }
+                        )
+                    attribute_list.append(entry)
+                top_attribute = attribute_list[0] if attribute_list else None
                 attribute_map[name.lower()] = {
                     "top_columns": top_columns,
+                    "attributes": attribute_list,
                     "refine_attribute": top_attribute,
                 }
 
         if not categories:
-            raise RuntimeError("Tabular dataset returned documents without product names")
+            raise RuntimeError(
+                "Tabular dataset returned documents without product names"
+            )
 
         logger.info(
             "tabular_categories_loaded",
@@ -114,11 +133,13 @@ class Pixie:
         default_limit: int,
         attribute_map: dict[str, dict[str, Any]],
     ) -> SearchCallable:
-        def run_search(sql: str, context: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
+        def run_search(
+            sql: str, context: Optional[Dict[str, Any]] = None
+        ) -> Dict[str, Any]:
             ctx = context or {}
             product = ctx.get("product")
             if not product:
-                product = str(ctx.get("category") or "").strip().lower() or "laptop"
+                product = str(ctx.get("category") or "").strip().lower()
             filters = ctx.get("filters")
             limit = ctx.get("limit") or default_limit
 
@@ -150,6 +171,9 @@ class Pixie:
             refine_attr = metadata.get("refine_attribute")
             if refine_attr:
                 response.setdefault("refine_attribute", dict(refine_attr))
+            attribute_options = metadata.get("attributes") or []
+            if attribute_options:
+                response.setdefault("attribute_options", attribute_options)
             return response
 
         return run_search

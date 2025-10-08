@@ -7,6 +7,7 @@ import logging
 import os
 from typing import Any, Dict, List, Optional, Tuple
 from urllib import error, request
+from urllib.parse import quote
 
 logger = logging.getLogger(__name__)
 
@@ -28,6 +29,10 @@ class TabularAPIClient:
         if payload is not None:
             data = json.dumps(payload).encode("utf-8")
             headers["Content-Type"] = "application/json"
+            logger.debug(
+                "tabular_api_request",
+                extra={"method": method, "url": url, "payload": payload},
+            )
         req = request.Request(url, data=data, headers=headers, method=method)
         try:
             with request.urlopen(req, timeout=self.timeout) as resp:
@@ -38,7 +43,10 @@ class TabularAPIClient:
                 "tabular_api_http_error",
                 extra={"url": url, "status": exc.code, "body": body[-400:]},
             )
-            raise RuntimeError(f"Tabular API error: {exc.code}") from exc
+            error_msg = f"Tabular API error: {exc.code}"
+            if body:
+                error_msg += f" - {body[:200]}"
+            raise RuntimeError(error_msg) from exc
         except error.URLError as exc:  # pragma: no cover - defensive
             logger.error(
                 "tabular_api_unreachable", extra={"url": url, "error": str(exc.reason)}
@@ -83,8 +91,20 @@ class TabularAPIClient:
         payload: Dict[str, Any] = {"limit": limit, "offset": offset}
         if filters:
             payload["filters"] = filters
+            logger.info(
+                "tabular_api_filters",
+                extra={
+                    "collection": collection,
+                    "product": product,
+                    "filters": filters,
+                },
+            )
+        # URL encode the product name to handle spaces and special characters
+        encoded_product = quote(product, safe="")
         response = self._request(
-            "POST", f"/collections/{collection}/products/{product}/query", payload
+            "POST",
+            f"/collections/{collection}/products/{encoded_product}/query",
+            payload,
         )
         if isinstance(response, dict):
             return response

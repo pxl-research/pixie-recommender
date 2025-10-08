@@ -75,25 +75,13 @@ class LLMOrchestrator:
     def generate_search_query(
         self, question: str, context: Dict[str, Any], category: str
     ) -> LLMResponse:
-        mapping = {
-            "printers": "printer",
-            "printer": "printer",
-            "laptops": "laptop",
-            "laptop": "laptop",
-            "computers": "pc",
-            "computer": "pc",
-            "smartphones": "smartphone",
-            "smartphone": "smartphone",
-        }
-        product_type = mapping.get(category, category)
         try:
-            sql = self.sql_llm.generate_sql(question, context, product_type)
+            sql = self.sql_llm.generate_sql(question, context, category)
             logger.info(
                 "sql_generation_success",
                 extra={
                     "question": question,
                     "category": category,
-                    "product_type": product_type,
                     "sql": sql,
                 },
             )
@@ -103,14 +91,13 @@ class LLMOrchestrator:
             fallback = (
                 "SELECT p.* FROM products p "
                 "JOIN product_types pt ON p.product_type_id = pt.id "
-                f"WHERE pt.name = '{product_type}' LIMIT 10"
+                f"WHERE pt.name = '{category}' LIMIT 10"
             )
             logger.info(
                 "sql_generation_fallback",
                 extra={
                     "question": question,
                     "category": category,
-                    "product_type": product_type,
                     "sql": fallback,
                 },
             )
