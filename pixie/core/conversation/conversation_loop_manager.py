@@ -223,6 +223,7 @@ class ConversationLoopManager:
         label = (name or "het product").replace("_", " ")
         attr_type = (attr.get("type") or "").lower()
         q1, q3 = attr.get("q1"), attr.get("q3")
+        values = attr.get("values")
 
         options: list[str] = []
         if (
@@ -239,6 +240,15 @@ class ConversationLoopManager:
                 f"meer dan {self._format_numeric_value(high)}",
             ]
             attr["options"] = options + ["weet ik niet"]
+            attr.setdefault("examples", options[:3])
+        elif attr_type == "boolean":
+            attr["options"] = ["ja", "nee", "weet ik niet"]
+            attr.setdefault("examples", ["ja", "nee"])
+        elif attr_type == "categorical" and isinstance(values, list):
+            sample_values = [str(v) for v in values if v][:5]
+            if sample_values:
+                attr["options"] = sample_values + ["weet ik niet"]
+                attr.setdefault("examples", sample_values)
 
         ctx = {"category": product_name, "attribute": attr, "count": count, "asked_attributes": sorted(asked)}
 
@@ -250,15 +260,11 @@ class ConversationLoopManager:
             question = None
 
         if not question:
-            if options:
-                return (
-                    f"Ik heb {count} resultaten voor {product_name}. Kies een optie of geef je eigen antwoord.\nAntwoordopties: {', '.join(options + ["'weet ik niet'"])}",
-                    attr,
-                )
-            return (
-                f"Ik heb {count} resultaten voor {product_name}. Welk detail over {label} is voor jou het belangrijkst?",
-                attr,
+            fallback = (
+                f"Ik heb {count} resultaten voor {product_name}. Wat vind je belangrijk aan {label}? "
+                "Je mag ook laten weten dat je het nog niet weet."
             )
+            return fallback, attr
         return question, attr
 
     def _select_attribute(self, metadata: Dict[str, Any], asked: set[str]) -> Optional[dict]:

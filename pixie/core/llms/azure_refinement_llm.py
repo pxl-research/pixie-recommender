@@ -43,30 +43,42 @@ class AzureRefinementLLM(AzureOpenAILLM):
         if not self.model:
             return fallback
 
-        prompt = (
-            "Je bent een vriendelijke Nederlandse productadviseur. "
-            "Stel één korte vraag (max 120 tekens) om de gebruiker te helpen "
-            "zijn zoekopdracht te verfijnen. Noem in dezelfde zin waarom je deze vraag stelt."
-            f"\nCategorie: {category}"
-            f"\nAttribuut: {label}"
-            f"\nBeschrijving: {description}"
-        )
+        options = attribute.get("options") or []
+        examples = attribute.get("examples") or []
+
+        prompt_parts = [
+            "Je bent een vriendelijke Nederlandse productadviseur.",
+            "Formuleer een behulpzame vervolgvraag die uitlegt waarom dit attribuut relevant is en die de gebruiker richting geeft.",
+            "Je mag één of twee zinnen gebruiken; eindig met een vraagteken en geef alleen de vraag terug.",
+            f"Categorie: {category}",
+            f"Attribuut: {label}",
+            f"Beschrijving: {description}",
+        ]
         if attr_type:
-            prompt += f"\nType attribuut: {attr_type}"
+            prompt_parts.append(f"Attribuut-type: {attr_type}")
         if isinstance(q1, (int, float)) and isinstance(q3, (int, float)):
-            prompt += f"\nTypische waarden: q1={q1}, q3={q3}"
+            prompt_parts.append(f"Typische waarden (q1/q3): {q1} / {q3}")
         if isinstance(values, list) and values:
-            prompt += f"\nMogelijke waardes: {values[:5]}"
+            prompt_parts.append(f"Mogelijke ruwe waarden: {values[:5]}")
+        if options:
+            prompt_parts.append(f"Suggesties die je mag noemen: {options[:5]}")
+        if examples:
+            prompt_parts.append(f"Voorbeelden voor je vraag: {examples[:5]}")
         if applied_filters:
-            prompt += f"\nReeds gekozen voorkeuren: {applied_filters}"
+            prompt_parts.append(f"Al gekozen voorkeuren: {applied_filters}")
         if asked_attributes:
-            prompt += f"\nEerder besproken attributen: {asked_attributes}"
+            prompt_parts.append(f"Eerder besproken attributen: {asked_attributes}")
         if reason:
-            prompt += f"\nReden voor vervolg: {reason}"
-        prompt += (
-            "\nGebruik toegankelijke taal, sluit af met een vraagteken, "
-            "verwijs kort naar de reden voor de vraag en geef uitsluitend de vraag terug."
+            prompt_parts.append(f"Reden voor vervolg: {reason}")
+        prompt_parts.append(
+            "Richtlijnen per type:\n"
+            "- Numeriek: bied één of twee voorbeeldbereiken of vraag naar een doelwaarde.\n"
+            "- Categorisch: noem een paar relevante opties en vraag naar voorkeur.\n"
+            "- Boolean: maak duidelijk dat het om een ja/nee keuze gaat."
         )
+        prompt_parts.append("Zorg dat de toon vriendelijk en concreet is.")
+
+        prompt = "\n".join(str(part) for part in prompt_parts if part)
 
         try:
             response = self.model.invoke(prompt)
@@ -74,42 +86,8 @@ class AzureRefinementLLM(AzureOpenAILLM):
                 answer = response.content.strip().strip("\"'")
                 if not answer.endswith("?"):
                     answer += "?"
-                if 5 <= len(answer) <= 120:
+                if len(answer) >= 5:
                     return answer
         except Exception:
             pass
         return fallback
-
-    def generate_result_intro(self, context: Optional[dict] = None) -> Optional[str]:
-        ctx = context or {}
-        category = ctx.get("category") or "de geselecteerde producten"
-        count = ctx.get("count")
-        filters = ctx.get("applied_filters") or []
-        reason = ctx.get("reason") or ""
-
-        if not self.model:
-            return None
-
-        prompt = (
-            "Je bent een vriendelijke Nederlandse productadviseur. "
-            "Schrijf één korte zin in het Nederlands (max 120 tekens) die uitlegt "
-            "waarom je deze resultaten toont. Verwijs naar opgegeven voorkeuren als ze er zijn."
-            f"\nCategorie: {category}"
-        )
-        if isinstance(count, int):
-            prompt += f"\nAantal resultaten: {count}"
-        if filters:
-            prompt += f"\nToegepaste filters: {filters}"
-        if reason:
-            prompt += f"\nReden: {reason}"
-        prompt += "\nGebruik geen opsommingstekens en eindig met een punt."
-
-        try:
-            response = self.model.invoke(prompt)
-            if hasattr(response, "content"):
-                answer = response.content.strip().strip("\"'")
-                if 5 <= len(answer) <= 120:
-                    return answer
-        except Exception:  # pragma: no cover - defensive
-            return None
-        return None
