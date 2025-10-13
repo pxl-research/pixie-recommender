@@ -82,6 +82,63 @@ class AzureFilterLLM(AzureOpenAILLM):
 
         return []
 
+    def derive_filters_from_question(
+        self, question: str, attributes: List[Dict[str, Any]]
+    ) -> List[Dict[str, Any]]:
+        """Ask the LLM to extract filters directly from the user's question."""
+        question_text = (question or "").strip()
+        if not question_text or not attributes or not self.model:
+            return []
+
+        prompt = self._build_initial_filter_prompt(question_text, attributes)
+        try:
+            response = self.model.invoke(prompt)
+            if not hasattr(response, "content"):
+                return []
+            content = (response.content or "").strip()
+            try:
+                parsed = json.loads(content)
+            except json.JSONDecodeError:
+                logger.warning(
+                    "initial_filter_invalid_json",
+                    extra={"question": question_text, "content": content},
+                )
+                return []
+
+            if isinstance(parsed, dict):
+                parsed = [parsed]
+            if not isinstance(parsed, list):
+                return []
+
+            attr_lookup = {
+                str(attr.get("name")): attr
+                for attr in attributes
+                if isinstance(attr, dict) and attr.get("name")
+            }
+            filters: List[Dict[str, Any]] = []
+            for entry in parsed:
+                if not isinstance(entry, dict):
+                    continue
+                name = entry.get("name")
+                meta = attr_lookup.get(name)
+                if not meta:
+                    continue
+                normalised = self._normalise_filters([entry], meta)
+                if normalised:
+                    filters.extend(normalised)
+            if filters:
+                logger.info(
+                    "initial_filter_llm_success",
+                    extra={"question": question_text, "filters": filters},
+                )
+            return filters
+        except Exception as exc:  # pragma: no cover - defensive
+            logger.warning(
+                "initial_filter_llm_failed",
+                extra={"question": question_text, "error": str(exc)},
+            )
+            return []
+
     def _build_prompt(
         self,
         reply: str,
@@ -183,6 +240,62 @@ OUTPUT FORMAAT (alleen JSON, geen markdown):
 [{{"name": "...", "type": "...", ...}}]
 """
 
+        return prompt
+
+    def _build_initial_filter_prompt(
+        self, question: str, attributes: List[Dict[str, Any]]
+    ) -> str:
+        limited: List[Dict[str, Any]] = []
+        for attr in attributes:
+            if not isinstance(attr, dict):
+                continue
+            name = attr.get("name")
+            if not name:
+                continue
+            entry: Dict[str, Any] = {"name": name}
+            attr_type = attr.get("type")
+            if attr_type:
+                entry["type"] = attr_type
+            description = attr.get("description")
+            if description:
+                entry["description"] = description
+            values = attr.get("values")
+            if isinstance(values, list) and values:
+                entry["values"] = values[:10]
+            q1 = attr.get("q1")
+            q3 = attr.get("q3")
+            if isinstance(q1, (int, float)):
+                entry["q1"] = q1
+            if isinstance(q3, (int, float)):
+                entry["q3"] = q3
+            limited.append(entry)
+            if len(limited) >= 20:
+                break
+
+        attributes_json = json.dumps(limited, ensure_ascii=False)
+
+        prompt = (
+            "Je bent een expert in het extraheren van gestructureerde filters uit gebruikersvragen.\n\n"
+            "Je krijgt een vraag van een gebruiker en de lijst met mogelijke attributen."
+            " Bepaal welke attributen expliciet of impliciet in de vraag voorkomen en geef passende filterwaarden terug.\n\n"
+            f"VRAAG: \"{question}\"\n\n"
+            "BESCHIKBARE ATTRIBUTEN (JSON):\n"
+            f"{attributes_json}\n\n"
+            "INSTRUCTIES:\n"
+            "- Gebruik uitsluitend de attribuutnamen uit de lijst (exacte string in het veld 'name').\n"
+            "- Voor categorische en boolean attributen gebruik een EXACT filter met een waarde uit de lijst 'values' (of de dichtstbijzijnde semantische match als het bijna gelijk is).\n"
+            "- Voor numerieke attributen gebruik RANGE filters met 'min_value' en/of 'max_value'.\n"
+            "- Als er meerdere voorkeuren in de vraag staan, geef meerdere filterobjecten terug.\n"
+            "- Als een attribuut niet duidelijk aanwezig is, neem het niet op in het resultaat.\n"
+            "- Retourneer enkel een JSON-array met filterobjecten.\n"
+            "- Gebruik strikte JSON (dubbele aanhalingstekens, geen extra tekst).\n"
+            "\nVOORBEELD:\n"
+            "Vraag: 'Ik zoek een blauwe Ford Fiesta auto'\n"
+            "Mogelijke uitvoer: [{\"name\": \"kleur\", \"type\": \"exact\", \"value\": \"blauw\"},"
+            " {\"name\": \"merk\", \"type\": \"exact\", \"value\": \"Ford\"},"
+            " {\"name\": \"model\", \"type\": \"exact\", \"value\": \"Fiesta\"}]\n"
+            "(alleen als deze attributen in de lijst voorkomen).\n"
+        )
         return prompt
 
     def _parse_llm_response(self, content: str, attr_name: str) -> List[Dict[str, Any]]:

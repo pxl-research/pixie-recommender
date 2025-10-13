@@ -78,21 +78,21 @@ class ConversationLoopManager:
             except Exception:  # pragma: no cover - defensive
                 logger.warning("initial_filter_derivation_failed", exc_info=True)
                 initial_filters = []
+            answered_attributes = {
+                str(name).lower()
+                for name in (flt.get("name") for flt in initial_filters)
+                if isinstance(name, str) and name
+            }
             if initial_filters:
-                answered_attributes = {
-                    str(name).lower()
-                    for name in (flt.get("name") for flt in initial_filters)
-                    if isinstance(name, str) and name
-                }
                 try:
                     results = self.search_fn(
                         None, {"category": category, "filters": initial_filters}
                     )
+                    items, metadata = self._normalise_results(results, category)
+                    total = self._total_count(metadata, items)
                 except Exception as exc:  # pragma: no cover
                     logger.error("loop.initial_filter_search_failed", exc_info=exc)
                     return AskResponse(type="error", reason="search_failed")
-                items, metadata = self._normalise_results(results, category)
-                total = self._total_count(metadata, items)
                 if total == 0:
                     logger.info(
                         "loop.initial_filters_no_hits",
@@ -100,8 +100,7 @@ class ConversationLoopManager:
                     )
                     items, metadata, total = base_items, base_metadata, base_total
                     initial_filters = []
-                    # Keep answered_attributes so we do not ask again,
-                    # even though the filter could not be applied reliably.
+                    answered_attributes = set()
 
         if total <= self.result_threshold:
             return self._finalise_answer(items, metadata, None)
@@ -273,31 +272,6 @@ class ConversationLoopManager:
         q1, q3 = attr.get("q1"), attr.get("q3")
         values = attr.get("values")
 
-        options: list[str] = []
-        if (
-            attr_type in {"continuous", "numeric"}
-            and isinstance(q1, (int, float))
-            and isinstance(q3, (int, float))
-            and q1 < q3
-        ):
-            low = self._friendly_round(q1)
-            high = self._friendly_round(q3)
-            options = [
-                f"minder dan {self._format_numeric_value(low)}",
-                f"tussen {self._format_numeric_value(low)} en {self._format_numeric_value(high)}",
-                f"meer dan {self._format_numeric_value(high)}",
-            ]
-            attr["options"] = options + ["weet ik niet"]
-            attr.setdefault("examples", options[:3])
-        elif attr_type == "boolean":
-            attr["options"] = ["ja", "nee", "weet ik niet"]
-            attr.setdefault("examples", ["ja", "nee"])
-        elif attr_type == "categorical" and isinstance(values, list):
-            sample_values = [str(v) for v in values if v][:5]
-            if sample_values:
-                attr["options"] = sample_values + ["weet ik niet"]
-                attr.setdefault("examples", sample_values)
-
         ctx = {
             "category": product_name,
             "attribute": attr,
@@ -361,17 +335,22 @@ class ConversationLoopManager:
     def _derive_filters_from_question(
         self, question: str, metadata: Dict[str, Any]
     ) -> List[Dict[str, Any]]:
+        if not self.filter_llm:
+            return []
+
         attribute_options = metadata.get("attribute_options") or []
-        collected: dict[tuple[str, str], Dict[str, Any]] = {}
-        for attribute in attribute_options:
-            if not isinstance(attribute, dict):
+        selected: List[Dict[str, Any]] = []
+        for attr in attribute_options:
+            if not isinstance(attr, dict):
                 continue
-            filters = self._build_filters_from_answer(attribute, question)
-            for flt in filters:
-                key = (flt.get("name"), flt.get("type"))
-                if key[0] and key not in collected:
-                    collected[key] = flt
-        return list(collected.values())
+            if not attr.get("name"):
+                continue
+            selected.append(attr)
+            if len(selected) >= 20:
+                break
+        if not selected:
+            return []
+        return self.filter_llm.derive_filters_from_question(question, selected)
 
     def _build_filters_from_answer(
         self,
@@ -431,25 +410,3 @@ class ConversationLoopManager:
                     seen.add(lowered)
                     ordered.append(text)
         return ordered
-
-    @staticmethod
-    def _friendly_round(value: float) -> float:
-        abs_val = abs(value)
-        if abs_val >= 1000:
-            rounded = round(value / 50) * 50
-        elif abs_val >= 100:
-            rounded = round(value / 10) * 10
-        elif abs_val >= 10:
-            rounded = round(value)
-        elif abs_val >= 1:
-            rounded = round(value)
-        else:
-            rounded = round(value, 1)
-        return float(int(rounded)) if abs(rounded - int(rounded)) < 0.01 else float(rounded)
-
-    @staticmethod
-    def _format_numeric_value(value: float) -> str:
-        if abs(value - int(value)) < 0.01:
-            return str(int(value))
-        formatted = f"{value:.1f}".rstrip("0").rstrip(".")
-        return formatted

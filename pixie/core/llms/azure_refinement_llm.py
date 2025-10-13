@@ -38,10 +38,9 @@ class AzureRefinementLLM(AzureOpenAILLM):
             return None
 
         label = attribute_name.replace("_", " ")
-        fallback = f"Kun je iets vertellen over {label}?"
 
         if not self.model:
-            return fallback
+            return None
 
         options = attribute.get("options") or []
         examples = attribute.get("examples") or []
@@ -90,4 +89,4 @@ class AzureRefinementLLM(AzureOpenAILLM):
                     return answer
         except Exception:
             pass
-        return fallback
+        return None
