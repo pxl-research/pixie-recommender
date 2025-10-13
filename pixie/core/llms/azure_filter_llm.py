@@ -132,7 +132,7 @@ class AzureFilterLLM(AzureOpenAILLM):
                     extra={"question": question_text, "filters": filters},
                 )
             return filters
-        except Exception as exc:  # pragma: no cover - defensive
+        except Exception as exc:   - defensive
             logger.warning(
                 "initial_filter_llm_failed",
                 extra={"question": question_text, "error": str(exc)},

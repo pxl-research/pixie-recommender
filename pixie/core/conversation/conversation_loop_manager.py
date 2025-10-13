@@ -85,7 +85,7 @@ class ConversationLoopManager:
         )
         try:
             result = self._execute_search(category, initial_filters or None)
-        except Exception as exc:  # pragma: no cover
+        except Exception as exc:  
             logger.error("loop.search_failed", exc_info=exc)
             return AskResponse(type="error", reason="search_failed")
 
@@ -98,7 +98,7 @@ class ConversationLoopManager:
             answered_attributes = set()
             try:
                 result = self._execute_search(category)
-            except Exception as exc:  # pragma: no cover
+            except Exception as exc:  
                 logger.error("loop.search_failed", exc_info=exc)
                 return AskResponse(type="error", reason="search_failed")
 
@@ -109,7 +109,7 @@ class ConversationLoopManager:
             if post_filters:
                 try:
                     filtered = self._execute_search(category, post_filters)
-                except Exception as exc:  # pragma: no cover
+                except Exception as exc:  
                     logger.error("loop.initial_filter_search_failed", exc_info=exc)
                     return AskResponse(type="error", reason="search_failed")
                 if filtered.total > 0:
@@ -178,7 +178,7 @@ class ConversationLoopManager:
 
             try:
                 result = self._execute_search(category, filters)
-            except Exception as exc:  # pragma: no cover
+            except Exception as exc:  
                 logger.error("loop.search_failed", exc_info=exc)
                 self.repository.delete(conversation_id)
                 return AskResponse(
@@ -334,7 +334,7 @@ class ConversationLoopManager:
         question = None
         try:
             question = self.refinement_llm.generate_question(ctx)
-        except Exception as exc:  # pragma: no cover
+        except Exception as exc:  
             logger.error("loop.refinement_failed", exc_info=exc)
             question = None
 
@@ -360,7 +360,7 @@ class ConversationLoopManager:
 
         try:
             raw_filters = self.filter_llm.build_filters(reply_text, attribute) or []
-        except Exception:  # pragma: no cover - defensive
+        except Exception:   - defensive
             logger.warning("filter_llm_failed_to_parse", exc_info=True)
             return []
 

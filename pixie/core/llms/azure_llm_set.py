@@ -47,7 +47,7 @@ def create_azure_llm_set(categories: Optional[list[str]] = None) -> AzureRelevan
     )
     try:
         relevance.is_relevant("test query")
-    except Exception as exc:  # pragma: no cover - defensive
+    except Exception as exc:   - defensive
         raise RuntimeError("Azure LLM validation failed") from exc
     return relevance
 
