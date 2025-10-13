@@ -57,7 +57,7 @@ class LLMOrchestrator:
                 result={"relevant": True, "category": category},
                 confidence=0.9 if category else 0.7,
             )
-        except Exception as exc:   - defensive
+        except Exception as exc:  # defensive
             logger.error("relevance_failed", exc_info=exc)
             return LLMResponse(
                 success=False,

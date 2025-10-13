@@ -37,7 +37,7 @@ class TabularAPIClient:
         try:
             with request.urlopen(req, timeout=self.timeout) as resp:
                 body = resp.read()
-        except error.HTTPError as exc:   - defensive
+        except error.HTTPError as exc:  # defensive
             body = exc.read().decode("utf-8", "ignore")
             logger.error(
                 "tabular_api_http_error",
@@ -47,7 +47,7 @@ class TabularAPIClient:
             if body:
                 error_msg += f" - {body[:200]}"
             raise RuntimeError(error_msg) from exc
-        except error.URLError as exc:   - defensive
+        except error.URLError as exc:  # defensive
             logger.error(
                 "tabular_api_unreachable", extra={"url": url, "error": str(exc.reason)}
             )
@@ -57,7 +57,7 @@ class TabularAPIClient:
             return None
         try:
             return json.loads(body.decode("utf-8"))
-        except json.JSONDecodeError as exc:   - defensive
+        except json.JSONDecodeError as exc:  # defensive
             logger.error(
                 "tabular_api_invalid_json", extra={"url": url, "body": body[:200]}
             )

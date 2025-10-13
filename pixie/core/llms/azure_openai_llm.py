@@ -2,7 +2,7 @@
 
 try:  # optional dependency
     from langchain_openai import AzureChatOpenAI  # type: ignore
-except Exception:   - optional dependency
+except Exception:  # optional dependency
     AzureChatOpenAI = None  # type: ignore
 
 from .abstractclasses.llm import LLM

@@ -360,7 +360,7 @@ class ConversationLoopManager:
 
         try:
             raw_filters = self.filter_llm.build_filters(reply_text, attribute) or []
-        except Exception:   - defensive
+        except Exception:  # defensive
             logger.warning("filter_llm_failed_to_parse", exc_info=True)
             return []
 
