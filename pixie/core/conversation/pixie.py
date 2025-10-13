@@ -67,6 +67,15 @@ class Pixie:
         result_threshold = int(os.environ["PIXIE_RESULT_THRESHOLD"])
         max_questions = int(os.environ["PIXIE_MAX_REFINE_QUESTIONS"])
 
+        def attribute_provider(category_name: str) -> Optional[List[Dict[str, Any]]]:
+            if not category_name:
+                return None
+            entry = attribute_map.get(category_name.lower())
+            if not entry:
+                return None
+            attributes = entry.get("attribute_options")
+            return attributes if isinstance(attributes, list) else None
+
         self._conversation_manager = ConversationLoopManager(
             search_fn=search_fn,
             llm_orchestrator=orchestrator,
@@ -75,6 +84,7 @@ class Pixie:
             repository=repo,
             result_threshold=result_threshold,
             max_questions=max_questions,
+            attribute_provider=attribute_provider,
         )
         self._repository = repo
 

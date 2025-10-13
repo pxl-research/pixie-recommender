@@ -1,4 +1,14 @@
-"""Lightweight, in-memory conversation loop with refinement and thresholds."""
+"""Conversation loop orchestration for the Pixie assistant.
+
+The loop manager ties together:
+    * the relevance/orchestration LLM (to decide the category),
+    * the Azure filter LLM (to translate replies into structured filters),
+    * the refinement LLM (to craft follow-up prompts),
+    * the data search function.
+
+Only the high-level flow lives in this file; reusable helpers sit in
+``conversation_utils`` to keep responsibilities tidy.
+"""
 
 from __future__ import annotations
 
@@ -13,6 +23,14 @@ from ..utils.logging import conversation_context
 from .llm_orchestrator import LLMOrchestrator
 from .repository import ConversationRepository
 from .state import ConversationState
+from .conversation_utils import (
+    Filters,
+    SearchResult,
+    attribute_label,
+    format_result_text,
+    normalise_search_response,
+    select_attribute_for_refinement,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -35,6 +53,7 @@ class ConversationLoopManager:
         repository: ConversationRepository,
         result_threshold: int = 3,
         max_questions: int = 2,
+        attribute_provider: Optional[Callable[[str], Optional[List[Dict[str, Any]]]]] = None,
     ) -> None:
         self.search_fn = search_fn
         self.llm_orchestrator = llm_orchestrator
@@ -43,11 +62,13 @@ class ConversationLoopManager:
         self.repository = repository
         self.result_threshold = max(result_threshold, 1)
         self.max_questions = max(max_questions, 1)
+        self.attribute_provider = attribute_provider
 
     # ------------------------------------------------------------------
     # Public API
     # ------------------------------------------------------------------
     def handle_new_question(self, question: str) -> AskResponse:
+        """Answer an initial user question or, if needed, kick off refinement."""
         self.repository.expire_stale()
         relevance = self.llm_orchestrator.check_relevance_and_category(question)
         if not relevance.success:
@@ -59,66 +80,60 @@ class ConversationLoopManager:
         if not category:
             return AskResponse(type="error", reason="missing_category")
 
+        initial_filters, answered_attributes = self._initial_filters(
+            question, category, None
+        )
         try:
-            results = self.search_fn(None, {"category": category})
+            result = self._execute_search(category, initial_filters or None)
         except Exception as exc:  # pragma: no cover
             logger.error("loop.search_failed", exc_info=exc)
             return AskResponse(type="error", reason="search_failed")
 
-        base_items, base_metadata = self._normalise_results(results, category)
-        base_total = self._total_count(base_metadata, base_items)
-        items, metadata = base_items, base_metadata
-        total = base_total
-
-        initial_filters: List[Dict[str, Any]] = []
-        answered_attributes: set[str] = set()
-        if self.filter_llm:
+        if initial_filters and result.total == 0:
+            logger.info(
+                "loop.initial_filters_no_hits",
+                extra={"filters": initial_filters, "question": question},
+            )
+            initial_filters = []
+            answered_attributes = set()
             try:
-                initial_filters = self._derive_filters_from_question(question, metadata)
-            except Exception:  # pragma: no cover - defensive
-                logger.warning("initial_filter_derivation_failed", exc_info=True)
-                initial_filters = []
-            answered_attributes = {
-                str(name).lower()
-                for name in (flt.get("name") for flt in initial_filters)
-                if isinstance(name, str) and name
-            }
-            if initial_filters:
+                result = self._execute_search(category)
+            except Exception as exc:  # pragma: no cover
+                logger.error("loop.search_failed", exc_info=exc)
+                return AskResponse(type="error", reason="search_failed")
+
+        if not initial_filters:
+            post_filters, post_answered = self._initial_filters(
+                question, category, result.metadata
+            )
+            if post_filters:
                 try:
-                    results = self.search_fn(
-                        None, {"category": category, "filters": initial_filters}
-                    )
-                    items, metadata = self._normalise_results(results, category)
-                    total = self._total_count(metadata, items)
+                    filtered = self._execute_search(category, post_filters)
                 except Exception as exc:  # pragma: no cover
                     logger.error("loop.initial_filter_search_failed", exc_info=exc)
                     return AskResponse(type="error", reason="search_failed")
-                if total == 0:
+                if filtered.total > 0:
+                    initial_filters = post_filters
+                    answered_attributes = post_answered
+                    result = filtered
+                else:
                     logger.info(
                         "loop.initial_filters_no_hits",
-                        extra={"filters": initial_filters, "question": question},
+                        extra={"filters": post_filters, "question": question},
                     )
-                    items, metadata, total = base_items, base_metadata, base_total
-                    initial_filters = []
-                    answered_attributes = set()
 
-        if total <= self.result_threshold:
-            return self._finalise_answer(items, metadata, None)
+        if result.total <= self.result_threshold:
+            return self._finalise_answer(result, None)
 
-        prompt, attribute = self._build_refinement_prompt(
-            category,
-            metadata,
-            items,
-            total,
-            asked=answered_attributes,
-            filters=initial_filters,
+        prompt, attribute = self._create_refinement_prompt(
+            category, result, answered_attributes, initial_filters
         )
         if not prompt or not attribute:
-            return self._finalise_answer(items, metadata, None)
+            return self._finalise_answer(result, None)
 
         conv_id = str(uuid4())
-        attr_name = attribute.get("name")
         asked = set(answered_attributes)
+        attr_name = attribute.get("name")
         if attr_name:
             asked.add(attr_name.lower())
         state = ConversationState(
@@ -127,16 +142,19 @@ class ConversationLoopManager:
             filters=initial_filters,
             asked_attributes=asked,
             question_count=1,
-            metadata=metadata,
+            metadata=result.metadata,
             current_attribute=attribute,
         )
         with conversation_context(conv_id, 1):
             self.repository.create(state)
-        return AskResponse(
-            type="ask_user", prompt=prompt, conversation_id=conv_id
-        )
+        return AskResponse(type="ask_user", prompt=prompt, conversation_id=conv_id)
+
+    # ------------------------------------------------------------------
+    # Internal helpers
+    # ------------------------------------------------------------------
 
     def handle_reply(self, conversation_id: str, reply: str) -> AskResponse:
+        """Process a follow-up reply inside an existing conversation."""
         self.repository.expire_stale()
         state = self.repository.get(conversation_id)
         if not state:
@@ -146,11 +164,11 @@ class ConversationLoopManager:
                 conversation_id=conversation_id,
             )
 
-        with conversation_context(conversation_id, state.question_count + 1):
-            category = state.category
-            filters = list(state.filters)
-            attribute = state.current_attribute or {}
+        category = state.category
+        filters: Filters = list(state.filters)
+        attribute = state.current_attribute or {}
 
+        with conversation_context(conversation_id, state.question_count + 1):
             new_filters = self._build_filters_from_answer(attribute, reply)
             if new_filters:
                 attr_name = attribute.get("name")
@@ -159,7 +177,7 @@ class ConversationLoopManager:
                 filters.extend(new_filters)
 
             try:
-                results = self.search_fn(None, {"category": category, "filters": filters})
+                result = self._execute_search(category, filters)
             except Exception as exc:  # pragma: no cover
                 logger.error("loop.search_failed", exc_info=exc)
                 self.repository.delete(conversation_id)
@@ -169,48 +187,75 @@ class ConversationLoopManager:
                     conversation_id=conversation_id,
                 )
 
-            items, metadata = self._normalise_results(results, category)
-            total = self._total_count(metadata, items)
-            if total <= self.result_threshold or state.question_count >= self.max_questions:
-                self.repository.delete(conversation_id)
-                return self._finalise_answer(items, metadata, conversation_id)
+        if result.total <= self.result_threshold or state.question_count >= self.max_questions:
+            self.repository.delete(conversation_id)
+            return self._finalise_answer(result, conversation_id)
 
-        prompt, next_attr = self._build_refinement_prompt(
-            category, metadata, items, total, state.asked_attributes, filters
+        prompt, next_attr = self._create_refinement_prompt(
+            category, result, state.asked_attributes, filters
         )
         if not prompt or not next_attr:
             self.repository.delete(conversation_id)
-            return self._finalise_answer(items, metadata, conversation_id)
+            return self._finalise_answer(result, conversation_id)
 
         state.filters = filters
-        state.metadata = metadata
+        state.metadata = result.metadata
         state.current_attribute = next_attr
         state.question_count += 1
         next_name = next_attr.get("name")
         if next_name:
             state.asked_attributes.add(next_name.lower())
         self.repository.update(state)
-        return AskResponse(
-            type="ask_user", prompt=prompt, conversation_id=conversation_id
-        )
+        return AskResponse(type="ask_user", prompt=prompt, conversation_id=conversation_id)
 
     # ------------------------------------------------------------------
     # Helpers
     # ------------------------------------------------------------------
-    @staticmethod
-    def _total_count(metadata: Dict[str, Any], items: List[dict]) -> int:
-        total = metadata.get("count")
-        return int(total) if isinstance(total, int) else len(items)
+    def _execute_search(
+        self, category: str, filters: Optional[Filters] = None
+    ) -> SearchResult:
+        """Run the search callback and normalise its response into ``SearchResult``."""
+        payload: Dict[str, Any] = {"category": category}
+        if filters:
+            payload["filters"] = filters
+        response = self.search_fn(None, payload)
+        return normalise_search_response(response, category)
 
-    def _normalise_results(self, payload: Any, category: str) -> Tuple[List[dict], Dict[str, Any]]:
-        if isinstance(payload, dict):
-            meta = {k: v for k, v in payload.items() if k != "results"}
-            items = payload.get("results") or []
-        else:
-            meta = {"category": category}
-            items = payload or []
-        items = [it for it in items if isinstance(it, dict)]
-        return items, meta
+    def _initial_filters(
+        self, question: str, category: str, metadata: Optional[Dict[str, Any]]
+    ) -> Tuple[Filters, set[str]]:
+        """Let the filter LLM derive structured filters from the opening question.
+
+        We first consult the optional ``attribute_provider`` so that we can avoid an
+        initial search call when metadata is already known (for example via the
+        bootstrap stage). If the provider is absent or returns nothing, we fall back
+        to metadata that may be supplied by the caller. At most the first 20
+        attribute descriptors are sent to the LLM to keep the prompt compact.
+        """
+        if not self.filter_llm:
+            return [], set()
+
+        attributes: List[Dict[str, Any]] = []
+        if self.attribute_provider:
+            provided = self.attribute_provider(category) or []
+            attributes = list(provided[:20]) if len(provided) > 20 else list(provided)
+
+        if not attributes and metadata:
+            raw_attributes = metadata.get("attribute_options") or []
+            attributes = (
+                list(raw_attributes[:20]) if len(raw_attributes) > 20 else list(raw_attributes)
+            )
+
+        if not attributes:
+            return [], set()
+
+        filters = self.filter_llm.derive_filters_from_question(question, attributes) or []
+        answered = {
+            str(item.get("name")).lower()
+            for item in filters
+            if isinstance(item, dict) and item.get("name")
+        }
+        return filters, answered
 
     def _format_results(self, items: List[dict], metadata: Dict[str, Any]) -> str:
         header = metadata.get("product_name") or metadata.get("category") or "producten"
@@ -242,31 +287,37 @@ class ConversationLoopManager:
         return "\n".join(lines)
 
     def _finalise_answer(
-        self, items: List[dict], metadata: Dict[str, Any], conversation_id: Optional[str]
+        self, result: SearchResult, conversation_id: Optional[str]
     ) -> AskResponse:
-        text = self._format_results(items, metadata) if items else "Geen producten gevonden"
+        """Render a terminal response (answer/no-results) for the user."""
+        text = (
+            format_result_text(result)
+            if result.items
+            else "Geen producten gevonden"
+        )
         return AskResponse(
-            type="answer" if items else "no_results",
+            type="answer" if result.items else "no_results",
             text=text,
             conversation_id=conversation_id,
         )
 
-    def _build_refinement_prompt(
+    def _create_refinement_prompt(
         self,
         category: str,
-        metadata: Dict[str, Any],
-        items: List[dict],
-        count: int,
+        result: SearchResult,
         asked: set[str],
-        filters: Optional[List[Dict[str, Any]]],
+        filters: Filters,
     ) -> Tuple[Optional[str], Optional[dict]]:
+        """Ask the refinement LLM for the next follow-up question."""
+        metadata = result.metadata
+        items = result.items
         product_name = metadata.get("product_name") or category or "producten"
-        attribute = self._select_attribute(metadata, asked, items)
+        attribute = select_attribute_for_refinement(metadata, asked, items)
         if not attribute:
             return None, None
 
         attr = dict(attribute)
-        label = self._attribute_label(attr)
+        label = attribute_label(attr)
         attr["label"] = label
         attr_type = (attr.get("type") or "").lower()
         q1, q3 = attr.get("q1"), attr.get("q3")
@@ -275,7 +326,7 @@ class ConversationLoopManager:
         ctx = {
             "category": product_name,
             "attribute": attr,
-            "count": count,
+            "count": result.total,
             "asked_attributes": sorted(asked),
             "applied_filters": filters or [],
         }
@@ -294,69 +345,12 @@ class ConversationLoopManager:
             return None, None
         return question_text, attr
 
-    def _select_attribute(
-        self, metadata: Dict[str, Any], asked: set[str], items: List[dict]
-    ) -> Optional[dict]:
-        options = metadata.get("attribute_options") or []
-        for entry in options:
-            if not isinstance(entry, dict):
-                continue
-            name = entry.get("name")
-            if not name or name.lower() in asked:
-                continue
-            attr_type = (entry.get("type") or "").lower()
-            values = entry.get("values")
-            available_values: Optional[List[str]] = None
-            if attr_type == "categorical":
-                collected = self._collect_attribute_values(items, name)
-                metadata_values = [str(v) for v in (values or []) if v]
-                if collected and len(collected) >= 2:
-                    available_values = collected
-                elif collected and len(collected) == 1:
-                    if len(metadata_values) > 1:
-                        available_values = metadata_values
-                    else:
-                        continue
-                elif len(metadata_values) > 1:
-                    available_values = metadata_values
-                else:
-                    continue
-            prepared = {
-                "name": name,
-                "description": entry.get("description"),
-                "type": entry.get("type"),
-                "q1": entry.get("q1"),
-                "q3": entry.get("q3"),
-                "values": available_values if available_values is not None else values,
-            }
-            return prepared
-        return None
-
-    def _derive_filters_from_question(
-        self, question: str, metadata: Dict[str, Any]
-    ) -> List[Dict[str, Any]]:
-        if not self.filter_llm:
-            return []
-
-        attribute_options = metadata.get("attribute_options") or []
-        selected: List[Dict[str, Any]] = []
-        for attr in attribute_options:
-            if not isinstance(attr, dict):
-                continue
-            if not attr.get("name"):
-                continue
-            selected.append(attr)
-            if len(selected) >= 20:
-                break
-        if not selected:
-            return []
-        return self.filter_llm.derive_filters_from_question(question, selected)
-
     def _build_filters_from_answer(
         self,
         attribute: Dict[str, Any],
         reply: str,
     ) -> List[Dict[str, Any]]:
+        """Convert a free-form reply into structured filters for a single attribute."""
         reply_text = (reply or "").strip()
         if not reply_text:
             return []
@@ -379,34 +373,3 @@ class ConversationLoopManager:
             if isinstance(item, dict) and item.get("name") == name:
                 valid.append(item)
         return valid
-
-    @staticmethod
-    def _attribute_label(attribute: Dict[str, Any]) -> str:
-        name = attribute.get("name")
-        if not name:
-            return "het product"
-        return str(name).replace("_", " ")
-
-    @staticmethod
-    def _collect_attribute_values(items: List[dict], attribute_name: str) -> List[str]:
-        seen: set[str] = set()
-        ordered: List[str] = []
-        for item in items:
-            if not isinstance(item, dict):
-                continue
-            value = item.get(attribute_name)
-            if value in (None, "", []):
-                continue
-            if isinstance(value, list):
-                candidates = value
-            else:
-                candidates = [value]
-            for candidate in candidates:
-                text = str(candidate).strip()
-                if not text:
-                    continue
-                lowered = text.lower()
-                if lowered not in seen:
-                    seen.add(lowered)
-                    ordered.append(text)
-        return ordered
