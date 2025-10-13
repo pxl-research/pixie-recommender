@@ -1,7 +1,8 @@
 import json
 import logging
+from contextlib import contextmanager
 from contextvars import ContextVar
-from typing import Optional
+from typing import Iterator, Optional
 
 trace_id_ctx: ContextVar[Optional[str]] = ContextVar("trace_id", default=None)
 conversation_id_ctx: ContextVar[Optional[str]] = ContextVar(
@@ -65,3 +66,16 @@ def configure_logging(level: int = logging.INFO) -> None:
 
     logging.setLogRecordFactory(record_factory)
     setattr(root, "pixie_configured", True)
+
+
+@contextmanager
+def conversation_context(
+    conversation_id: Optional[str], turn_index: Optional[int]
+) -> Iterator[None]:
+    id_token = conversation_id_ctx.set(conversation_id)
+    turn_token = turn_index_ctx.set(turn_index)
+    try:
+        yield
+    finally:
+        conversation_id_ctx.reset(id_token)
+        turn_index_ctx.reset(turn_token)

@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import logging
 import os
+from datetime import timedelta
 from typing import Any, Callable, Dict, List, Optional
 
 from ..llms.azure_llm_set import (
@@ -12,9 +13,11 @@ from ..llms.azure_llm_set import (
     create_azure_refinement_llm,
 )
 from ..utils.contracts import AskResponse
+from ..utils.logging import conversation_context
 from ..utils.tabular_api import TabularAPIClient, build_tabular_client
 from .conversation_loop_manager import ConversationLoopManager
 from .llm_orchestrator import LLMOrchestrator
+from .repository import ConversationRepository
 
 logger = logging.getLogger(__name__)
 
@@ -27,9 +30,16 @@ class Pixie:
     def __init__(
         self,
         conversation_manager: ConversationLoopManager | None = None,
+        repository: ConversationRepository | None = None,
     ) -> None:
         if conversation_manager is not None:
             self._conversation_manager = conversation_manager
+            self._repository = (
+                repository
+                or getattr(conversation_manager, "repository", None)
+            )
+            if self._repository is None:
+                raise ValueError("Conversation repository is required")
             return
 
         client, base_url, collection, default_limit = build_tabular_client()
@@ -46,27 +56,40 @@ class Pixie:
         refinement_llm = create_azure_refinement_llm()
         filter_llm = create_azure_filter_llm()
         orchestrator = LLMOrchestrator(relevance_llm)
-        search_fn = self._build_search_fn(client, collection, default_limit, attribute_map)
+        search_fn = self._build_search_fn(
+            client, collection, default_limit, attribute_map
+        )
 
-        result_threshold = int(os.getenv("PIXIE_RESULT_THRESHOLD", "3"))
-        max_questions = int(os.getenv("PIXIE_MAX_REFINE_QUESTIONS", "2"))
+        ttl_minutes = int(os.environ["PIXIE_CONVERSATION_TTL_MINUTES"])
+        repo = repository or ConversationRepository(
+            ttl=timedelta(minutes=ttl_minutes)
+        )
+        result_threshold = int(os.environ["PIXIE_RESULT_THRESHOLD"])
+        max_questions = int(os.environ["PIXIE_MAX_REFINE_QUESTIONS"])
 
         self._conversation_manager = ConversationLoopManager(
             search_fn=search_fn,
             llm_orchestrator=orchestrator,
             refinement_llm=refinement_llm,
             filter_llm=filter_llm,
+            repository=repo,
             result_threshold=result_threshold,
             max_questions=max_questions,
         )
+        self._repository = repo
 
     def answer(self, question: str) -> AskResponse:
         logger.info("answer", extra={"question": question})
-        return self._conversation_manager.handle_new_question(question)
+        with conversation_context(None, 0):
+            return self._conversation_manager.handle_new_question(question)
 
     def reply(self, conversation_id: str, reply_text: str) -> AskResponse:
         logger.info("reply", extra={"conversation_id": conversation_id})
-        return self._conversation_manager.handle_reply(conversation_id, reply_text)
+        with conversation_context(conversation_id, None):
+            return self._conversation_manager.handle_reply(conversation_id, reply_text)
+
+    def active_conversations(self) -> int:
+        return self._repository.count()
 
     def _load_categories(
         self, client: TabularAPIClient, collection: str

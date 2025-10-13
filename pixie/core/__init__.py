@@ -5,6 +5,7 @@ from .llms.azure_relevance_llm import AzureRelevanceLLM
 from .utils.contracts import AskResponse
 from .utils.logging import (
     configure_logging,
+    conversation_context,
     conversation_id_ctx,
     trace_id_ctx,
     turn_index_ctx,
@@ -16,6 +17,7 @@ __all__ = [
     "AzureRelevanceLLM",
     "create_azure_llm_set",
     "configure_logging",
+    "conversation_context",
     "conversation_id_ctx",
     "Pixie",
     "trace_id_ctx",

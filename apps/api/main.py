@@ -18,9 +18,8 @@ pixie_logging.configure_logging()
 
 class AskPayload(BaseModel):
     question: Optional[str] = None
-    pending_id: Optional[str] = None
-    message: Optional[str] = None
     conversation_id: Optional[str] = None
+    message: Optional[str] = None
 
 
 @asynccontextmanager
@@ -60,11 +59,13 @@ def health():
 
 @app.get("/metrics")
 def metrics():
+    pixie: Pixie | None = getattr(app.state, "pixie", None)
+    active = pixie.active_conversations() if pixie else 0
     return {
         "timestamp": int(time.time()),
         "status": "healthy",
         "version": "0.6.0",
-        "active_conversations": 0,
+        "active_conversations": active,
     }
 
 
@@ -79,13 +80,13 @@ async def ask(payload: AskPayload, request: Request):
         return AskResponse(type="error", reason="service_unavailable").dict()
 
     try:
-        if payload.pending_id or payload.conversation_id:
+        if payload.conversation_id:
             message = (payload.message or "").strip()
             if not message:
                 return AskResponse(
                     type="error", reason="'message' is required when replying"
                 ).dict()
-            identifier = (payload.conversation_id or payload.pending_id or "").strip()
+            identifier = (payload.conversation_id or "").strip()
             if not identifier:
                 return AskResponse(
                     type="error",
@@ -93,6 +94,12 @@ async def ask(payload: AskPayload, request: Request):
                 ).dict()
             resp = pixie.reply(identifier, message)
             return resp.dict()
+
+        if payload.message and not payload.conversation_id:
+            return AskResponse(
+                type="error",
+                reason="'conversation_id' is required when replying",
+            ).dict()
 
         question = (payload.question or "").strip()
         if not question:

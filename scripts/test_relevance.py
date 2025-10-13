@@ -53,6 +53,9 @@ def load_env() -> None:
             ".env.dev not found; please create it before running the test script"
         )
     os.environ["PIXIE_TABULAR_API_URL"] = "http://localhost:8000"
+    os.environ.setdefault("PIXIE_CONVERSATION_TTL_MINUTES", "15")
+    os.environ.setdefault("PIXIE_RESULT_THRESHOLD", "3")
+    os.environ.setdefault("PIXIE_MAX_REFINE_QUESTIONS", "2")
 
 
 def main() -> None:
@@ -73,7 +76,7 @@ def main() -> None:
         print(f"Antwoord: {response}")
 
         turn = 0
-        conversation_id = response.conversation_id or response.pending_id
+        conversation_id = response.conversation_id
         while response.type == "ask_user" and conversation_id:
             follow_up = _craft_follow_up(response.prompt)
             turn += 1

@@ -10,7 +10,10 @@ from uuid import uuid4
 from ..llms.azure_filter_llm import AzureFilterLLM
 from ..llms.azure_refinement_llm import AzureRefinementLLM
 from ..utils.contracts import AskResponse
+from ..utils.logging import conversation_context
 from .llm_orchestrator import LLMOrchestrator
+from .repository import ConversationRepository
+from .state import ConversationState
 
 logger = logging.getLogger(__name__)
 
@@ -30,6 +33,7 @@ class ConversationLoopManager:
         llm_orchestrator: LLMOrchestrator,
         refinement_llm: AzureRefinementLLM,
         filter_llm: AzureFilterLLM,
+        repository: ConversationRepository,
         result_threshold: int = 3,
         max_questions: int = 2,
     ) -> None:
@@ -37,14 +41,15 @@ class ConversationLoopManager:
         self.llm_orchestrator = llm_orchestrator
         self.refinement_llm = refinement_llm
         self.filter_llm = filter_llm
+        self.repository = repository
         self.result_threshold = max(result_threshold, 1)
         self.max_questions = max(max_questions, 1)
-        self._state: dict[str, dict[str, Any]] = {}
 
     # ------------------------------------------------------------------
     # Public API
     # ------------------------------------------------------------------
     def handle_new_question(self, question: str) -> AskResponse:
+        self.repository.expire_stale()
         relevance = self.llm_orchestrator.check_relevance_and_category(question)
         if not relevance.success:
             return AskResponse(type="error", reason=relevance.error or "llm_failure")
@@ -66,68 +71,87 @@ class ConversationLoopManager:
         if total <= self.result_threshold:
             return self._finalise_answer(items, metadata, None)
 
-        prompt, attribute = self._build_refinement_prompt(category, metadata, total, set())
+        prompt, attribute = self._build_refinement_prompt(
+            category, metadata, total, asked=set()
+        )
         if not prompt or not attribute:
             return self._finalise_answer(items, metadata, None)
 
         conv_id = str(uuid4())
-        self._state[conv_id] = {
-            "category": category,
-            "filters": [],
-            "asked": {attribute["name"].lower()},
-            "question_count": 1,
-            "metadata": metadata,
-            "current_attribute": attribute,
-        }
-        return AskResponse(type="ask_user", prompt=prompt, conversation_id=conv_id)
+        attr_name = attribute.get("name")
+        asked = {attr_name.lower()} if attr_name else set()
+        state = ConversationState(
+            conversation_id=conv_id,
+            category=category,
+            filters=[],
+            asked_attributes=asked,
+            question_count=1,
+            metadata=metadata,
+            current_attribute=attribute,
+        )
+        with conversation_context(conv_id, 1):
+            self.repository.create(state)
+        return AskResponse(
+            type="ask_user", prompt=prompt, conversation_id=conv_id
+        )
 
     def handle_reply(self, conversation_id: str, reply: str) -> AskResponse:
-        state = self._state.get(conversation_id)
+        self.repository.expire_stale()
+        state = self.repository.get(conversation_id)
         if not state:
-            return AskResponse(type="error", reason="unknown_conversation", conversation_id=conversation_id)
+            return AskResponse(
+                type="error",
+                reason="unknown_conversation",
+                conversation_id=conversation_id,
+            )
 
-        category: str = state["category"]
-        filters: List[dict] = state.get("filters", [])
-        asked: set[str] = set(state.get("asked", set()))
-        question_count: int = int(state.get("question_count", 1))
-        attribute = state.get("current_attribute") or {}
+        with conversation_context(conversation_id, state.question_count + 1):
+            category = state.category
+            filters = list(state.filters)
+            attribute = state.current_attribute or {}
 
-        new_filters = self._build_filters_from_answer(attribute, reply)
-        if new_filters:
-            attr_name = attribute.get("name")
-            if attr_name:
-                filters = [f for f in filters if f.get("name") != attr_name]
-            filters.extend(new_filters)
+            new_filters = self._build_filters_from_answer(attribute, reply)
+            if new_filters:
+                attr_name = attribute.get("name")
+                if attr_name:
+                    filters = [f for f in filters if f.get("name") != attr_name]
+                filters.extend(new_filters)
 
-        try:
-            results = self.search_fn(None, {"category": category, "filters": filters})
-        except Exception as exc:  # pragma: no cover
-            logger.error("loop.search_failed", exc_info=exc)
-            self._state.pop(conversation_id, None)
-            return AskResponse(type="error", reason="search_failed", conversation_id=conversation_id)
+            try:
+                results = self.search_fn(None, {"category": category, "filters": filters})
+            except Exception as exc:  # pragma: no cover
+                logger.error("loop.search_failed", exc_info=exc)
+                self.repository.delete(conversation_id)
+                return AskResponse(
+                    type="error",
+                    reason="search_failed",
+                    conversation_id=conversation_id,
+                )
 
-        items, metadata = self._normalise_results(results, category)
-        total = self._total_count(metadata, items)
-        if total <= self.result_threshold or question_count >= self.max_questions:
-            self._state.pop(conversation_id, None)
-            return self._finalise_answer(items, metadata, conversation_id)
+            items, metadata = self._normalise_results(results, category)
+            total = self._total_count(metadata, items)
+            if total <= self.result_threshold or state.question_count >= self.max_questions:
+                self.repository.delete(conversation_id)
+                return self._finalise_answer(items, metadata, conversation_id)
 
-        prompt, next_attr = self._build_refinement_prompt(category, metadata, total, asked)
-        if not prompt or not next_attr:
-            self._state.pop(conversation_id, None)
-            return self._finalise_answer(items, metadata, conversation_id)
+            prompt, next_attr = self._build_refinement_prompt(
+                category, metadata, total, state.asked_attributes
+            )
+            if not prompt or not next_attr:
+                self.repository.delete(conversation_id)
+                return self._finalise_answer(items, metadata, conversation_id)
 
-        asked.add(next_attr["name"].lower())
-        state.update(
-            {
-                "filters": filters,
-                "asked": asked,
-                "question_count": question_count + 1,
-                "metadata": metadata,
-                "current_attribute": next_attr,
-            }
-        )
-        return AskResponse(type="ask_user", prompt=prompt, conversation_id=conversation_id)
+            state.filters = filters
+            state.metadata = metadata
+            state.current_attribute = next_attr
+            state.question_count += 1
+            next_name = next_attr.get("name")
+            if next_name:
+                state.asked_attributes.add(next_name.lower())
+            self.repository.update(state)
+            return AskResponse(
+                type="ask_user", prompt=prompt, conversation_id=conversation_id
+            )
 
     # ------------------------------------------------------------------
     # Helpers
