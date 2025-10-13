@@ -71,7 +71,7 @@ class ConversationLoopManager:
             return self._finalise_answer(items, metadata, None)
 
         prompt, attribute = self._build_refinement_prompt(
-            category, metadata, total, asked=set(), filters=[]
+            category, metadata, items, total, asked=set(), filters=[]
         )
         if not prompt or not attribute:
             return self._finalise_answer(items, metadata, None)
@@ -134,7 +134,7 @@ class ConversationLoopManager:
                 return self._finalise_answer(items, metadata, conversation_id)
 
         prompt, next_attr = self._build_refinement_prompt(
-            category, metadata, total, state.asked_attributes, filters
+            category, metadata, items, total, state.asked_attributes, filters
         )
         if not prompt or not next_attr:
             self.repository.delete(conversation_id)
@@ -213,12 +213,13 @@ class ConversationLoopManager:
         self,
         category: str,
         metadata: Dict[str, Any],
+        items: List[dict],
         count: int,
         asked: set[str],
         filters: Optional[List[Dict[str, Any]]],
     ) -> Tuple[Optional[str], Optional[dict]]:
         product_name = metadata.get("product_name") or category or "producten"
-        attribute = self._select_attribute(metadata, asked)
+        attribute = self._select_attribute(metadata, asked, items)
         if not attribute:
             return None, None
 
@@ -276,7 +277,9 @@ class ConversationLoopManager:
             return None, None
         return question_text, attr
 
-    def _select_attribute(self, metadata: Dict[str, Any], asked: set[str]) -> Optional[dict]:
+    def _select_attribute(
+        self, metadata: Dict[str, Any], asked: set[str], items: List[dict]
+    ) -> Optional[dict]:
         options = metadata.get("attribute_options") or []
         for entry in options:
             if not isinstance(entry, dict):
@@ -284,17 +287,39 @@ class ConversationLoopManager:
             name = entry.get("name")
             if not name or name.lower() in asked:
                 continue
-            return {
+            attr_type = (entry.get("type") or "").lower()
+            values = entry.get("values")
+            available_values: Optional[List[str]] = None
+            if attr_type == "categorical":
+                collected = self._collect_attribute_values(items, name)
+                metadata_values = [str(v) for v in (values or []) if v]
+                if collected and len(collected) >= 2:
+                    available_values = collected
+                elif collected and len(collected) == 1:
+                    if len(metadata_values) > 1:
+                        available_values = metadata_values
+                    else:
+                        continue
+                elif len(metadata_values) > 1:
+                    available_values = metadata_values
+                else:
+                    continue
+            prepared = {
                 "name": name,
                 "description": entry.get("description"),
                 "type": entry.get("type"),
                 "q1": entry.get("q1"),
                 "q3": entry.get("q3"),
-                "values": entry.get("values"),
+                "values": available_values if available_values is not None else values,
             }
+            return prepared
         return None
 
-    def _build_filters_from_answer(self, attribute: Dict[str, Any], reply: str) -> List[Dict[str, Any]]:
+    def _build_filters_from_answer(
+        self,
+        attribute: Dict[str, Any],
+        reply: str,
+    ) -> List[Dict[str, Any]]:
         reply_text = (reply or "").strip()
         if not reply_text:
             return []
@@ -326,6 +351,30 @@ class ConversationLoopManager:
         return str(name).replace("_", " ")
 
     @staticmethod
+    def _collect_attribute_values(items: List[dict], attribute_name: str) -> List[str]:
+        seen: set[str] = set()
+        ordered: List[str] = []
+        for item in items:
+            if not isinstance(item, dict):
+                continue
+            value = item.get(attribute_name)
+            if value in (None, "", []):
+                continue
+            if isinstance(value, list):
+                candidates = value
+            else:
+                candidates = [value]
+            for candidate in candidates:
+                text = str(candidate).strip()
+                if not text:
+                    continue
+                lowered = text.lower()
+                if lowered not in seen:
+                    seen.add(lowered)
+                    ordered.append(text)
+        return ordered
+
+    @staticmethod
     def _friendly_round(value: float) -> float:
         abs_val = abs(value)
         if abs_val >= 1000:
@@ -342,4 +391,7 @@ class ConversationLoopManager:
 
     @staticmethod
     def _format_numeric_value(value: float) -> str:
-        return str(int(value)) if abs(value - int(value)) < 0.01 else f"{value:.1f}".rstrip("0").rstrip(".")
+        if abs(value - int(value)) < 0.01:
+            return str(int(value))
+        formatted = f"{value:.1f}".rstrip("0").rstrip(".")
+        return formatted
