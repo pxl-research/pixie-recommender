@@ -37,3 +37,27 @@ def test_build_filters_ignores_unknown_reply():
     for answer in ["Geen idee", "Ik weet het niet", "Maakt niet uit"]:
         filters = manager._build_filters_from_answer(attribute, answer)
         assert filters == [], f"Answer '{answer}' should not yield filters"
+
+
+class EchoFilterLLM:
+    def __init__(self, payload):
+        self.payload = payload
+
+    def build_filters(self, reply, attribute):
+        return self.payload
+
+
+def test_build_filters_uses_llm_output():
+    repo = ConversationRepository(ttl=timedelta(minutes=1))
+    expected = [{"name": "merk", "type": "exact", "value": "HP"}]
+    manager = ConversationLoopManager(
+        search_fn=lambda *_args, **_kwargs: {},
+        llm_orchestrator=DummyOrchestrator(),
+        refinement_llm=DummyRefinementLLM(),
+        filter_llm=EchoFilterLLM(expected),
+        repository=repo,
+    )
+
+    attribute = {"name": "merk", "type": "categorical", "values": ["HP"]}
+    filters = manager._build_filters_from_answer(attribute, "HP graag")
+    assert filters == expected

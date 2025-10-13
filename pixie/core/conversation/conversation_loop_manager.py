@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 import logging
-import re
 from typing import Any, Callable, Dict, List, Optional, Tuple
 from uuid import uuid4
 
@@ -72,7 +71,7 @@ class ConversationLoopManager:
             return self._finalise_answer(items, metadata, None)
 
         prompt, attribute = self._build_refinement_prompt(
-            category, metadata, total, asked=set()
+            category, metadata, total, asked=set(), filters=[]
         )
         if not prompt or not attribute:
             return self._finalise_answer(items, metadata, None)
@@ -134,24 +133,24 @@ class ConversationLoopManager:
                 self.repository.delete(conversation_id)
                 return self._finalise_answer(items, metadata, conversation_id)
 
-            prompt, next_attr = self._build_refinement_prompt(
-                category, metadata, total, state.asked_attributes
-            )
-            if not prompt or not next_attr:
-                self.repository.delete(conversation_id)
-                return self._finalise_answer(items, metadata, conversation_id)
+        prompt, next_attr = self._build_refinement_prompt(
+            category, metadata, total, state.asked_attributes, filters
+        )
+        if not prompt or not next_attr:
+            self.repository.delete(conversation_id)
+            return self._finalise_answer(items, metadata, conversation_id)
 
-            state.filters = filters
-            state.metadata = metadata
-            state.current_attribute = next_attr
-            state.question_count += 1
-            next_name = next_attr.get("name")
-            if next_name:
-                state.asked_attributes.add(next_name.lower())
-            self.repository.update(state)
-            return AskResponse(
-                type="ask_user", prompt=prompt, conversation_id=conversation_id
-            )
+        state.filters = filters
+        state.metadata = metadata
+        state.current_attribute = next_attr
+        state.question_count += 1
+        next_name = next_attr.get("name")
+        if next_name:
+            state.asked_attributes.add(next_name.lower())
+        self.repository.update(state)
+        return AskResponse(
+            type="ask_user", prompt=prompt, conversation_id=conversation_id
+        )
 
     # ------------------------------------------------------------------
     # Helpers
@@ -211,7 +210,12 @@ class ConversationLoopManager:
         )
 
     def _build_refinement_prompt(
-        self, category: str, metadata: Dict[str, Any], count: int, asked: set[str]
+        self,
+        category: str,
+        metadata: Dict[str, Any],
+        count: int,
+        asked: set[str],
+        filters: Optional[List[Dict[str, Any]]],
     ) -> Tuple[Optional[str], Optional[dict]]:
         product_name = metadata.get("product_name") or category or "producten"
         attribute = self._select_attribute(metadata, asked)
@@ -219,8 +223,8 @@ class ConversationLoopManager:
             return None, None
 
         attr = dict(attribute)
-        name = attr.get("name")
-        label = (name or "het product").replace("_", " ")
+        label = self._attribute_label(attr)
+        attr["label"] = label
         attr_type = (attr.get("type") or "").lower()
         q1, q3 = attr.get("q1"), attr.get("q3")
         values = attr.get("values")
@@ -250,7 +254,13 @@ class ConversationLoopManager:
                 attr["options"] = sample_values + ["weet ik niet"]
                 attr.setdefault("examples", sample_values)
 
-        ctx = {"category": product_name, "attribute": attr, "count": count, "asked_attributes": sorted(asked)}
+        ctx = {
+            "category": product_name,
+            "attribute": attr,
+            "count": count,
+            "asked_attributes": sorted(asked),
+            "applied_filters": filters or [],
+        }
 
         question = None
         try:
@@ -260,12 +270,11 @@ class ConversationLoopManager:
             question = None
 
         if not question:
-            fallback = (
-                f"Ik heb {count} resultaten voor {product_name}. Wat vind je belangrijk aan {label}? "
-                "Je mag ook laten weten dat je het nog niet weet."
-            )
-            return fallback, attr
-        return question, attr
+            return None, None
+        question_text = question.strip()
+        if not question_text:
+            return None, None
+        return question_text, attr
 
     def _select_attribute(self, metadata: Dict[str, Any], asked: set[str]) -> Optional[dict]:
         options = metadata.get("attribute_options") or []
@@ -286,47 +295,35 @@ class ConversationLoopManager:
         return None
 
     def _build_filters_from_answer(self, attribute: Dict[str, Any], reply: str) -> List[Dict[str, Any]]:
-        # Try LLM first
-        filters = self.filter_llm.build_filters(reply, attribute) if self.filter_llm else []
-        if filters:
-            return filters
-        # Minimal fallback parsing
-        reply_text = reply.strip()
-        reply_lower = reply_text.lower()
-
+        reply_text = (reply or "").strip()
         if not reply_text:
+            return []
+
+        if not self.filter_llm:
+            return []
+
+        try:
+            raw_filters = self.filter_llm.build_filters(reply_text, attribute) or []
+        except Exception:  # pragma: no cover - defensive
+            logger.warning("filter_llm_failed_to_parse", exc_info=True)
             return []
 
         name = attribute.get("name")
         if not name:
             return []
-        attr_type = (attribute.get("type") or "").lower()
-        out: List[Dict[str, Any]] = []
-        if attr_type in {"continuous", "numeric"}:
-            q1, q3 = attribute.get("q1"), attribute.get("q3")
-            if isinstance(q1, (int, float)) and isinstance(q3, (int, float)):
-                if "minder" in reply_lower or "onder" in reply_lower:
-                    out.append({"name": name, "type": "range", "min_value": None, "max_value": q1})
-                elif "meer" in reply_lower or "boven" in reply_lower:
-                    out.append({"name": name, "type": "range", "min_value": q3, "max_value": None})
-                elif "tussen" in reply_lower and "en" in reply_lower:
-                    out.append({"name": name, "type": "range", "min_value": q1, "max_value": q3})
-                else:
-                    num = self._extract_number(reply_lower)
-                    if num is not None:
-                        span = max(num * 0.1, 1)
-                        out.append({"name": name, "type": "range", "min_value": max(0, num - span), "max_value": num + span})
-        elif attr_type == "boolean":
-            if any(w in reply_lower for w in ["ja", "wel", "true", "aan"]):
-                out.append({"name": name, "type": "exact", "value": True})
-            elif any(w in reply_lower for w in ["nee", "niet", "false", "uit"]):
-                out.append({"name": name, "type": "exact", "value": False})
-        elif attr_type == "categorical":
-            vals = attribute.get("values")
-            val = self._match_value(reply_lower, vals) if vals else None
-            if val:
-                out.append({"name": name, "type": "exact", "value": val})
-        return out
+
+        valid: List[Dict[str, Any]] = []
+        for item in raw_filters:
+            if isinstance(item, dict) and item.get("name") == name:
+                valid.append(item)
+        return valid
+
+    @staticmethod
+    def _attribute_label(attribute: Dict[str, Any]) -> str:
+        name = attribute.get("name")
+        if not name:
+            return "het product"
+        return str(name).replace("_", " ")
 
     @staticmethod
     def _friendly_round(value: float) -> float:
@@ -346,26 +343,3 @@ class ConversationLoopManager:
     @staticmethod
     def _format_numeric_value(value: float) -> str:
         return str(int(value)) if abs(value - int(value)) < 0.01 else f"{value:.1f}".rstrip("0").rstrip(".")
-
-    @staticmethod
-    def _extract_number(text: str) -> Optional[float]:
-        m = re.search(r"(\d+[\d.,]*)", text)
-        if not m:
-            return None
-        num = m.group(0).replace(".", "").replace(",", ".")
-        try:
-            return float(num)
-        except ValueError:
-            return None
-
-    @staticmethod
-    def _match_value(reply_lower: str, values: Any) -> Optional[str]:
-        if not isinstance(values, list):
-            return None
-        for v in values:
-            if v is None:
-                continue
-            s = str(v)
-            if s.lower() in reply_lower:
-                return s
-        return None
