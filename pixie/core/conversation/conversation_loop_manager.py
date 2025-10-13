@@ -287,6 +287,10 @@ class ConversationLoopManager:
         # Minimal fallback parsing
         reply_text = reply.strip()
         reply_lower = reply_text.lower()
+
+        if not reply_text:
+            return []
+
         name = attribute.get("name")
         if not name:
             return []
@@ -313,12 +317,9 @@ class ConversationLoopManager:
                 out.append({"name": name, "type": "exact", "value": False})
         elif attr_type == "categorical":
             vals = attribute.get("values")
-            val = self._match_value(reply_lower, vals) if vals else reply_text
+            val = self._match_value(reply_lower, vals) if vals else None
             if val:
                 out.append({"name": name, "type": "exact", "value": val})
-        else:
-            if reply_text:
-                out.append({"name": name, "type": "exact", "value": reply_text})
         return out
 
     @staticmethod

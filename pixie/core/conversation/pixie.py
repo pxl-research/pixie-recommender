@@ -84,8 +84,8 @@ class Pixie:
             return self._conversation_manager.handle_new_question(question)
 
     def reply(self, conversation_id: str, reply_text: str) -> AskResponse:
-        logger.info("reply", extra={"conversation_id": conversation_id})
         with conversation_context(conversation_id, None):
+            logger.info("reply")
             return self._conversation_manager.handle_reply(conversation_id, reply_text)
 
     def active_conversations(self) -> int:
