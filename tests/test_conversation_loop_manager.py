@@ -21,6 +21,21 @@ class DummyOrchestrator:
         raise RuntimeError("not used in this test")
 
 
+class AcceptingOrchestrator:
+    def __init__(self, category: str = "printers") -> None:
+        self.category = category
+
+    def check_relevance_and_category(self, question):
+        return type(
+            "Resp",
+            (),
+            {
+                "success": True,
+                "result": {"relevant": True, "category": self.category},
+            },
+        )()
+
+
 class HelpfulRefinementLLM:
     def generate_question(self, context=None):
         attribute = (context or {}).get("attribute", {})
@@ -52,6 +67,13 @@ class EchoFilterLLM:
 
     def build_filters(self, reply, attribute):
         return self.payload
+
+
+class BrandFilterLLM:
+    def build_filters(self, reply, attribute):
+        if attribute.get("name") == "merk" and "brother" in (reply or "").lower():
+            return [{"name": "merk", "type": "exact", "value": "Brother"}]
+        return []
 
 
 def test_build_filters_uses_llm_output():
@@ -154,3 +176,59 @@ def test_build_refinement_prompt_limits_options_to_remaining_values():
     assert attribute is not None
     assert attribute.get("values") == ["Brother", "HP"]
     assert attribute.get("options")[:2] == ["Brother", "HP"]
+
+
+def test_handle_new_question_derives_initial_filters():
+    repo = ConversationRepository(ttl=timedelta(minutes=1))
+    calls: list[list[dict] | None] = []
+
+    inventory = [
+        {"naam": "Brother Laser 1", "merk": "Brother"},
+        {"naam": "Brother Laser 2", "merk": "Brother"},
+        {"naam": "HP OfficeJet", "merk": "HP"},
+    ]
+
+    def search_fn(_sql, context):
+        filters = (context or {}).get("filters")
+        calls.append(filters)
+        results = inventory
+        if filters:
+            for flt in filters:
+                if flt.get("name") == "merk":
+                    results = [item for item in results if item.get("merk") == flt.get("value")]
+        return {
+            "product_name": "printers",
+            "results": results,
+            "count": len(results),
+            "total": len(results),
+            "attribute_options": [
+                {"name": "merk", "type": "categorical", "values": ["Brother", "HP"]},
+                {
+                    "name": "printtechnologie",
+                    "type": "categorical",
+                    "values": ["laser", "inkjet", "led"],
+                },
+            ],
+        }
+
+    manager = ConversationLoopManager(
+        search_fn=search_fn,
+        llm_orchestrator=AcceptingOrchestrator(),
+        refinement_llm=HelpfulRefinementLLM(),
+        filter_llm=BrandFilterLLM(),
+        repository=repo,
+        result_threshold=1,
+    )
+
+    response = manager.handle_new_question("Ik zoek een Brother printer")
+
+    assert len(calls) == 2
+    assert calls[0] in (None, [])
+    assert calls[1] and calls[1][0]["name"] == "merk"
+    assert response.type == "ask_user"
+    assert response.conversation_id is not None
+
+    state = manager.repository.get(response.conversation_id)
+    assert state is not None
+    assert state.filters == [{"name": "merk", "type": "exact", "value": "Brother"}]
+    assert "merk" in state.asked_attributes

@@ -65,24 +65,67 @@ class ConversationLoopManager:
             logger.error("loop.search_failed", exc_info=exc)
             return AskResponse(type="error", reason="search_failed")
 
-        items, metadata = self._normalise_results(results, category)
-        total = self._total_count(metadata, items)
+        base_items, base_metadata = self._normalise_results(results, category)
+        base_total = self._total_count(base_metadata, base_items)
+        items, metadata = base_items, base_metadata
+        total = base_total
+
+        initial_filters: List[Dict[str, Any]] = []
+        answered_attributes: set[str] = set()
+        if self.filter_llm:
+            try:
+                initial_filters = self._derive_filters_from_question(question, metadata)
+            except Exception:  # pragma: no cover - defensive
+                logger.warning("initial_filter_derivation_failed", exc_info=True)
+                initial_filters = []
+            if initial_filters:
+                answered_attributes = {
+                    str(name).lower()
+                    for name in (flt.get("name") for flt in initial_filters)
+                    if isinstance(name, str) and name
+                }
+                try:
+                    results = self.search_fn(
+                        None, {"category": category, "filters": initial_filters}
+                    )
+                except Exception as exc:  # pragma: no cover
+                    logger.error("loop.initial_filter_search_failed", exc_info=exc)
+                    return AskResponse(type="error", reason="search_failed")
+                items, metadata = self._normalise_results(results, category)
+                total = self._total_count(metadata, items)
+                if total == 0:
+                    logger.info(
+                        "loop.initial_filters_no_hits",
+                        extra={"filters": initial_filters, "question": question},
+                    )
+                    items, metadata, total = base_items, base_metadata, base_total
+                    initial_filters = []
+                    # Keep answered_attributes so we do not ask again,
+                    # even though the filter could not be applied reliably.
+
         if total <= self.result_threshold:
             return self._finalise_answer(items, metadata, None)
 
         prompt, attribute = self._build_refinement_prompt(
-            category, metadata, items, total, asked=set(), filters=[]
+            category,
+            metadata,
+            items,
+            total,
+            asked=answered_attributes,
+            filters=initial_filters,
         )
         if not prompt or not attribute:
             return self._finalise_answer(items, metadata, None)
 
         conv_id = str(uuid4())
         attr_name = attribute.get("name")
-        asked = {attr_name.lower()} if attr_name else set()
+        asked = set(answered_attributes)
+        if attr_name:
+            asked.add(attr_name.lower())
         state = ConversationState(
             conversation_id=conv_id,
             category=category,
-            filters=[],
+            filters=initial_filters,
             asked_attributes=asked,
             question_count=1,
             metadata=metadata,
@@ -314,6 +357,21 @@ class ConversationLoopManager:
             }
             return prepared
         return None
+
+    def _derive_filters_from_question(
+        self, question: str, metadata: Dict[str, Any]
+    ) -> List[Dict[str, Any]]:
+        attribute_options = metadata.get("attribute_options") or []
+        collected: dict[tuple[str, str], Dict[str, Any]] = {}
+        for attribute in attribute_options:
+            if not isinstance(attribute, dict):
+                continue
+            filters = self._build_filters_from_answer(attribute, question)
+            for flt in filters:
+                key = (flt.get("name"), flt.get("type"))
+                if key[0] and key not in collected:
+                    collected[key] = flt
+        return list(collected.values())
 
     def _build_filters_from_answer(
         self,
