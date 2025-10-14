@@ -12,6 +12,7 @@ Only the high-level flow lives in this file; reusable helpers sit in
 
 from __future__ import annotations
 
+import json
 import logging
 from typing import Any, Callable, Dict, List, Optional, Protocol, Tuple
 from uuid import uuid4
@@ -26,7 +27,7 @@ from .conversation_utils import (
     Filters,
     SearchResult,
     attribute_label,
-    format_result_text,
+    build_structured_summary,
     normalise_search_response,
     select_attribute_for_refinement,
 )
@@ -308,46 +309,29 @@ class ConversationLoopManager:
         data = list(raw)
         return data[:20] if len(data) > 20 else data
 
-    def _format_results(self, items: List[dict], metadata: Dict[str, Any]) -> str:
-        header = metadata.get("product_name") or metadata.get("category") or "producten"
-        preferred = metadata.get("preferred_columns") or []
-        lines = [f"Resultaten voor {header}:"]
-        for item in items[:3]:
-            show: list[tuple[str, Any]] = []
-            for col in preferred:
-                val = item.get(col)
-                if val not in (None, ""):
-                    show.append((col, val))
-                if len(show) == 3:
-                    break
-            if not show:
-                for k, v in item.items():
-                    if k in {"id", "created_at", "updated_at", "product_name"} or v in (None, ""):
-                        continue
-                    show.append((k, v))
-                    if len(show) == 3:
-                        break
-            if not show:
-                lines.append("- (geen details)")
-                continue
-            parts = [f"{c.replace('_',' ')}: {v}" for c, v in show]
-            lines.append(f"- {' | '.join(parts)}")
-        total = metadata.get("total")
-        if isinstance(total, int):
-            lines.append(f"Totaal gevonden: {total}")
-        return "\n".join(lines)
-
     def _finalise_answer(
         self, result: SearchResult, conversation_id: Optional[str]
     ) -> AskResponse:
         """Render a terminal response (answer/no-results) for the user."""
-        text = (
-            format_result_text(result)
-            if result.items
-            else "Geen producten gevonden"
-        )
+        if result.items:
+            payload = build_structured_summary(
+                result,
+                self.result_threshold,
+            )
+            text = json.dumps(payload, ensure_ascii=False)
+            response_type = "answer"
+        else:
+            payload = {
+                "total": result.total,
+                "count": 0,
+                "items": [],
+                "message": "Geen producten gevonden",
+            }
+            text = json.dumps(payload, ensure_ascii=False)
+            response_type = "no_results"
+
         return AskResponse(
-            type="answer" if result.items else "no_results",
+            type=response_type,
             text=text,
             conversation_id=conversation_id,
         )
