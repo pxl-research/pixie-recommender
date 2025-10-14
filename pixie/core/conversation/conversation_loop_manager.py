@@ -133,26 +133,6 @@ class ConversationLoopManager:
                 logger.error("loop.search_failed", exc_info=exc)
                 return AskResponse(type="error", reason="search_failed")
 
-        if not initial_filters:
-            post_filters, post_answered = self._initial_filters(
-                question, category, result.metadata
-            )
-            if post_filters:
-                try:
-                    filtered = self._execute_search(category, post_filters)
-                except Exception as exc:  
-                    logger.error("loop.initial_filter_search_failed", exc_info=exc)
-                    return AskResponse(type="error", reason="search_failed")
-                if filtered.total > 0:
-                    initial_filters = post_filters
-                    answered_attributes = post_answered
-                    result = filtered
-                else:
-                    logger.info(
-                        "loop.initial_filters_no_hits",
-                        extra={"filters": post_filters, "question": question},
-                    )
-
         if result.total <= self.result_threshold:
             return self._finalise_answer(result, None)
 
