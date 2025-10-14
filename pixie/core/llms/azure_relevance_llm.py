@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from typing import List, Optional
+from typing import Any, Dict, List, Optional
 
 from .azure_openai_llm import AzureOpenAILLM
 
@@ -94,6 +94,13 @@ class AzureRelevanceLLM(AzureOpenAILLM):
             if lowered == "none":
                 return None
         raise ValueError("Invalid response format from Azure model")
+
+    def check_relevance_and_category(self, question: Optional[str]) -> Dict[str, Any]:
+        relevant = self.is_relevant(question)
+        if not relevant:
+            return {"relevant": False, "category": None}
+        category = self.detect_category(question)
+        return {"relevant": True, "category": category}
 
     def clear_cache(self) -> None:
         pass

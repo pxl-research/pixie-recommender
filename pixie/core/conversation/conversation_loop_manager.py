@@ -13,14 +13,13 @@ Only the high-level flow lives in this file; reusable helpers sit in
 from __future__ import annotations
 
 import logging
-from typing import Any, Callable, Dict, List, Optional, Tuple
+from typing import Any, Callable, Dict, List, Optional, Protocol, Tuple
 from uuid import uuid4
 
 from ..llms.azure_filter_llm import AzureFilterLLM
 from ..llms.azure_refinement_llm import AzureRefinementLLM
 from ..utils.contracts import AskResponse
 from ..utils.logging import conversation_context
-from .llm_orchestrator import LLMOrchestrator
 from .repository import ConversationRepository
 from .state import ConversationState
 from .conversation_utils import (
@@ -35,6 +34,14 @@ from .conversation_utils import (
 logger = logging.getLogger(__name__)
 
 
+class RelevanceLLM(Protocol):
+    def is_relevant(self, question: Optional[str]) -> bool: ...
+
+    def detect_category(self, question: Optional[str]) -> Optional[str]: ...
+
+    def check_relevance_and_category(self, question: Optional[str]) -> Dict[str, Any]: ...
+
+
 class ConversationLoopManager:
     """Minimal multi-turn controller with in-memory state.
 
@@ -47,16 +54,16 @@ class ConversationLoopManager:
         self,
         *,
         search_fn: Callable[[str, Optional[dict]], Dict[str, Any]],
-        llm_orchestrator: LLMOrchestrator,
+        relevance_llm: RelevanceLLM,
         refinement_llm: AzureRefinementLLM,
         filter_llm: AzureFilterLLM,
         repository: ConversationRepository,
         result_threshold: int = 3,
         max_questions: int = 2,
-        attribute_provider: Optional[Callable[[str], Optional[List[Dict[str, Any]]]]] = None,
+        attribute_provider: Optional[Callable[[str], Optional[Dict[str, Any]]]] = None,
     ) -> None:
         self.search_fn = search_fn
-        self.llm_orchestrator = llm_orchestrator
+        self.relevance_llm = relevance_llm
         self.refinement_llm = refinement_llm
         self.filter_llm = filter_llm
         self.repository = repository
@@ -70,18 +77,42 @@ class ConversationLoopManager:
     def handle_new_question(self, question: str) -> AskResponse:
         """Answer an initial user question or, if needed, kick off refinement."""
         self.repository.expire_stale()
-        relevance = self.llm_orchestrator.check_relevance_and_category(question)
-        if not relevance.success:
-            return AskResponse(type="error", reason=relevance.error or "llm_failure")
-        if not relevance.result.get("relevant"):
+        try:
+            decision = self.relevance_llm.check_relevance_and_category(question)
+        except Exception as exc:  
+            logger.error("relevance_failed", exc_info=exc)
+            return AskResponse(type="error", reason="llm_failure")
+
+        relevant = bool(decision.get("relevant"))
+        category = decision.get("category")
+
+        logger.info(
+            "relevance_decision",
+            extra={"question": question, "relevant": relevant, "category": category},
+        )
+
+        if not relevant:
             return AskResponse(type="not_relevant", text="Not relevant")
 
-        category = relevance.result.get("category")
+        category_metadata: Optional[Dict[str, Any]] = None
         if not category:
             return AskResponse(type="error", reason="missing_category")
 
+        if self.attribute_provider and category:
+            try:
+                category_metadata = self.attribute_provider(category) or None
+            except Exception as exc:  
+                logger.warning(
+                    "attribute_provider_failed",
+                    extra={"category": category},
+                    exc_info=exc,
+                )
+
+        if category_metadata:
+            decision["category_metadata"] = category_metadata
+
         initial_filters, answered_attributes = self._initial_filters(
-            question, category, None
+            question, category, category_metadata
         )
         try:
             result = self._execute_search(category, initial_filters or None)
@@ -235,17 +266,7 @@ class ConversationLoopManager:
         if not self.filter_llm:
             return [], set()
 
-        attributes: List[Dict[str, Any]] = []
-        if self.attribute_provider:
-            provided = self.attribute_provider(category) or []
-            attributes = list(provided[:20]) if len(provided) > 20 else list(provided)
-
-        if not attributes and metadata:
-            raw_attributes = metadata.get("attribute_options") or []
-            attributes = (
-                list(raw_attributes[:20]) if len(raw_attributes) > 20 else list(raw_attributes)
-            )
-
+        attributes = self._collect_attributes(category, metadata)
         if not attributes:
             return [], set()
 
@@ -256,6 +277,33 @@ class ConversationLoopManager:
             if isinstance(item, dict) and item.get("name")
         }
         return filters, answered
+
+    def _collect_attributes(
+        self, category: str, metadata: Optional[Dict[str, Any]]
+    ) -> List[Dict[str, Any]]:
+        """Combine attributes from metadata or, as a fallback, the provider."""
+        attributes = self._attribute_options_from_source(metadata)
+        if attributes:
+            return attributes
+
+        if self.attribute_provider:
+            provided = self.attribute_provider(category)
+            return self._attribute_options_from_source(provided)
+        return []
+
+    def _attribute_options_from_source(self, source: Any) -> List[Dict[str, Any]]:
+        """Normalise different metadata inputs to a trimmed attribute list."""
+        if not source:
+            return []
+        if isinstance(source, dict):
+            raw = source.get("attribute_options") or []
+        elif isinstance(source, list):
+            raw = source
+        else:
+            return []
+
+        data = list(raw)
+        return data[:20] if len(data) > 20 else data
 
     def _format_results(self, items: List[dict], metadata: Dict[str, Any]) -> str:
         header = metadata.get("product_name") or metadata.get("category") or "producten"

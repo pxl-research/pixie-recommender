@@ -16,7 +16,6 @@ from ..utils.contracts import AskResponse
 from ..utils.logging import conversation_context
 from ..utils.tabular_api import TabularAPIClient, build_tabular_client
 from .conversation_loop_manager import ConversationLoopManager
-from .llm_orchestrator import LLMOrchestrator
 from .repository import ConversationRepository
 
 logger = logging.getLogger(__name__)
@@ -55,7 +54,6 @@ class Pixie:
         relevance_llm = create_azure_llm_set(categories)
         refinement_llm = create_azure_refinement_llm()
         filter_llm = create_azure_filter_llm()
-        orchestrator = LLMOrchestrator(relevance_llm)
         search_fn = self._build_search_fn(
             client, collection, default_limit, attribute_map
         )
@@ -67,18 +65,21 @@ class Pixie:
         result_threshold = int(os.environ["PIXIE_RESULT_THRESHOLD"])
         max_questions = int(os.environ["PIXIE_MAX_REFINE_QUESTIONS"])
 
-        def attribute_provider(category_name: str) -> Optional[List[Dict[str, Any]]]:
+        def attribute_provider(category_name: str) -> Optional[Dict[str, Any]]:
             if not category_name:
                 return None
             entry = attribute_map.get(category_name.lower())
             if not entry:
                 return None
-            attributes = entry.get("attribute_options")
-            return attributes if isinstance(attributes, list) else None
+            metadata = dict(entry)
+            options = metadata.get("attribute_options")
+            if isinstance(options, list):
+                metadata["attribute_options"] = list(options)
+            return metadata
 
         self._conversation_manager = ConversationLoopManager(
             search_fn=search_fn,
-            llm_orchestrator=orchestrator,
+            relevance_llm=relevance_llm,
             refinement_llm=refinement_llm,
             filter_llm=filter_llm,
             repository=repo,
