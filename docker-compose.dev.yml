@@ -1,5 +1,5 @@
 services:
-  api:
+  core-api:
     build:
       context: .
       dockerfile: infra/docker/Dockerfile.dev
@@ -9,17 +9,6 @@ services:
     env_file: .env.dev
     volumes:
       - .:/app   # hot reload
-
-  dev:
-    build:
-      context: .
-      dockerfile: infra/docker/Dockerfile.dev
-    volumes:
-      - .:/app
-    working_dir: /app
-    environment:
-      - ENV=dev
-    command: ["bash"]
 
 networks:
   default:
