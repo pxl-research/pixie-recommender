@@ -86,6 +86,7 @@ class Pixie:
             result_threshold=result_threshold,
             max_questions=max_questions,
             attribute_provider=attribute_provider,
+            available_categories=categories,
         )
         self._repository = repo
 

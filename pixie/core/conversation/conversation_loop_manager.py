@@ -61,6 +61,7 @@ class ConversationLoopManager:
         result_threshold: int = 3,
         max_questions: int = 2,
         attribute_provider: Optional[Callable[[str], Optional[Dict[str, Any]]]] = None,
+        available_categories: Optional[List[str]] = None,
     ) -> None:
         self.search_fn = search_fn
         self.relevance_llm = relevance_llm
@@ -70,6 +71,7 @@ class ConversationLoopManager:
         self.result_threshold = max(result_threshold, 1)
         self.max_questions = max(max_questions, 1)
         self.attribute_provider = attribute_provider
+        self.available_categories = list(available_categories or [])
 
     # ------------------------------------------------------------------
     # Public API
@@ -92,7 +94,10 @@ class ConversationLoopManager:
         )
 
         if not relevant:
-            return AskResponse(type="not_relevant", text="Not relevant")
+            return AskResponse(
+                type="not_relevant",
+                text=self._compose_not_relevant_message(),
+            )
 
         category_metadata: Optional[Dict[str, Any]] = None
         if not category:
@@ -257,6 +262,24 @@ class ConversationLoopManager:
             if isinstance(item, dict) and item.get("name")
         }
         return filters, answered
+
+    def _compose_not_relevant_message(self) -> str:
+        base = (
+            "Helaas valt het buiten mijn mogelijkheden om deze vraag te beantwoorden."
+        )
+        if not self.available_categories:
+            return f"{base} Laat me weten waarmee ik je wel kan helpen."
+
+        lines = [
+            base,
+            "Ik kan je wel verder helpen met de volgende categorieën:",
+        ]
+        for category in self.available_categories:
+            lines.append(f"- {category}")
+        lines.append(
+            "Geef gerust aan welke categorie je interesseert, dan zoek ik met je mee."
+        )
+        return "\n".join(lines)
 
     def _collect_attributes(
         self, category: str, metadata: Optional[Dict[str, Any]]
