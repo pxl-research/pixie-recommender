@@ -31,6 +31,11 @@ class Pixie:
         conversation_manager: ConversationLoopManager | None = None,
         repository: ConversationRepository | None = None,
     ) -> None:
+        self._tabular_client: TabularAPIClient | None = None
+        self._collection: str | None = None
+        self._attribute_map: dict[str, Dict[str, Any]] = {}
+        self._categories: List[str] = []
+
         if conversation_manager is not None:
             self._conversation_manager = conversation_manager
             self._repository = (
@@ -57,6 +62,11 @@ class Pixie:
         search_fn = self._build_search_fn(
             client, collection, default_limit, attribute_map
         )
+
+        self._tabular_client = client
+        self._collection = collection
+        self._attribute_map = attribute_map
+        self._categories = list(categories)
 
         ttl_minutes = int(os.environ["PIXIE_CONVERSATION_TTL_MINUTES"])
         repo = repository or ConversationRepository(
@@ -121,37 +131,12 @@ class Pixie:
         categories: List[str] = []
         attribute_map: dict[str, Dict[str, Any]] = {}
         for doc in documents:
-            raw_name = doc.get("product_name") or doc.get("product") or ""
-            name = str(raw_name).strip()
-            if not name:
+            prepared = self._build_metadata_from_document(doc)
+            if not prepared:
                 continue
+            name, metadata = prepared
             categories.append(name)
-
-            descriptors = doc.get("attribute_descriptions") or {}
-            ranked = sorted(
-                descriptors.items(),
-                key=lambda item: item[1].get("rank", 10_000),
-            )
-            top_columns = [column for column, _ in ranked[:3]]
-            attribute_list: List[dict[str, Any]] = []
-            for column, info in ranked:
-                entry: dict[str, Any] = {"name": column}
-                if isinstance(info, dict):
-                    entry.update(
-                        {
-                            "description": info.get("description"),
-                            "type": info.get("type"),
-                            "q1": info.get("q1"),
-                            "q3": info.get("q3"),
-                            "values": info.get("values"),
-                        }
-                    )
-                attribute_list.append(entry)
-            attribute_map[name.lower()] = {
-                "top_columns": top_columns,
-                "attribute_options": attribute_list,
-                "refine_attribute": attribute_list[0] if attribute_list else None,
-            }
+            attribute_map[name.lower()] = metadata
 
         if not categories:
             raise RuntimeError(
@@ -216,3 +201,119 @@ class Pixie:
             return response
 
         return run_search
+
+    def update_document(self, document_id: str, updates: Dict[str, Any]) -> Dict[str, Any]:
+        if not document_id or not document_id.strip():
+            raise ValueError("document identifier is required")
+        cleaned_updates = {k: v for k, v in updates.items() if v is not None}
+        if not cleaned_updates:
+            raise ValueError("At least one update field must be provided")
+        if not self._tabular_client or not self._collection:
+            raise RuntimeError("Tabular client is not configured")
+
+        logger.info(
+            "pixie.update_document",
+            extra={"document": document_id, "fields": list(cleaned_updates.keys())},
+        )
+        updated = self._tabular_client.update_document_fields(
+            self._collection, document_id, cleaned_updates
+        )
+        if not isinstance(updated, dict) or not updated:
+            raise RuntimeError("Document update failed or returned no data")
+
+        self._apply_document_metadata(document_id, updated)
+        return updated
+
+    def _build_metadata_from_document(
+        self, document: Dict[str, Any]
+    ) -> Optional[tuple[str, Dict[str, Any]]]:
+        raw_name = document.get("product_name") or document.get("product") or ""
+        name = str(raw_name).strip()
+        if not name:
+            return None
+
+        descriptors = document.get("attribute_descriptions") or {}
+        ranked = sorted(
+            descriptors.items(),
+            key=lambda item: item[1].get("rank", 10_000)
+            if isinstance(item[1], dict)
+            else 10_000,
+        )
+        top_columns = [column for column, _ in ranked[:3]]
+        attribute_list: List[dict[str, Any]] = []
+        for column, info in ranked:
+            entry: dict[str, Any] = {"name": column}
+            if isinstance(info, dict):
+                entry.update(
+                    {
+                        "description": info.get("description"),
+                        "type": info.get("type"),
+                        "q1": info.get("q1"),
+                        "q3": info.get("q3"),
+                        "values": info.get("values"),
+                    }
+                )
+            attribute_list.append(entry)
+
+        metadata: Dict[str, Any] = {
+            "top_columns": top_columns,
+            "attribute_options": attribute_list,
+            "refine_attribute": attribute_list[0] if attribute_list else None,
+            "product_name": name,
+        }
+        description = document.get("description")
+        if isinstance(description, str) and description.strip():
+            metadata["description"] = description.strip()
+        return name, metadata
+
+    def _apply_document_metadata(self, document_id: str, document: Dict[str, Any]) -> None:
+        prepared = self._build_metadata_from_document(document)
+        if not prepared:
+            logger.warning(
+                "pixie.update_document_missing_name",
+                extra={"document_id": document_id},
+            )
+            return
+
+        name, metadata = prepared
+        old_key = document_id.strip().lower()
+        new_key = name.lower()
+
+        target_map = self._attribute_map
+        if old_key and old_key != new_key:
+            target_map.pop(old_key, None)
+        target_map[new_key] = metadata
+
+        replaced = False
+        for index, existing in enumerate(self._categories):
+            if existing.lower() == old_key:
+                self._categories[index] = name
+                replaced = True
+                break
+            if not replaced and existing.lower() == new_key:
+                self._categories[index] = name
+                replaced = True
+                break
+        if not replaced:
+            if all(existing.lower() != new_key for existing in self._categories):
+                self._categories.append(name)
+
+        seen: set[str] = set()
+        unique_categories: List[str] = []
+        for entry in self._categories:
+            lowered = entry.lower()
+            if lowered in seen:
+                continue
+            seen.add(lowered)
+            unique_categories.append(entry)
+        self._categories = unique_categories
+
+        if hasattr(self._conversation_manager, "available_categories"):
+            self._conversation_manager.available_categories = list(self._categories)
+
+        relevance = getattr(self._conversation_manager, "relevance_llm", None)
+        if relevance and hasattr(relevance, "set_categories"):
+            try:
+                relevance.set_categories(self._categories)
+            except Exception:  # defensive
+                logger.warning("pixie.update_document_relevance_refresh_failed", exc_info=True)
