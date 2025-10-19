@@ -1,11 +1,11 @@
 import logging
 import time
 from contextlib import asynccontextmanager
-from typing import Any, Dict, Optional
+from typing import Optional
 from uuid import uuid4
 
-from fastapi import FastAPI, HTTPException, Request
-from pydantic import BaseModel, ConfigDict
+from fastapi import FastAPI, Request
+from pydantic import BaseModel
 
 from pixie.core.conversation.pixie import Pixie
 from pixie.core.utils import logging as pixie_logging
@@ -20,13 +20,6 @@ class AskPayload(BaseModel):
     question: Optional[str] = None
     conversation_id: Optional[str] = None
     message: Optional[str] = None
-
-
-class DocumentUpdatePayload(BaseModel):
-    product_name: Optional[str] = None
-    description: Optional[str] = None
-    attribute_descriptions: Optional[Dict[str, Any]] = None
-    model_config = ConfigDict(extra="allow")
 
 
 @asynccontextmanager
@@ -120,37 +113,3 @@ async def ask(payload: AskPayload, request: Request):
     except Exception:
         logger.exception("unexpected_error_in_ask")
         return AskResponse(type="error", reason="Internal server error occurred").dict()
-
-
-@app.patch("/documents/{document_id}")
-async def update_document(document_id: str, payload: DocumentUpdatePayload, request: Request):
-    logger = logging.getLogger(__name__)
-    pixie: Pixie | None = getattr(request.app.state, "pixie", None)
-    if pixie is None:
-        raise HTTPException(status_code=503, detail="Pixie service unavailable")
-
-    updates = payload.model_dump(exclude_none=True)
-    if not updates:
-        raise HTTPException(
-            status_code=400,
-            detail="Body must contain at least one field to update",
-        )
-
-    logger.info(
-        "api.update_document",
-        extra={"document_id": document_id, "fields": list(updates.keys())},
-    )
-
-    try:
-        updated = pixie.update_document(document_id, updates)
-    except ValueError as exc:
-        raise HTTPException(status_code=400, detail=str(exc)) from exc
-    except RuntimeError as exc:
-        raise HTTPException(status_code=502, detail=str(exc)) from exc
-    except Exception:
-        logger.exception("unexpected_error_in_update_document")
-        raise HTTPException(
-            status_code=500,
-            detail="Internal server error occurred",
-        )
-    return updated

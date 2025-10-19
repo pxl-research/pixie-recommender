@@ -80,32 +80,6 @@ class TabularAPIClient:
         )
         return []
 
-    def update_document_fields(
-        self, collection: str, document: str, updates: Dict[str, Any]
-    ) -> Dict[str, Any]:
-        """Apply partial updates to a single document inside the collection."""
-        if not updates:
-            raise ValueError("At least one field is required to update a document")
-
-        encoded_document = quote(document, safe="")
-        response = self._request(
-            "PATCH",
-            f"/collections/{collection}/documents/{encoded_document}",
-            updates,
-        )
-        if isinstance(response, dict):
-            return response
-
-        logger.warning(
-            "tabular_api_unexpected_document_update_response",
-            extra={
-                "collection": collection,
-                "document": document,
-                "payload": response,
-            },
-        )
-        return {}
-
     def query_product_rows(
         self,
         collection: str,
