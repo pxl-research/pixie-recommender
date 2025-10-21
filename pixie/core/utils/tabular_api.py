@@ -65,20 +65,11 @@ class TabularAPIClient:
 
     def list_collections(self) -> List[Dict[str, Any]]:
         data = self._request("GET", "/collections/") or []
-        if isinstance(data, list):
-            return data
-        logger.warning("tabular_api_expected_list", extra={"payload": data})
-        return []
+        return self._ensure_list(data)
 
     def list_documents(self, collection: str) -> List[Dict[str, Any]]:
         data = self._request("GET", f"/collections/{collection}/documents/") or []
-        if isinstance(data, list):
-            return data
-        logger.warning(
-            "tabular_api_expected_list",
-            extra={"collection": collection, "payload": data},
-        )
-        return []
+        return self._ensure_list(data, extra={"collection": collection})
 
     def query_product_rows(
         self,
@@ -120,6 +111,16 @@ class TabularAPIClient:
             "limit": limit,
             "offset": offset,
         }
+
+    def _ensure_list(
+        self, data: Any, extra: Optional[Dict[str, Any]] = None
+    ) -> List[Dict[str, Any]]:
+        if isinstance(data, list):
+            return data
+        details = dict(extra or {})
+        details["payload"] = data
+        logger.warning("tabular_api_expected_list", extra=details)
+        return []
 
 
 def _require_env(name: str) -> str:

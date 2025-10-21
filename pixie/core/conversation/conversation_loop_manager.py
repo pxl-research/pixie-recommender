@@ -120,11 +120,9 @@ class ConversationLoopManager:
         initial_filters, answered_attributes = self._initial_filters(
             question, category, category_metadata
         )
-        try:
-            result = self._execute_search(category, initial_filters or None)
-        except Exception as exc:  
-            logger.error("loop.search_failed", exc_info=exc)
-            return AskResponse(type="error", reason="search_failed")
+        result, error = self._search_or_error(category, initial_filters or None)
+        if error or not result:
+            return error or AskResponse(type="error", reason="search_failed")
 
         if initial_filters and result.total == 0:
             logger.info(
@@ -133,11 +131,9 @@ class ConversationLoopManager:
             )
             initial_filters = []
             answered_attributes = set()
-            try:
-                result = self._execute_search(category)
-            except Exception as exc:  
-                logger.error("loop.search_failed", exc_info=exc)
-                return AskResponse(type="error", reason="search_failed")
+            result, error = self._search_or_error(category, None)
+            if error or not result:
+                return error or AskResponse(type="error", reason="search_failed")
 
         if result.total <= self.result_threshold:
             return self._finalise_answer(result, None)
@@ -185,6 +181,7 @@ class ConversationLoopManager:
         filters: Filters = list(state.filters)
         attribute = state.current_attribute or {}
 
+        result: Optional[SearchResult] = None
         with conversation_context(conversation_id, state.question_count + 1):
             new_filters = self._build_filters_from_answer(attribute, reply)
             if new_filters:
@@ -193,16 +190,18 @@ class ConversationLoopManager:
                     filters = [f for f in filters if f.get("name") != attr_name]
                 filters.extend(new_filters)
 
-            try:
-                result = self._execute_search(category, filters)
-            except Exception as exc:  
-                logger.error("loop.search_failed", exc_info=exc)
+            result, error = self._search_or_error(category, filters, conversation_id)
+            if error:
                 self.repository.delete(conversation_id)
-                return AskResponse(
-                    type="error",
-                    reason="search_failed",
-                    conversation_id=conversation_id,
-                )
+                return error
+
+        if not result:
+            self.repository.delete(conversation_id)
+            return AskResponse(
+                type="error",
+                reason="search_failed",
+                conversation_id=conversation_id,
+            )
 
         if result.total <= self.result_threshold or state.question_count >= self.max_questions:
             self.repository.delete(conversation_id)
@@ -237,6 +236,25 @@ class ConversationLoopManager:
             payload["filters"] = filters
         response = self.search_fn(None, payload)
         return normalise_search_response(response, category)
+
+    def _search_or_error(
+        self,
+        category: str,
+        filters: Optional[Filters],
+        conversation_id: Optional[str] = None,
+    ) -> Tuple[Optional[SearchResult], Optional[AskResponse]]:
+        try:
+            return self._execute_search(category, filters or None), None
+        except Exception as exc:  
+            logger.error("loop.search_failed", exc_info=exc)
+            return (
+                None,
+                AskResponse(
+                    type="error",
+                    reason="search_failed",
+                    conversation_id=conversation_id,
+                ),
+            )
 
     def _initial_filters(
         self, question: str, category: str, metadata: Optional[Dict[str, Any]]
@@ -306,8 +324,7 @@ class ConversationLoopManager:
         else:
             return []
 
-        data = list(raw)
-        return data[:20] if len(data) > 20 else data
+        return list(raw[:20])
 
     def _finalise_answer(
         self, result: SearchResult, conversation_id: Optional[str]
@@ -354,9 +371,6 @@ class ConversationLoopManager:
         attr = dict(attribute)
         label = attribute_label(attr)
         attr["label"] = label
-        attr_type = (attr.get("type") or "").lower()
-        q1, q3 = attr.get("q1"), attr.get("q3")
-        values = attr.get("values")
 
         ctx = {
             "category": product_name,
@@ -366,19 +380,14 @@ class ConversationLoopManager:
             "applied_filters": filters or [],
         }
 
-        question = None
         try:
-            question = self.refinement_llm.generate_question(ctx)
+            question = (self.refinement_llm.generate_question(ctx) or "").strip()
         except Exception as exc:  
             logger.error("loop.refinement_failed", exc_info=exc)
-            question = None
-
+            return None, None
         if not question:
             return None, None
-        question_text = question.strip()
-        if not question_text:
-            return None, None
-        return question_text, attr
+        return question, attr
 
     def _build_filters_from_answer(
         self,
@@ -403,8 +412,8 @@ class ConversationLoopManager:
         if not name:
             return []
 
-        valid: List[Dict[str, Any]] = []
-        for item in raw_filters:
-            if isinstance(item, dict) and item.get("name") == name:
-                valid.append(item)
-        return valid
+        return [
+            item
+            for item in raw_filters
+            if isinstance(item, dict) and item.get("name") == name
+        ]
