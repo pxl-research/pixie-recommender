@@ -1,34 +1,39 @@
-# pixie-core
+# PiXie Core: het hart van de aanbevelingsflow
 
-Minimal FastAPI service that routes product questions to Azure OpenAI. It classifies a question, optionally asks a refinement LLM for follow-up details, turns the answers into structured filters, and forwards those filters to the tabular dataset service. Conversation state is stored in-memory with a TTL so follow-up questions remain consistent.
+PiXie Core zorgt ervoor dat mensen met een aankoopvraag snel de juiste producten en vervolgstappen krijgen. Het is de schakel tussen de gebruiksvriendelijke chatinterface en de slimme diensten die tabellen doorzoeken, follow-upvragen bedenken en resultaten presenteren.
 
-## Run
+## Wat doet deze service?
 
-```bash
-cp .env.example .env.dev
-docker compose -f docker-compose.dev.yml up --build
-```
+- Begrijpt waar een vraag over gaat en kiest de juiste productcategorie.
+- Houdt korte gesprekken bij zodat vervolgvragen logisch op elkaar aansluiten.
+- Stelt extra vragen als er meer informatie nodig is om tot een passende selectie te komen.
+- Vertaalt antwoorden naar filters voor de tabellendatabase, die de echte productgegevens bevat.
+- Geeft een helder overzicht terug van de best passende opties of licht toe dat er niets gevonden is.
 
-Set `PIXIE_TABULAR_API_URL`, `PIXIE_TABULAR_COLLECTION` and `PIXIE_API_KEY` in your `.env.dev`
-to let Pixie query the external tabular dataset (the defaults assume the dev compose stack).
+## Hoe past het in het PiXie-landschap?
 
-## API
+| Rol | Uitleg |
+| --- | --- |
+| Bron van vragen | De `chat_ui` vraagt raad aan PiXie Core zodra een gebruiker een aanbeveling wil. |
+| Databron | De service gebruikt de `pixie-tabular-db` voor de productgegevens. |
+| LLM-ondersteuning | Andere PiXie-componenten leveren taalinzichten (zoals het bedenken van vervolgvragen). |
+| Resultaat | Een makkelijk leesbaar antwoord dat de chat direct aan de gebruiker laat zien. |
 
-POST `/ask` with `{ "question": "Ik zoek een nieuwe laptop" }` to receive an answer (or a `no_results`/`error` response). When a follow-up is required the response includes a `conversation_id` that clients must echo in subsequent calls. For follow-ups send:
+PiXie Core werkt dus samen met de andere bouwstenen van PiXie om een vloeiende klantervaring te bieden, zonder dat gebruikers iets hoeven te weten over de achterliggende techniek.
 
-```json
-{
-  "conversation_id": "<uuid-from-response>",
-  "message": "Maximaal 1200 euro alsjeblieft"
-}
-```
+## Waarom is dit belangrijk?
 
-Set the environment variables `PIXIE_RESULT_THRESHOLD`, `PIXIE_MAX_REFINE_QUESTIONS`, and `PIXIE_CONVERSATION_TTL_MINUTES` to control how aggressively the service asks follow-up questions and how long conversations remain active.
+- **Rust in de flow:** gebruikers krijgen één aanspreekpunt voor hun keuzevraag.
+- **Slim doorvragen:** vervolgvragen verschijnen alleen als dat waarde toevoegt.
+- **Consistente antwoorden:** productfilters worden altijd op dezelfde manier toegepast.
+- **Snelle integratie:** andere teams kunnen PiXie Core aanroepen zonder technische details te hoeven kennen.
 
-## Docs
+## Een typische gebruikersreis
 
-- [Conversation scenarios](docs/conversation-scenarios.md)
+1. Een bezoeker van de chat vraagt bijvoorbeeld: “Welke laptop past bij thuiswerken en een beperkt budget?”
+2. PiXie Core herkent dat dit een productaanvraag is en pakt de categorie “laptops”.
+3. Er zijn nog te veel mogelijkheden, dus er volgt een gerichte vraag over het gewenste prijsniveau.
+4. De gebruiker antwoordt met een bedrag; PiXie Core vertaalt dat naar een filter en zoekt opnieuw.
+5. Er blijft een handvol laptops over. PiXie Core bouwt een duidelijk overzicht en stuurt dat naar de chat.
 
-## TODO
-
-- Populate the category/attribute metadata from the dataset instead of the inline placeholders.
+Het resultaat is een persoonlijke aanbeveling zonder dat iemand door tabellen of filters hoeft te klikken.
