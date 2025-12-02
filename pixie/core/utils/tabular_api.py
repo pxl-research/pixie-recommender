@@ -11,6 +11,8 @@ from urllib.parse import quote
 
 logger = logging.getLogger(__name__)
 
+DEFAULT_TABULAR_PAGE_SIZE = 10
+
 
 class TabularAPIClient:
     """Thin wrapper around ``urllib`` to avoid adding an HTTP dependency."""
@@ -133,11 +135,11 @@ def _require_env(name: str) -> str:
 
 
 def build_tabular_client() -> Tuple[TabularAPIClient, str, str, int]:
-    base_url = _require_env("PIXIE_TABULAR_API_URL").rstrip("/")
-    api_key = _require_env("PIXIE_API_KEY")
-    collection = _require_env("PIXIE_TABULAR_COLLECTION")
+    base_url = _require_env("TABULAR_API_URL").rstrip("/")
+    api_key = _require_env("TABULAR_API_KEY")
+    collection = _require_env("TABULAR_COLLECTION")
     timeout = float(os.getenv("PIXIE_TABULAR_TIMEOUT", "10"))
-    default_limit = int(os.getenv("PIXIE_DEFAULT_PAGE_SIZE", "10"))
+    default_limit = DEFAULT_TABULAR_PAGE_SIZE
 
     client = TabularAPIClient(base_url, api_key, timeout=timeout)
     return client, base_url, collection, default_limit

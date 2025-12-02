@@ -20,6 +20,8 @@ from .repository import ConversationRepository
 
 logger = logging.getLogger(__name__)
 
+CONVERSATION_TTL_MINUTES = 15
+
 SearchCallable = Callable[[Optional[str], Optional[Dict[str, Any]]], Dict[str, Any]]
 
 
@@ -58,12 +60,11 @@ class Pixie:
             client, collection, default_limit, attribute_map
         )
 
-        ttl_minutes = int(os.environ["PIXIE_CONVERSATION_TTL_MINUTES"])
         repo = repository or ConversationRepository(
-            ttl=timedelta(minutes=ttl_minutes)
+            ttl=timedelta(minutes=CONVERSATION_TTL_MINUTES)
         )
-        result_threshold = int(os.environ["PIXIE_RESULT_THRESHOLD"])
-        max_questions = int(os.environ["PIXIE_MAX_REFINE_QUESTIONS"])
+        result_threshold = int(os.environ["TABULAR_RESULT_THRESHOLD"])
+        max_questions = int(os.environ["TABULAR_MAX_REFINE_QUESTIONS"])
 
         def attribute_provider(category_name: str) -> Optional[Dict[str, Any]]:
             if not category_name:
