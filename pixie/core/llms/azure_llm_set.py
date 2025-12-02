@@ -25,12 +25,12 @@ def _require_env(name: str, default: str) -> str:
 
 
 def _load_azure_config() -> Tuple[str, str, str, str]:
-    api_version = _require_env("AZURE_OPENAI_API_VERSION", "2024-02-01")
+    api_version = _require_env("ADVANCED_AZURE_OPENAI_API_VERSION", "2024-02-01")
     endpoint = _require_env(
         "AZURE_OPENAI_ENDPOINT", "https://example.openai.azure.com/"
     )
     api_key = _require_env("AZURE_OPENAI_KEY", "dummy-key-for-development")
-    model = _require_env("AZURE_OPENAI_MODEL", "gpt-4")
+    model = _require_env("ADVANCED_AZURE_OPENAI_MODEL", "gpt-4")
     if endpoint in PLACEHOLDERS or api_key in PLACEHOLDERS:
         raise ValueError("Azure OpenAI configuration is not set")
     return api_version, endpoint, api_key, model

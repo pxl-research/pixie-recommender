@@ -12,6 +12,7 @@ from urllib.parse import quote
 logger = logging.getLogger(__name__)
 
 DEFAULT_TABULAR_PAGE_SIZE = 10
+TABULAR_API_URL = "http://pixie_tabular_api:8000"
 
 
 class TabularAPIClient:
@@ -135,7 +136,7 @@ def _require_env(name: str) -> str:
 
 
 def build_tabular_client() -> Tuple[TabularAPIClient, str, str, int]:
-    base_url = _require_env("TABULAR_API_URL").rstrip("/")
+    base_url = TABULAR_API_URL.rstrip("/")
     api_key = _require_env("TABULAR_API_KEY")
     collection = _require_env("TABULAR_COLLECTION")
     timeout = float(os.getenv("PIXIE_TABULAR_TIMEOUT", "10"))
