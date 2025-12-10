@@ -12,7 +12,7 @@ from urllib.parse import quote
 logger = logging.getLogger(__name__)
 
 DEFAULT_TABULAR_PAGE_SIZE = 10
-TABULAR_API_URL = "http://pixie_tabular_api:8000"
+TABULAR_API_URL = "http://tabular_api:8000"
 
 
 class TabularAPIClient:
