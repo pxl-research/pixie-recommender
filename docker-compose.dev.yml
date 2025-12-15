@@ -8,6 +8,8 @@ services:
     ports:
       - "8012:8000"
     env_file: .env.dev
+    environment:
+      TABULAR_API_URL: http://tabular-api:8000
     volumes:
       - .:/app   # hot reload
     networks:
